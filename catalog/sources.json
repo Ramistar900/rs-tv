@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "project": "RS TV",
+  "purpose": "Candidate source registry for lawful free-to-watch channel discovery. A source entry is not proof that every channel or stream may be redistributed.",
+  "sources": [
+    {
+      "id": "iptv-org-main",
+      "name": "IPTV-org public playlist",
+      "type": "internet_playlist",
+      "url": "https://iptv-org.github.io/iptv/index.m3u",
+      "groupings": {
+        "country": "https://iptv-org.github.io/iptv/index.country.m3u",
+        "language": "https://iptv-org.github.io/iptv/index.language.m3u",
+        "category": "https://iptv-org.github.io/iptv/index.category.m3u",
+        "arab_region": "https://iptv-org.github.io/iptv/regions/arab.m3u"
+      },
+      "status": "candidate_source_requires_channel_level_review",
+      "notes": "Publicly available community playlist; verify each channel, stream origin, availability, and redistribution rights before bundling."
+    },
+    {
+      "id": "lyngsat-fta",
+      "name": "LyngSat Free TV directory",
+      "type": "satellite_fta_reference",
+      "url": "https://www.lyngsat.com/freetv/",
+      "status": "reference_only_requires_manual_verification",
+      "notes": "Use for FTA channel, satellite, and transponder research. Frequency data is not an internet stream and does not grant redistribution rights."
+    },
+    {
+      "id": "pluto-tv",
+      "name": "Pluto TV",
+      "type": "official_free_streaming_service",
+      "url": "https://pluto.tv/where-to-watch",
+      "status": "official_service_link_only",
+      "notes": "Free ad-supported service; availability and playback are controlled by the service and may vary by country/device. Do not extract or rehost its streams."
+    },
+    {
+      "id": "rakuten-tv-live",
+      "name": "Rakuten TV Live / Free",
+      "type": "official_free_streaming_service",
+      "url": "https://support.rakuten.tv/hc/en-us/articles/360016822920-Live-TV",
+      "status": "official_service_link_only",
+      "notes": "Official free ad-supported channels; availability varies by country and device. Do not extract or rehost its streams."
+    },
+    {
+      "id": "samsung-tv-plus",
+      "name": "Samsung TV Plus",
+      "type": "official_free_streaming_service",
+      "url": "https://www.samsungtvplus.com/help-center.html",
+      "status": "official_service_link_only",
+      "notes": "Free ad-supported service with device and regional restrictions. Do not extract or rehost its streams."
+    }
+  ],
+  "channel_record_required_fields": [
+    "channel_id",
+    "name",
+    "country_code",
+    "languages",
+    "categories",
+    "logo_url",
+    "delivery_type",
+    "stream_url",
+    "stream_format",
+    "source_id",
+    "official_channel_or_rights_evidence",
+    "rights_review_status",
+    "last_stream_check_utc",
+    "last_metadata_review_utc"
+  ],
+  "satellite_record_fields": [
+    "channel_id",
+    "satellite_name",
+    "orbital_position",
+    "frequency_mhz",
+    "polarization",
+    "symbol_rate",
+    "fec",
+    "standard",
+    "encryption_status",
+    "languages",
+    "country_code",
+    "source_url",
+    "last_verified_utc"
+  ],
+  "rules": [
+    "Do not mark a channel as rights-cleared solely because a stream is publicly reachable.",
+    "Do not include paid, encrypted, DRM-protected, leaked, or unauthorized streams.",
+    "Do not scrape, extract, proxy, or rehost streams from official FAST services without written permission.",
+    "Keep satellite reception data separate from internet playback URLs.",
+    "Store source attribution and review timestamps for every channel record.",
+    "Treat all external URLs and playlist metadata as untrusted input."
+  ]
+}
