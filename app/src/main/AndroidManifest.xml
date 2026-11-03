@@ -5,6 +5,9 @@
     <application
         android:allowBackup="false"
         android:label="RS TV"
+        android:icon="@drawable/ic_rs_tv"
+        android:banner="@drawable/rs_tv_banner"
+        android:usesCleartextTraffic="false"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
