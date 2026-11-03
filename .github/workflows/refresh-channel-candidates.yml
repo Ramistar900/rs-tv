@@ -37,7 +37,7 @@ jobs:
 
       - name: Commit updated candidate catalogue
         run: |
-          if git diff --quiet -- catalog/generated/candidates.json; then
+          if [ -z "$(git status --porcelain -- catalog/generated/candidates.json)" ]; then
             echo "Candidate catalogue is unchanged."
             exit 0
           fi
