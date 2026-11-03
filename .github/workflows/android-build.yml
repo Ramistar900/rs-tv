@@ -5,12 +5,17 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "catalog/generated/**"
       - "*.gradle.kts"
       - "gradle.properties"
       - ".github/workflows/android-build.yml"
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["RS TV Channel Candidate Catalogue"]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: rs-tv-android-${{ github.ref }}
@@ -21,6 +26,7 @@ permissions:
 
 jobs:
   debug-apk:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: Build debug APK
     runs-on: ubuntu-latest
     steps:
