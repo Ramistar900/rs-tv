@@ -57,3 +57,25 @@ Only `approved` channels appear in the default RS TV catalogue. Imported API rec
 ## Encrypted channels — later phase
 
 Keep encrypted/paid channels out of the free catalogue. A later directory may list channel identity, country, language, official provider, and legal subscription route. Playback requires valid provider authorization; do not include leaked playlists, decryption keys, or unauthorized streams.
+
+
+## Automated candidate import
+
+The scheduled importer is implemented at `tools/import_channel_candidates.py`.
+It downloads channels, streams, countries, languages, categories, logos, feeds,
+and the upstream blocklist, joins records by stable channel ID, and writes
+`catalog/generated/candidates.json`.
+
+Run locally with Python 3:
+
+```sh
+python -m unittest discover -s tools -p 'test_*.py' -v
+python tools/import_channel_candidates.py
+```
+
+GitHub Actions runs the same tests and refreshes the candidate file daily
+(`.github/workflows/refresh-channel-candidates.yml`) or on manual dispatch.
+The generated file is a review queue only: every record is marked
+`candidate`, rights status `not_reviewed`, and reliability `unrated`.
+It is not a playable/approved playlist. Adult, closed/replaced, blocklisted,
+country-less, and no-stream records are excluded from this candidate output.
