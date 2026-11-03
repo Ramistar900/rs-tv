@@ -42,7 +42,7 @@ internal object M3uPlaylistParser {
             if (line.startsWith("#EXTINF:", ignoreCase = true)) {
                 if (pending != null) invalidEntries++
                 val info = line.substringAfter(':')
-                val separator = info.indexOf(',')
+                val separator = findTitleSeparator(info)
                 val metadata = if (separator >= 0) info.substring(0, separator) else info
                 val displayName = if (separator >= 0) info.substring(separator + 1).trim() else ""
                 val attributes = attributePattern.findAll(metadata).associate { match ->
@@ -66,8 +66,7 @@ internal object M3uPlaylistParser {
 
             if (line.startsWith('#')) continue
 
-            val channel = pending
-            if (channel == null) continue
+            val channel = pending ?: continue
             pending = null
 
             val streamUri = runCatching { URI(line) }.getOrNull()
@@ -93,5 +92,19 @@ internal object M3uPlaylistParser {
 
         if (pending != null) invalidEntries++
         return M3uParseResult(channels, skippedUnsafeLinks, invalidEntries, true)
+    }
+
+    private fun findTitleSeparator(value: String): Int {
+        var quote: Char? = null
+        value.forEachIndexed { index, character ->
+            if (quote != null && character == quote) {
+                quote = null
+            } else if (quote == null && (character == '"' || character == '\'')) {
+                quote = character
+            } else if (quote == null && character == ',') {
+                return index
+            }
+        }
+        return -1
     }
 }
