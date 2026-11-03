@@ -824,7 +824,7 @@ private fun LiveContent(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("القنوات المتاحة: ${channels.size}", color = MutedText, fontSize = 12.sp, modifier = Modifier.weight(1f))
             if (skippedUnsafeLinks > 0) {
-                Text("تجاهلنا $skippedUnsafeLinks رابطاً غير آمن", color = AccentRed, fontSize = 10.sp)
+                Text("تجاهلنا $skippedUnsafeLinks رابطاً غير متوافق أو غير آمن", color = AccentRed, fontSize = 10.sp)
             }
         }
         if (channels.isEmpty()) {
