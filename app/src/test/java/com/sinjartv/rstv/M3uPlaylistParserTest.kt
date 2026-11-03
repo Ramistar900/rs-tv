@@ -44,6 +44,25 @@ class M3uPlaylistParserTest {
     }
 
     @Test
+    fun skipsPlatformWebPagesThatAreNotDirectMediaStreams() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1,YouTube page
+            https://www.youtube.com/@channel/live
+            #EXTINF:-1,Twitch page
+            https://player.twitch.tv/?channel=example
+            #EXTINF:-1,Direct HLS stream
+            https://cdn.example/live/index.m3u8
+        """.trimIndent()
+
+        val result = M3uPlaylistParser.parse(playlist)
+
+        assertEquals(1, result.channels.size)
+        assertEquals("Direct HLS stream", result.channels.single().name)
+        assertEquals(2, result.skippedUnsafeLinks)
+    }
+
+    @Test
     fun rejectsCredentialBearingStreamUrls() {
         val playlist = """
             #EXTM3U
