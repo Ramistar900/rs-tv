@@ -2,6 +2,11 @@ name: RS TV Channel Candidate Catalogue
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/**"
+      - ".github/workflows/refresh-channel-candidates.yml"
   schedule:
     - cron: "23 4 * * *"
 
