@@ -79,3 +79,16 @@ The generated file is a review queue only: every record is marked
 `candidate`, rights status `not_reviewed`, and reliability `unrated`.
 It is not a playable/approved playlist. Adult, closed/replaced, blocklisted,
 country-less, and no-stream records are excluded from this candidate output.
+
+
+## Playback quality: 4K / FHD / HD / SD
+
+The player should expose Auto plus the available stream variants in these
+classes: 4K UHD (2160p), Full HD (1080p), HD (720p), and SD (480p/576p or
+lower). Do not invent a quality variant when the provider does not supply it.
+Source labels imported by the candidate importer are hints, not verified
+resolution. The player must inspect the selected HLS/DASH variant or decoded
+video dimensions and only then display a verified quality badge. Auto is the
+default and should adapt to bandwidth/device capability. Never upscale an SD
+or HD source and label it as native 4K. If the source has only one rendition,
+only that rendition is selectable.
