@@ -1,44 +1,60 @@
 # RS TV — Sinjar TV Show
 
-RS TV is an independent Android streaming application project for phones, tablets, Android TV, and TV boxes.
+RS TV is an independent Android television app for phones, tablets, Android TV, and TV boxes. It is built with Kotlin, Jetpack Compose, and AndroidX Media3.
 
-## Android foundation
+## Implemented Android features
 
-The Android application is built with Kotlin, Jetpack Compose, and Media3. It can import a user-selected local M3U/M3U8 playlist, list its channels, search by channel/group, and play a selected HTTPS stream. This first playback phase does not bundle a public channel catalogue or certify the rights of imported streams.
+- Adaptive navigation: bottom navigation on compact screens and a navigation rail on wide screens/TV layouts.
+- Arabic-first interface with a black, red, and silver visual identity.
+- Local M3U/M3U8 import, channel name/group search, and HTTPS stream playback.
+- Local persistence for the imported playlist, favorites, and the recent channel history.
+- XMLTV programme-guide import, secure XML parsing, and channel matching through M3U `tvg-id` and XMLTV `channel` IDs.
+- Separate satellite-directory screen; it does not mix satellite tuning parameters with internet stream URLs.
+- Android TV launcher entry and a dedicated TV banner; custom vector launcher icon.
+- Settings to re-import local data and clear the saved playlist, favorites, or viewing history.
+- Debug APK upload as a GitHub Actions artifact after tests and build succeed.
 
-Build locally with Gradle 8.9 and JDK 17:
+## Build and test
+
+Requirements: JDK 17, Android SDK Platform 35, and Gradle 8.9.
 
 ```bash
 gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
-GitHub Actions runs the playlist-parser unit tests and builds a debug APK on changes to the Android app, Gradle configuration, or its workflow.
+GitHub Actions runs the M3U and XMLTV parser unit tests and assembles a debug APK for changes to Android sources, Gradle configuration, or the workflow. Successful runs publish the APK as the `rs-tv-debug-apk` workflow artifact for 14 days.
 
-## Project direction
+## Playlist and guide behavior
 
-- Adaptive touch and TV-remote interfaces.
-- Authorized free-to-air and official internet streams only.
-- M3U/M3U8 playlists and XMLTV programme guides where permitted.
-- Internet channels organized by country, language, and category.
-- A separate worldwide satellite directory grouped by satellite/orbital position.
-- Optional Community VPN integration, subject to the security design below.
+- Only HTTPS stream URLs with a valid host are accepted by the current M3U parser. HTTP, file, and other non-HTTPS stream entries are skipped.
+- The imported playlist is copied into the app's private local storage; it is not uploaded to a server.
+- Favorites and recent viewing history stay on the device.
+- XMLTV parsing rejects DTD declarations and external entities, limits input size and the number of parsed programme entries, and ignores malformed programme rows.
+- Programme matching uses the playlist channel's `tvg-id` and the XMLTV programme's `channel` value.
+- Playlist/logo metadata is untrusted input. The app does not yet download arbitrary logo URLs.
 
-Read [Global Satellite Catalogue](docs/SATELLITE-CATALOG.md) for the satellite data model and vertical per-satellite channel-list behavior. Satellite frequencies are tuning metadata, not internet streams; live reception requires compatible DVB-S/S2/S2X tuner hardware.
+## Satellite catalogue
 
-## Community VPN security baseline
+The satellite screen is a separate reference area and currently shows only the starter regional sections. **A verified global satellite-frequency dataset has not yet been imported**, so it does not display invented frequencies or claim complete coverage. Read [Global Satellite Catalogue](docs/SATELLITE-CATALOG.md) for the data schema and quality rules.
 
-The selected direction is **Community VPN**. The first phase will let users deliberately select a community provider and import a provider-issued configuration on-device. RS TV will not bundle anonymous public VPN endpoints, collect private keys, or connect automatically.
+Satellite frequencies are tuning metadata, not internet streams. Actual reception requires compatible DVB-S/S2/S2X tuner hardware and separate device integration. An ordinary phone or TV box cannot tune a dish through software alone.
 
-Read [RS VPN Community Security Design](docs/RS-VPN-COMMUNITY-SECURITY.md) before implementing VPN functionality. This is an architecture specification, not a working VPN feature. No VPN servers or endpoints are currently configured.
+## Channel catalogue and content rights
 
-A VPN does not decrypt paid channels or grant streaming rights. Only streams that are free and authorized by their rights holders may be included in the built-in channel catalogue.
+The candidate source importer and review workflow are in the repository, but an approved bundled channel catalogue is not yet integrated into the app. Imported playlists remain user-supplied input. Public reachability or free-to-air reception does not establish redistribution rights. Do not bypass DRM, conditional access, paid subscriptions, or provider entitlement.
 
-## Current status
+## Community VPN
 
-- Android project foundation: merged into `main`.
-- M3U/M3U8 local playlist import, channel list/search, and Media3 playback: implemented for HTTPS stream URLs.
-- Imported playlists remain user-provided input; public reachability does not establish redistribution rights.
-- Internet channel-source ingestion: candidate importer and catalogue planning are present; reviewed catalogue integration is pending.
-- Satellite catalogue: schema and product/data contract documented; no global frequency dataset or satellite playback integration is claimed yet.
-- RS TV logo: source image remains at [rs-tv-logo.png](rs-tv-logo.png); app resource integration is pending.
-- VPN: security design documented; no implementation or live service yet.
+The chosen direction is an optional, user-controlled Community VPN with provider-issued configuration imported on-device. This remains a security design only; there are no configured VPN servers or working VPN controls. Read [RS VPN Community Security Design](docs/RS-VPN-COMMUNITY-SECURITY.md). A VPN does not grant rights to streams or decrypt paid channels.
+
+## Remaining validation
+
+- Test playback against a lawful HTTPS stream on real Android phone, tablet, Android TV, and TV-box hardware.
+- Verify D-pad focus behavior and screen scaling on multiple TV launchers and remote controls.
+- Integrate the original `rs-tv-logo.png` artwork into Android resources; the current launcher icon/banner are vector placeholders in the RS TV color palette.
+- Import source-attributed satellite records only after independent technical verification.
+- Integrate approved country/language/category channel data after rights and reliability review.
+- Complete EPG edge-case checks against real provider XMLTV files and device timezone behavior.
+- Add signed release configuration after the debug APK has been device-tested.
+
+No physical device playback, satellite tuning, VPN connection, or release signing is claimed as completed.
