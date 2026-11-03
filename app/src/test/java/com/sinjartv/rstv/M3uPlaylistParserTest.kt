@@ -20,6 +20,7 @@ class M3uPlaylistParserTest {
         assertTrue(result.isValidPlaylist)
         assertEquals(1, result.channels.size)
         assertEquals("News HD", result.channels.single().name)
+        assertEquals("news.id", result.channels.single().tvgId)
         assertEquals("News", result.channels.single().group)
         assertEquals("https://cdn.example/logo.png", result.channels.single().logoUrl)
         assertEquals("https://cdn.example/live/index.m3u8", result.channels.single().streamUrl)
