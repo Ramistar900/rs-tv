@@ -26,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,7 +66,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    primary = AccentRed,
+                    secondary = AccentRed,
+                    background = ScreenBlack,
+                    surface = PanelBlack,
+                    surfaceVariant = PanelBlack,
+                    onPrimary = SoftWhite,
+                    onBackground = SoftWhite,
+                    onSurface = SoftWhite,
+                    onSurfaceVariant = MutedText
+                )
+            ) {
                 RSTVHome()
             }
         }
