@@ -97,6 +97,39 @@
       "url": "https://www.samsungtvplus.com/help-center.html",
       "status": "official_service_link_only",
       "notes": "Device and regional restrictions apply. Do not extract or rehost streams."
+    },
+    {
+      "id": "doubo-public-directory",
+      "name": "Doubo Public Channel Directory",
+      "type": "daily_refreshed_curated_internet_playlist",
+      "url": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.m3u",
+      "related_endpoints": {
+        "index": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.json",
+        "countries": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/{country_code_lowercase}.m3u",
+        "categories": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/{category_id}.m3u",
+        "languages": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/languages/{language_code_iso_639_3}.m3u"
+      },
+      "status": "daily_checked_candidate_import_on_user_request",
+      "license": "CC BY 4.0 for link selection/index; credit Doubo Public Channel Directory",
+      "notes": "The publisher says each entry is served from the broadcaster's own domain or an allowlisted broadcast-grade CDN/official free platform, excludes paid/blocked/takedown entries, and checks the first media segment daily. Technical checks and the directory's link-selection license do not grant rights to the channel's underlying content. RS TV downloads the M3U on demand and applies its own HTTPS parser."
+    },
+    {
+      "id": "free-tv-iptv",
+      "name": "Free-TV/IPTV curated playlist",
+      "type": "community_curated_free_to_air_playlist",
+      "url": "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+      "status": "secondary_candidate_source_on_user_request",
+      "license": "Repository does not state a playlist data license in its README; links only, attribution retained",
+      "notes": "Maintainers describe a quality-over-quantity list, one URL per channel and channels officially offered free in at least one market; some streams can be geo-restricted or unavailable."
+    },
+    {
+      "id": "freecasthub-public-iptv",
+      "name": "FreeCastHub public IPTV",
+      "type": "small_community_curated_public_playlist",
+      "url": "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u",
+      "status": "experimental_secondary_candidate_source_on_user_request",
+      "license": "Unlicense (as stated by repository)",
+      "notes": "Small supplementary collection grouped by news, sports, weather and education. Maintainer rights claims are not independent proof; every channel still needs review."
     }
   ],
   "channel_record_required_fields": [
@@ -131,7 +164,8 @@
     "Open YouTube and restricted broadcaster content through official playback routes.",
     "Keep metadata discovery separate from a playable video source.",
     "Preserve source attribution, country/region availability, and review timestamps.",
-    "Treat all external URLs and metadata as untrusted input."
+    "Treat all external URLs and metadata as untrusted input.",
+    "The app may offer source M3U playlists for user-initiated download. Each download replaces the active local playlist; only HTTPS stream entries are imported."
   ],
   "reliability_policy": {
     "principle": "Never promise zero buffering. Reliability is measured per source and can change without notice.",
@@ -148,5 +182,37 @@
       "Hide stale or repeatedly failing streams from the default catalogue.",
       "Do not use successful technical playback checks as evidence of copyright permission."
     ]
-  }
+  },
+  "official_live_destinations": [
+    {
+      "id": "aljazeera-ar",
+      "name": "Al Jazeera Arabic live",
+      "url": "https://www.aljazeera.net/video/live",
+      "playback": "Official broadcaster website; open externally."
+    },
+    {
+      "id": "aljazeera-en",
+      "name": "Al Jazeera English live",
+      "url": "https://www.aljazeera.com/video/live/",
+      "playback": "Official broadcaster website; open externally."
+    },
+    {
+      "id": "cgtn",
+      "name": "CGTN live channels",
+      "url": "https://www.cgtn.com/tv",
+      "playback": "Official broadcaster website; open externally."
+    },
+    {
+      "id": "euronews",
+      "name": "Euronews Live",
+      "url": "https://www.euronews.com/live",
+      "playback": "Official broadcaster website; regional availability may vary."
+    },
+    {
+      "id": "nasa-plus",
+      "name": "NASA+",
+      "url": "https://plus.nasa.gov/",
+      "playback": "Official free NASA streaming service; use its own player."
+    }
+  ]
 }
