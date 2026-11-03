@@ -85,5 +85,28 @@
     "output": "catalog/generated/candidates.json",
     "refresh": "Daily at 04:23 UTC and manual workflow dispatch",
     "safety": "Generated records remain candidate/not_reviewed and are never directly playable."
-  }
+  },
+  "quality_profiles": {
+    "UHD_4K": {
+      "label": "4K UHD",
+      "minimum_height": 2160
+    },
+    "FHD": {
+      "label": "Full HD",
+      "minimum_height": 1080
+    },
+    "HD": {
+      "label": "HD",
+      "minimum_height": 720
+    },
+    "SD": {
+      "label": "SD",
+      "maximum_height": 576
+    },
+    "UNKNOWN": {
+      "label": "Auto / unknown",
+      "note": "Do not claim a resolution until measured during playback."
+    }
+  },
+  "quality_selection": "Auto by default; allow manual selection only among variants actually supplied by the stream. Source metadata is a hint, not verified resolution. Never upscale and label as native 4K."
 }
