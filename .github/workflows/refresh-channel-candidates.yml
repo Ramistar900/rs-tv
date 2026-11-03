@@ -1,0 +1,43 @@
+name: RS TV Channel Candidate Catalogue
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rs-tv-channel-catalogue
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run importer
+        run: python -m unittest discover -s tools -p 'test_*.py' -v && python tools/import_channel_candidates.py
+
+      - name: Commit updated candidate catalogue
+        run: |
+          if git diff --quiet -- catalog/generated/candidates.json; then
+            echo "Candidate catalogue is unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/generated/candidates.json
+          git commit -m "Refresh RS TV channel candidates"
+          git push origin HEAD:main
