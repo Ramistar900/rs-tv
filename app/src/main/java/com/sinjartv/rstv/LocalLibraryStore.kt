@@ -54,6 +54,10 @@ internal object LocalLibraryStore {
     fun favoriteStreams(context: Context): Set<String> =
         prefs(context).getStringSet(FAVORITES, emptySet()).orEmpty().toSet()
 
+    fun clearFavorites(context: Context) {
+        prefs(context).edit().remove(FAVORITES).apply()
+    }
+
     fun addToHistory(context: Context, streamUrl: String) {
         val recent = history(context).filterNot { it == streamUrl }.toMutableList()
         recent.add(0, streamUrl)
