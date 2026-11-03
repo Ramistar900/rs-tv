@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -102,6 +103,7 @@ private enum class RSTVTab(
     HOME("الرئيسية", Icons.Outlined.Home),
     LIVE("البث المباشر", Icons.Outlined.Tv),
     WORLD("العالمية", Icons.Outlined.Public),
+    SOURCES("مصادر IPTV", Icons.Outlined.CloudDownload),
     YOUTUBE("YouTube", Icons.Outlined.PlayCircle),
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
@@ -145,6 +147,8 @@ private fun RSTVHome() {
     val channels = remember { mutableStateListOf<RSTVChannel>() }
     var worldChannels by remember { mutableStateOf<List<WorldChannelCandidate>>(emptyList()) }
     var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
+    var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
+    val uriHandler = LocalUriHandler.current
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
     var selectedTab by remember { mutableStateOf(RSTVTab.HOME) }
@@ -272,6 +276,39 @@ private fun RSTVHome() {
         }
     }
 
+    fun loadRemotePlaylist(source: RemotePlaylistSource) {
+        remotePlaylistStatus = "جارٍ جلب ${source.name}..."
+        scope.launch {
+            runCatching {
+                val content = withContext(Dispatchers.IO) {
+                    RemotePlaylistDownloader.download(source)
+                }
+                val parsed = withContext(Dispatchers.Default) {
+                    M3uPlaylistParser.parse(content)
+                }
+                require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
+                require(parsed.channels.isNotEmpty()) {
+                    "لم نجد روابط HTTPS صالحة في هذه القائمة"
+                }
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.savePlaylist(context, content)
+                }
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                selectedChannel = null
+                channels.clear()
+                channels.addAll(parsed.channels)
+                skippedUnsafeLinks = parsed.skippedUnsafeLinks
+                val resultMessage = "تم تحميل ${parsed.channels.size} قناة من ${source.name}. تم استبدال القائمة المحلية السابقة."
+                status = resultMessage
+                remotePlaylistStatus = resultMessage
+                selectedTab = RSTVTab.LIVE
+            }.onFailure { error ->
+                remotePlaylistStatus = "تعذر تحميل ${source.name}: ${error.message ?: "خطأ غير معروف"}"
+            }
+        }
+    }
+
     fun playChannel(channel: RSTVChannel) {
         selectedChannel = channel
         status = "جارٍ تجهيز قناة ${channel.name}..."
@@ -379,6 +416,12 @@ private fun RSTVHome() {
                             tab = selectedTab,
                             worldChannels = worldChannels,
                             worldCatalogStatus = worldCatalogStatus,
+                            remotePlaylistStatus = remotePlaylistStatus,
+                            onLoadRemotePlaylist = ::loadRemotePlaylist,
+                            onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
+                            remotePlaylistStatus = remotePlaylistStatus,
+                            onLoadRemotePlaylist = ::loadRemotePlaylist,
+                            onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
                                 else -> visibleChannels
@@ -504,6 +547,9 @@ private fun ScreenBody(
     tab: RSTVTab,
     worldChannels: List<WorldChannelCandidate>,
     worldCatalogStatus: String,
+    remotePlaylistStatus: String,
+    onLoadRemotePlaylist: (RemotePlaylistSource) -> Unit,
+    onOpenOfficialUrl: (String) -> Unit,
     channels: List<RSTVChannel>,
     recentChannels: List<RSTVChannel>,
     programmes: List<GuideProgramme>,
@@ -530,6 +576,12 @@ private fun ScreenBody(
             onPlay = onPlay,
             onNavigate = onNavigate,
             onImportPlaylist = onImportPlaylist,
+            modifier = modifier
+        )
+        RSTVTab.SOURCES -> OnlineSourcesContent(
+            status = remotePlaylistStatus,
+            onLoadPlaylist = onLoadRemotePlaylist,
+            onOpenOfficialUrl = onOpenOfficialUrl,
             modifier = modifier
         )
         RSTVTab.WORLD -> WorldCatalogContent(
@@ -650,10 +702,15 @@ private fun HomeContent(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FeatureCard("مصادر IPTV", "قوائم عالمية وعربية وتركية قابلة للتحديث", "تحميل القنوات", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.SOURCES)
+                }
                 FeatureCard("الأفلام والمسلسلات", "كتالوج معلوماتي منفصل عن حقوق المشاهدة", "فتح المكتبة", Modifier.weight(1f)) {
                     onNavigate(RSTVTab.MOVIES)
                 }
-                FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.weight(1f)) {
+            }
+            item {
+                FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.fillMaxWidth()) {
                     onNavigate(RSTVTab.FAVORITES)
                 }
             }
@@ -803,6 +860,97 @@ private fun LiveContent(
                             onPlay = { onPlay(channel) },
                             onToggleFavorite = { onToggleFavorite(channel) }
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineSourcesContent(
+    status: String,
+    onLoadPlaylist: (RemotePlaylistSource) -> Unit,
+    onOpenOfficialUrl: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("مصادر القنوات عبر الإنترنت", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "قوائم عالمية وعربية وتركية ومصادر بث رسمية. اختر مصدراً لتنزيل قائمته وتشغيل القنوات في RS TV.",
+            color = MutedText,
+            fontSize = 11.sp
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = PanelRaised),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(status, color = SoftWhite, fontSize = 11.sp)
+                Text(
+                    "تنبيه: تحميل مصدر جديد يستبدل قائمة القنوات المحلية الحالية. تُقبل روابط HTTPS فقط. قد تتوقف القنوات أو تُقيّد جغرافياً، والإتاحة العامة لا تثبت وحدها حقوق إعادة البث.",
+                    color = AccentRed,
+                    fontSize = 10.sp
+                )
+            }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                Text("قوائم IPTV القابلة للتحديث", color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            items(RemotePlaylistSources.playlists, key = { it.id }) { source ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(13.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(source.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(source.description, color = MutedText, fontSize = 11.sp)
+                        Text("المصدر: ${source.provider}", color = Silver, fontSize = 10.sp)
+                        source.attribution?.let {
+                            Text(it, color = MutedText, fontSize = 9.sp)
+                        }
+                        Button(
+                            onClick = { onLoadPlaylist(source) },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("تحميل واستبدال القائمة")
+                        }
+                    }
+                }
+            }
+            item {
+                Text("البث من المواقع الرسمية", color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            items(RemotePlaylistSources.officialDestinations, key = { it.id }) { destination ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(destination.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text(destination.description, color = MutedText, fontSize = 10.sp)
+                        }
+                        TextButton(onClick = { onOpenOfficialUrl(destination.url) }) {
+                            Text("فتح رسمي", color = AccentRed, fontSize = 11.sp)
+                        }
                     }
                 }
             }
