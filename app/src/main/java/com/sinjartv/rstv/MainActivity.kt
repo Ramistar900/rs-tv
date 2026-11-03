@@ -139,7 +139,7 @@ private fun RSTVHome() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val channels = remember { mutableStateListOf<RSTVChannel>() }
-    val worldChannels = remember { mutableStateListOf<WorldChannelCandidate>() }
+    var worldChannels by remember { mutableStateOf<List<WorldChannelCandidate>>(emptyList()) }
     var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
@@ -202,8 +202,7 @@ private fun RSTVHome() {
                 WorldChannelCatalogParser.parse(catalogJson)
             }
         }.onSuccess { imported ->
-            worldChannels.clear()
-            worldChannels.addAll(imported)
+            worldChannels = imported
             worldCatalogStatus = "تم تحميل ${imported.size} قناة مرشّحة من الكتالوج المضمّن"
         }.onFailure {
             worldCatalogStatus = "تعذر تحميل الكتالوج العالمي: ${it.message ?: "ملف غير متاح"}"
