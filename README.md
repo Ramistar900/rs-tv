@@ -9,10 +9,10 @@ The Android application is built with Kotlin, Jetpack Compose, and Media3. It ca
 Build locally with Gradle 8.9 and JDK 17:
 
 ```bash
-gradle --no-daemon :app:assembleDebug
+gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
-GitHub Actions builds a debug APK on changes to the Android app, Gradle configuration, or its workflow.
+GitHub Actions runs the playlist-parser unit tests and builds a debug APK on changes to the Android app, Gradle configuration, or its workflow.
 
 ## Project direction
 
@@ -35,7 +35,7 @@ A VPN does not decrypt paid channels or grant streaming rights. Only streams tha
 
 ## Current status
 
-- Android project foundation: created on `android-foundation`.
+- Android project foundation: merged into `main`.
 - M3U/M3U8 local playlist import, channel list/search, and Media3 playback: implemented for HTTPS stream URLs.
 - Imported playlists remain user-provided input; public reachability does not establish redistribution rights.
 - Internet channel-source ingestion: candidate importer and catalogue planning are present; reviewed catalogue integration is pending.
