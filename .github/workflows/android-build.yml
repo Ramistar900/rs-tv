@@ -40,7 +40,7 @@ jobs:
           fi
           echo "Found sdkmanager at: $SDKMANAGER"
           echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
-          yes | "$SDKMANAGER" --licenses
+          printf 'y\n%.0s' {1..100} | "$SDKMANAGER" --licenses
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
