@@ -52,6 +52,21 @@ def valid_stream_url(value):
     return value.startswith("https://") or value.startswith("http://")
 
 
+def normalize_quality(*values):
+    """Normalize source hints only; these are not verified playback resolutions."""
+    text = " ".join(str(value) for value in values if value is not None).lower()
+    import re
+    if re.search(r"(?<!\\d)(2160p|4k|uhd)(?!\\w)", text):
+        return "UHD_4K"
+    if re.search(r"(?<!\\d)(1080p|fhd)(?!\\w)", text):
+        return "FHD"
+    if re.search(r"(?<!\\d)(720p|hd)(?!\\w)", text):
+        return "HD"
+    if re.search(r"(?<!\\d)(480p|576p|sd)(?!\\w)", text):
+        return "SD"
+    return "UNKNOWN"
+
+
 def build_catalog(data, generated_at):
     channels = data["channels"]
     countries = {x.get("code"): x for x in data["countries"] if x.get("code")}
@@ -161,7 +176,7 @@ def main():
         "generated_at_utc": generated_at,
         "source": "https://github.com/iptv-org/api",
         "source_notice": "Discovery metadata only. Public reachability is not proof of free-to-watch status, redistribution rights, or stream stability.",
-        "playback_policy": "Only separately rights-reviewed and technically approved records may enter the playable catalogue.",
+        "playback_policy": "Only separately rights-reviewed and technically approved records may enter the playable catalogue.",\n        "quality_profiles": {\n            "UHD_4K": {"label": "4K UHD", "minimum_height": 2160},\n            "FHD": {"label": "Full HD", "minimum_height": 1080},\n            "HD": {"label": "HD", "minimum_height": 720},\n            "SD": {"label": "SD", "maximum_height": 576},\n            "UNKNOWN": {"label": "Auto / unknown", "note": "Do not claim a resolution until measured during playback."}\n        },\n        "quality_selection": "Auto by default; manual selection only among variants actually exposed by the stream. Never upscale and label it as native 4K/FHD/HD.",
         "country_filter": {
             "all_value": "ALL",
             "all_behavior": "Combine all approved countries in one list; retain each channel country flag and name.",
