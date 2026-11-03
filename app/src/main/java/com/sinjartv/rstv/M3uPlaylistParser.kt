@@ -74,7 +74,8 @@ internal object M3uPlaylistParser {
 
             val streamUri = runCatching { URI(line) }.getOrNull()
             val isSecureHttps = streamUri?.scheme.equals("https", ignoreCase = true) &&
-                !streamUri?.host.isNullOrBlank()
+                !streamUri?.host.isNullOrBlank() &&
+                streamUri.userInfo == null
 
             if (!isSecureHttps) {
                 skippedUnsafeLinks++
