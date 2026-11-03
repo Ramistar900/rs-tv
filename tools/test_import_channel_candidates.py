@@ -1,6 +1,6 @@
 import unittest
 
-from import_channel_candidates import build_catalog
+from import_channel_candidates import build_catalog, normalize_quality
 
 
 class ImporterTests(unittest.TestCase):
@@ -45,6 +45,14 @@ class ImporterTests(unittest.TestCase):
         self.assertEqual(skipped["closed_or_replaced"], 1)
         self.assertEqual(skipped["blocklisted"], 1)
         self.assertEqual(skipped["no_stream"], 1)
+
+    def test_quality_labels_are_normalized_as_hints(self):
+        self.assertEqual(normalize_quality("2160p"), "UHD_4K")
+        self.assertEqual(normalize_quality("4K UHD"), "UHD_4K")
+        self.assertEqual(normalize_quality("1080p"), "FHD")
+        self.assertEqual(normalize_quality("720p"), "HD")
+        self.assertEqual(normalize_quality("576p"), "SD")
+        self.assertEqual(normalize_quality("unknown"), "UNKNOWN")
 
     def test_no_stream_is_approved_automatically(self):
         records, _ = build_catalog(self.data, "2026-11-03T00:00:00Z")
