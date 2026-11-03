@@ -419,9 +419,6 @@ private fun RSTVHome() {
                             remotePlaylistStatus = remotePlaylistStatus,
                             onLoadRemotePlaylist = ::loadRemotePlaylist,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
-                            remotePlaylistStatus = remotePlaylistStatus,
-                            onLoadRemotePlaylist = ::loadRemotePlaylist,
-                            onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
                                 else -> visibleChannels
@@ -458,6 +455,9 @@ private fun RSTVHome() {
                             tab = selectedTab,
                             worldChannels = worldChannels,
                             worldCatalogStatus = worldCatalogStatus,
+                            remotePlaylistStatus = remotePlaylistStatus,
+                            onLoadRemotePlaylist = ::loadRemotePlaylist,
+                            onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
                                 else -> visibleChannels
