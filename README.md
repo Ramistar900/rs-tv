@@ -1,12 +1,15 @@
 # RS TV — Sinjar TV Show
 
-RS TV is an independent **internet-only** Android viewing app for phones, tablets, Android TV, and TV boxes. It is built with Kotlin, Jetpack Compose, and AndroidX Media3. Satellite reception, DVB tuners, dishes, and satellite-frequency directories are outside the product.
+RS TV is an independent Android TV app for phones, tablets, Android TV, and TV boxes. It plays television delivered over the internet, including online feeds of traditional satellite broadcasters when publicly available. Direct dish/DVB reception and satellite-frequency tuning are not provided.
 
 ## Implemented Android features
 
 - Adaptive navigation: bottom navigation on compact screens and a navigation rail on wide screens/TV layouts.
 - Arabic-first interface with a black, red, and silver visual identity.
 - Local M3U/M3U8 import, channel name/group search, and HTTPS stream playback.
+- In-app online source directory for worldwide, Arab-region, Arabic-language, and Türkiye M3U lists from IPTV-org and Doubo, plus Free-TV and FreeCastHub supplementary lists.
+- User-initiated remote playlist download with HTTPS-only connections, exact-host redirect allowlisting, response-size and timeout limits; the selected source replaces the active local playlist.
+- Official external live destinations for Al Jazeera Arabic/English, CGTN, Euronews, and NASA+.
 - Local persistence for the imported playlist, favorites, and recent channel history.
 - XMLTV programme-guide import, secure XML parsing, and channel matching through M3U `tvg-id` and XMLTV `channel` IDs.
 - Android TV launcher entry and a dedicated TV banner; custom vector launcher icon.
