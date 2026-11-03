@@ -1,6 +1,6 @@
 # RS TV Global Internet Catalogue
 
-RS TV is an internet-only catalogue and player. Satellite dishes, DVB tuners, orbital positions, and satellite frequencies are outside the product.
+RS TV plays television delivered over the internet. A broadcaster may also be a traditional satellite channel; RS TV can play its official/public online feed when available. Direct dish reception, DVB tuners, orbital tuning and satellite frequencies are not performed by a phone/TV Box app.
 
 ## Worldwide live-channel discovery
 
@@ -25,6 +25,20 @@ python tools/import_channel_candidates.py
 ```
 
 GitHub Actions refreshes `catalog/generated/candidates.json` daily and when the importer changes. The generated file is a discovery/review queue, not a ready-to-play or rights-cleared playlist. The importer does not guarantee that every country or broadcaster is represented; it is limited to upstream source coverage.
+
+
+## Additional online channel sources in the Android app
+
+The **مصادر IPTV** screen offers user-initiated M3U downloads from several independent publishing projects:
+
+- **Doubo Public Channel Directory**: worldwide, Türkiye, and Arabic-language lists. Its publisher describes a daily build with an official-domain/allowlisted-host policy and first-media-segment checks. The link selection/index data is CC BY 4.0; RS TV credits the directory. This is not a licence to redistribute the underlying programmes.
+- **IPTV-org playlists**: worldwide, Arab-region, and Türkiye lists. This is a large community-maintained discovery catalogue; availability and rights vary by channel.
+- **Free-TV/IPTV**: a smaller quality-focused community list whose README says it targets channels officially offered free in at least one market; regional blocks can apply.
+- **FreeCastHub public IPTV**: an experimental small supplementary list, never treated as independently rights-cleared.
+
+The app downloads only the selected playlist, checks HTTPS and a size limit, validates redirects against the source's exact host, parses HTTPS entries, and stores the playlist locally. Selecting another source **replaces the active local playlist**. Selecting a source again fetches its latest published list. Official broadcaster destinations (Al Jazeera Arabic/English, CGTN, Euronews and NASA+) open the broadcaster's own website/player instead of extracting or proxying its media.
+
+These playlists include traditional linear television brands and channels that may also be carried by satellite, but the app receives them through their online streams. It does not tune a satellite dish or emulate a satellite receiver.
 
 ## YouTube live broadcasts
 
