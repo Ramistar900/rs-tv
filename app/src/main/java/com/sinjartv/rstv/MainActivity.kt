@@ -725,12 +725,14 @@ private fun LiveContent(
             }
         }
         if (channels.isEmpty()) {
-            EmptyState(
-                title = "لا توجد قنوات بعد",
-                description = "استورد قائمة M3U أو M3U8 من جهازك لعرض قنواتك هنا."
-            )
-        } else if (channels.none { it.name.contains(searchQuery, true) || it.group.orEmpty().contains(searchQuery, true) }) {
-            EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
+            if (searchQuery.isBlank()) {
+                EmptyState(
+                    title = "لا توجد قنوات بعد",
+                    description = "استورد قائمة M3U أو M3U8 من جهازك لعرض قنواتك هنا."
+                )
+            } else {
+                EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -860,6 +862,7 @@ private fun GuideContent(
     } else {
         programmes.filter { it.channelId == selectedChannel?.tvgId }
     }
+    val currentAndUpcoming = matching.filter { it.endMillis > System.currentTimeMillis() }
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -878,12 +881,14 @@ private fun GuideContent(
                 "لا توجد برامج مرتبطة بهذه القناة",
                 "تأكد من تطابق tvg-id في قائمة M3U مع channel id في ملف XMLTV."
             )
+        } else if (currentAndUpcoming.isEmpty()) {
+            EmptyState("لا توجد برامج حالية أو قادمة", "ملف XMLTV المحمّل لا يحتوي جدولاً مستقبلياً لهذه القناة.")
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(matching, key = { "${it.channelId}-${it.startMillis}-${it.title}" }) { programme ->
+                items(currentAndUpcoming, key = { "${it.channelId}-${it.startMillis}-${it.title}" }) { programme ->
                     ProgrammeCard(programme)
                 }
             }
@@ -896,14 +901,23 @@ private fun ProgrammeCard(programme: GuideProgramme) {
     val formatter = remember { SimpleDateFormat("dd/MM  HH:mm", Locale.getDefault()) }
     val start = formatter.format(Date(programme.startMillis))
     val end = formatter.format(Date(programme.endMillis))
+    val now = System.currentTimeMillis()
+    val programmeState = when {
+        now in programme.startMillis until programme.endMillis -> "يعرض الآن"
+        programme.startMillis > now -> "لاحقاً"
+        else -> "انتهى"
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = PanelBlack),
         shape = RoundedCornerShape(13.dp)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(programme.title, color = SoftWhite, fontWeight = FontWeight.Bold)
-            Text("$start  —  $end  •  ${programme.channelId}", color = AccentRed, fontSize = 11.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(programme.title, color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(programmeState, color = if (programmeState == "يعرض الآن") AccentRed else Silver, fontSize = 10.sp)
+            }
+            Text("$start  —  $end  •  ${programme.channelId}", color = MutedText, fontSize = 11.sp)
             programme.description?.let {
                 Text(it, color = MutedText, fontSize = 12.sp)
             }
