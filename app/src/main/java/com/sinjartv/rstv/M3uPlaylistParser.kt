@@ -20,6 +20,12 @@ internal data class M3uParseResult(
 internal object M3uPlaylistParser {
     private val attributePattern =
         Regex("""([A-Za-z0-9_-]+)[ ]*=[ ]*("([^"]*)"|'([^']*)'|([^ ,]+))""")
+    private val pageOnlyPlatformHosts = setOf(
+        "youtube.com", "youtu.be", "googlevideo.com",
+        "twitch.tv", "ttvnw.net",
+        "dailymotion.com", "facebook.com", "fb.watch", "fbcdn.net",
+        "instagram.com", "tiktok.com", "rumble.com"
+    )
 
     fun parse(content: String): M3uParseResult {
         val lines = content.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
@@ -73,9 +79,14 @@ internal object M3uPlaylistParser {
             pending = null
 
             val streamUri = runCatching { URI(line) }.getOrNull()
+            val host = streamUri?.host?.lowercase().orEmpty()
+            val isPageOnlyPlatform = pageOnlyPlatformHosts.any { blockedHost ->
+                host == blockedHost || host.endsWith(".$blockedHost")
+            }
             val isSecureHttps = streamUri?.scheme.equals("https", ignoreCase = true) &&
-                !streamUri?.host.isNullOrBlank() &&
-                streamUri.userInfo == null
+                host.isNotBlank() &&
+                streamUri.userInfo == null &&
+                !isPageOnlyPlatform
 
             if (!isSecureHttps) {
                 skippedUnsafeLinks++
