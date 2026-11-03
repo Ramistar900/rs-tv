@@ -2,7 +2,7 @@ name: RS TV Android Build
 
 on:
   push:
-    branches: [main, android-foundation]
+    branches: [main]
     paths:
       - "app/**"
       - "*.gradle.kts"
@@ -46,5 +46,5 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Run unit tests and build debug APK
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
