@@ -56,13 +56,13 @@ def normalize_quality(*values):
     """Normalize source hints only; these are not verified playback resolutions."""
     text = " ".join(str(value) for value in values if value is not None).lower()
     import re
-    if re.search(r"(?<!\\d)(2160p|4k|uhd)(?!\\w)", text):
+    if re.search(r"(?<!\d)(2160p|4k|uhd)(?!\w)", text):
         return "UHD_4K"
-    if re.search(r"(?<!\\d)(1080p|fhd)(?!\\w)", text):
+    if re.search(r"(?<!\d)(1080p|fhd)(?!\w)", text):
         return "FHD"
-    if re.search(r"(?<!\\d)(720p|hd)(?!\\w)", text):
+    if re.search(r"(?<!\d)(720p|hd)(?!\w)", text):
         return "HD"
-    if re.search(r"(?<!\\d)(480p|576p|sd)(?!\\w)", text):
+    if re.search(r"(?<!\d)(480p|576p|sd)(?!\w)", text):
         return "SD"
     return "UNKNOWN"
 
