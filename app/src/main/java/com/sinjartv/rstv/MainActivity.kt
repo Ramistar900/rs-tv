@@ -30,6 +30,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tv
@@ -100,6 +102,8 @@ private enum class RSTVTab(
     HOME("الرئيسية", Icons.Outlined.Home),
     LIVE("البث المباشر", Icons.Outlined.Tv),
     WORLD("العالمية", Icons.Outlined.Public),
+    YOUTUBE("YouTube", Icons.Outlined.PlayCircle),
+    MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
@@ -533,6 +537,8 @@ private fun ScreenBody(
             catalogStatus = worldCatalogStatus,
             modifier = modifier
         )
+        RSTVTab.YOUTUBE -> YouTubeLiveContent(modifier = modifier)
+        RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
         RSTVTab.LIVE -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
@@ -636,6 +642,16 @@ private fun HomeContent(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FeatureCard("القنوات العالمية", "${worldChannelCount} قناة مرشّحة من مصادر دولية", "استعراض", Modifier.weight(1f)) {
                     onNavigate(RSTVTab.WORLD)
+                }
+                FeatureCard("YouTube المباشر", "اكتشاف البث عبر YouTube الرسمي", "استكشاف", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.YOUTUBE)
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FeatureCard("الأفلام والمسلسلات", "كتالوج معلوماتي منفصل عن حقوق المشاهدة", "فتح المكتبة", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.MOVIES)
                 }
                 FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.weight(1f)) {
                     onNavigate(RSTVTab.FAVORITES)
@@ -1291,3 +1307,92 @@ private fun readBoundedDocument(context: Context, uri: Uri): String {
     }
     return output.toByteArray().toString(Charsets.UTF_8)
 }
+
+@Composable
+private fun YouTubeLiveContent(modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
+    var query by remember { mutableStateOf("قنوات مباشرة") }
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text("البث المباشر عبر YouTube", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "ابحث وافتح نتائج البث من منصة YouTube الرسمية. لا يشغّل RS TV فيديوهات YouTube عبر روابط غير رسمية ولا يتجاوز قيود المنصة.",
+            color = MutedText,
+            fontSize = 13.sp
+        )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("اسم القناة أو موضوع البث") }
+        )
+        Button(
+            onClick = {
+                val encoded = Uri.encode(query.trim().ifBlank { "قنوات مباشرة" })
+                uriHandler.openUri("https://www.youtube.com/results?search_query=$encoded")
+            },
+            enabled = query.isNotBlank(),
+            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+        ) {
+            Text("فتح البحث الرسمي في YouTube")
+        }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = PanelBlack),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("تكامل API داخل التطبيق: غير مفعّل بعد", color = SoftWhite, fontWeight = FontWeight.Bold)
+                Text(
+                    "لإضافة نتائج مباشرة داخل RS TV نحتاج مفتاح YouTube Data API محفوظاً كسرّ في بيئة البناء/الخادم، ثم مراجعة شروط API وطريقة التشغيل الرسمية. لم نضع مفتاحاً داخل التطبيق.",
+                    color = MutedText,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoviesLibraryContent(modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Text("الأفلام والمسلسلات", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "قسم مستقل لبيانات الأفلام والمسلسلات: العناوين، الملخصات، التصنيفات، الملصقات، وسنوات الإصدار.",
+            color = MutedText,
+            fontSize = 13.sp
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = PanelBlack),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("مصدر البيانات الوصفية: TMDB", color = SoftWhite, fontWeight = FontWeight.Bold)
+                Text(
+                    "لم يتم ربط API بعد. يتطلب ذلك إعداد TMDB_API_KEY بطريقة آمنة وإضافة إشعار الإسناد المطلوب. بيانات TMDB لا توفر ملفات مشاهدة ولا تمنح حقوق بث الأفلام أو الحلقات.",
+                    color = MutedText,
+                    fontSize = 12.sp
+                )
+                TextButton(onClick = {
+                    uriHandler.openUri("https://www.themoviedb.org/")
+                }) {
+                    Text("زيارة TMDB", color = AccentRed)
+                }
+            }
+        }
+        Text(
+            "حالة المكتبة: بانتظار إعداد مصدر البيانات ومراجعة روابط المشاهدة القانونية لكل مزوّد على حدة.",
+            color = Silver,
+            fontSize = 12.sp
+        )
+    }
+}
+
