@@ -17,6 +17,9 @@ android {
     }
 
     buildFeatures { compose = true }
+    sourceSets {
+        getByName("main").assets.srcDir(rootProject.file("catalog/generated"))
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -42,6 +45,7 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.5.1")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
