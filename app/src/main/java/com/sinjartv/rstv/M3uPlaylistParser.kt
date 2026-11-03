@@ -1,0 +1,97 @@
+package com.sinjartv.rstv
+
+import java.net.URI
+
+internal data class RSTVChannel(
+    val name: String,
+    val group: String?,
+    val logoUrl: String?,
+    val streamUrl: String
+)
+
+internal data class M3uParseResult(
+    val channels: List<RSTVChannel>,
+    val skippedUnsafeLinks: Int,
+    val invalidEntries: Int,
+    val isValidPlaylist: Boolean
+)
+
+internal object M3uPlaylistParser {
+    private val attributePattern =
+        Regex("""([A-Za-z0-9_-]+)\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s,]+))""")
+
+    fun parse(content: String): M3uParseResult {
+        val lines = content.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
+        if (lines.firstOrNull()?.startsWith("#EXTM3U", ignoreCase = true) != true) {
+            return M3uParseResult(emptyList(), 0, 0, false)
+        }
+
+        data class PendingChannel(
+            val name: String,
+            val group: String?,
+            val logoUrl: String?
+        )
+
+        val channels = mutableListOf<RSTVChannel>()
+        val seenUrls = mutableSetOf<String>()
+        var pending: PendingChannel? = null
+        var skippedUnsafeLinks = 0
+        var invalidEntries = 0
+
+        for (line in lines.drop(1)) {
+            if (line.startsWith("#EXTINF:", ignoreCase = true)) {
+                if (pending != null) invalidEntries++
+                val info = line.substringAfter(':')
+                val separator = info.indexOf(',')
+                val metadata = if (separator >= 0) info.substring(0, separator) else info
+                val displayName = if (separator >= 0) info.substring(separator + 1).trim() else ""
+                val attributes = attributePattern.findAll(metadata).associate { match ->
+                    val value = match.groups[3]?.value
+                        ?: match.groups[4]?.value
+                        ?: match.groups[5]?.value.orEmpty()
+                    match.groupValues[1].lowercase() to value
+                }
+
+                val name = attributes["tvg-name"]?.takeIf(String::isNotBlank)
+                    ?: displayName.takeIf(String::isNotBlank)
+                    ?: "قناة بدون اسم"
+
+                pending = PendingChannel(
+                    name = name,
+                    group = attributes["group-title"]?.takeIf(String::isNotBlank),
+                    logoUrl = attributes["tvg-logo"]?.takeIf(String::isNotBlank)
+                )
+                continue
+            }
+
+            if (line.startsWith('#')) continue
+
+            val channel = pending
+            if (channel == null) continue
+            pending = null
+
+            val streamUri = runCatching { URI(line) }.getOrNull()
+            val isSecureHttps = streamUri?.scheme.equals("https", ignoreCase = true) &&
+                !streamUri?.host.isNullOrBlank()
+
+            if (!isSecureHttps) {
+                skippedUnsafeLinks++
+                continue
+            }
+
+            if (seenUrls.add(line)) {
+                channels += RSTVChannel(
+                    name = channel.name,
+                    group = channel.group,
+                    logoUrl = channel.logoUrl,
+                    streamUrl = line
+                )
+            } else {
+                invalidEntries++
+            }
+        }
+
+        if (pending != null) invalidEntries++
+        return M3uParseResult(channels, skippedUnsafeLinks, invalidEntries, true)
+    }
+}
