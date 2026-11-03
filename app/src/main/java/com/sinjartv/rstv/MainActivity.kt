@@ -734,18 +734,30 @@ private fun LiveContent(
                 EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
             }
         } else {
+            val groupedChannels = channels.groupBy { it.group?.takeIf(String::isNotBlank) ?: "غير مصنّفة" }
             LazyColumn(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(channels, key = { it.streamUrl }) { channel ->
-                    ChannelCard(
-                        channel = channel,
-                        active = selectedChannel?.streamUrl == channel.streamUrl,
-                        favorite = isFavorite(channel),
-                        onPlay = { onPlay(channel) },
-                        onToggleFavorite = { onToggleFavorite(channel) }
-                    )
+                groupedChannels.forEach { (groupName, groupChannels) ->
+                    item(key = "group-$groupName") {
+                        Text(
+                            "$groupName  •  ${groupChannels.size}",
+                            color = Silver,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                        )
+                    }
+                    items(groupChannels, key = { it.streamUrl }) { channel ->
+                        ChannelCard(
+                            channel = channel,
+                            active = selectedChannel?.streamUrl == channel.streamUrl,
+                            favorite = isFavorite(channel),
+                            onPlay = { onPlay(channel) },
+                            onToggleFavorite = { onToggleFavorite(channel) }
+                        )
+                    }
                 }
             }
         }
