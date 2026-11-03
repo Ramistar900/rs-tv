@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "RS TV",
-  "mode": "remote_catalogue_discovery",
+  "mode": "scheduled_candidate_import",
   "language": "ar",
   "endpoints": {
     "channels": "https://iptv-org.github.io/api/channels.json",
@@ -13,7 +13,9 @@
     "master_playlist": "https://iptv-org.github.io/iptv/index.m3u",
     "country_playlists": "https://iptv-org.github.io/iptv/countries/{country_code_lowercase}.m3u",
     "category_playlists": "https://iptv-org.github.io/iptv/categories/{category_id}.m3u",
-    "language_playlists": "https://iptv-org.github.io/iptv/languages/{language_code}.m3u"
+    "language_playlists": "https://iptv-org.github.io/iptv/languages/{language_code}.m3u",
+    "feeds": "https://iptv-org.github.io/api/feeds.json",
+    "blocklist": "https://iptv-org.github.io/api/blocklist.json"
   },
   "field_mapping": {
     "channel_id": "channels[].id",
@@ -27,7 +29,12 @@
     "stream_user_agent": "streams[].user_agent",
     "country_name": "countries[].name",
     "country_flag": "countries[].flag",
-    "language_codes": "countries[].languages"
+    "language_codes": "countries[].languages",
+    "feed_channel_id": "feeds[].channel",
+    "feed_languages": "feeds[].languages",
+    "logo_channel_id": "logos[].channel",
+    "logo_url": "logos[].url",
+    "blocklisted_channel_id": "blocklist[].channel"
   },
   "country_filter": {
     "all_value": "ALL",
@@ -39,7 +46,7 @@
   },
   "admission": {
     "imported_status": "candidate",
-    "default_catalogue_status": "approved",
+    "default_catalogue_status": "candidate",
     "required_before_approval": [
       "stable_channel_id",
       "country_code_verified",
@@ -70,5 +77,13 @@
     "stale_stream_action": "hide from default catalogue pending recheck",
     "preserve_source_attribution": true
   },
-  "important": "This is a discovery/import contract. Imported records are candidates, not automatically free, authorized, stable, or approved."
+  "important": "This is a discovery/import contract. Imported records are candidates, not automatically free, authorized, stable, or approved.",
+  "implementation": {
+    "importer": "tools/import_channel_candidates.py",
+    "tests": "tools/test_import_channel_candidates.py",
+    "workflow": ".github/workflows/refresh-channel-candidates.yml",
+    "output": "catalog/generated/candidates.json",
+    "refresh": "Daily at 04:23 UTC and manual workflow dispatch",
+    "safety": "Generated records remain candidate/not_reviewed and are never directly playable."
+  }
 }
