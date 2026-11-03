@@ -139,5 +139,62 @@
       "note": "Do not claim a resolution until measured during playback."
     }
   },
-  "quality_selection": "Auto by default; allow manual selection only among variants actually supplied by the stream. Never upscale and label as native 4K."
+  "quality_selection": "Auto by default; allow manual selection only among variants actually supplied by the stream. Never upscale and label as native 4K.",
+  "online_playlist_sources": {
+    "mode": "user_initiated_remote_m3u_download",
+    "app_file": "app/src/main/java/com/sinjartv/rstv/RemotePlaylistSources.kt",
+    "behavior": "The user selects one source; the app downloads it over HTTPS, parses HTTPS channel stream URLs, saves the playlist locally and replaces the currently active local playlist. The source list is fetched again on next selection; no client background polling is required.",
+    "limits": {
+      "max_download_bytes": 12582912,
+      "connect_timeout_ms": 15000,
+      "read_timeout_ms": 30000,
+      "max_redirects": 4,
+      "redirect_policy": "HTTPS only; redirect host must match the source's exact allowlisted host."
+    },
+    "sources": [
+      {
+        "id": "doubo-world",
+        "url": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.m3u",
+        "coverage": "worldwide daily-updated channel directory",
+        "attribution": "Doubo Public Channel Directory, CC BY 4.0 link-selection data"
+      },
+      {
+        "id": "doubo-turkey",
+        "url": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/tr.m3u",
+        "coverage": "Türkiye"
+      },
+      {
+        "id": "doubo-arabic",
+        "url": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/languages/ara.m3u",
+        "coverage": "Arabic-language channels"
+      },
+      {
+        "id": "iptv-org-world",
+        "url": "https://iptv-org.github.io/iptv/index.m3u",
+        "coverage": "global community playlist"
+      },
+      {
+        "id": "iptv-org-arab",
+        "url": "https://iptv-org.github.io/iptv/regions/arab.m3u",
+        "coverage": "Arab region"
+      },
+      {
+        "id": "iptv-org-turkey",
+        "url": "https://iptv-org.github.io/iptv/countries/tr.m3u",
+        "coverage": "Türkiye"
+      },
+      {
+        "id": "free-tv",
+        "url": "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+        "coverage": "smaller quality-focused free-TV list; may be geo-restricted"
+      },
+      {
+        "id": "freecasthub",
+        "url": "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u",
+        "coverage": "secondary public-broadcast candidate list"
+      }
+    ],
+    "safety": "Sources are discovery/playback entry points, not proof of blanket redistribution rights. The app never downloads video content itself, never follows cross-host or non-HTTPS redirects, rejects insecure/credential-bearing stream URLs and preserves provider attribution. Paid/DRM/conditional-access streams must not be bypassed."
+  },
+  "official_broadcaster_web_destinations": "Al Jazeera Arabic and English, CGTN, Euronews, and NASA+ are presented as external official playback pages; they are not extracted into private media URLs."
 }
