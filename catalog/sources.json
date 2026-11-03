@@ -48,6 +48,14 @@
       "url": "https://www.samsungtvplus.com/help-center.html",
       "status": "official_service_link_only",
       "notes": "Free ad-supported service with device and regional restrictions. Do not extract or rehost its streams."
+    },
+    {
+      "id": "satstar-fta",
+      "name": "SatStar free-to-air satellite directory",
+      "type": "satellite_fta_reference",
+      "url": "https://www.satstar.net/",
+      "status": "reference_only_requires_manual_verification",
+      "notes": "Additional worldwide FTA satellite reference. Verify each channel and transponder against an operator or satellite-provider source before publication; this is tuning metadata, not an internet stream."
     }
   ],
   "channel_record_required_fields": [
@@ -88,5 +96,29 @@
     "Keep satellite reception data separate from internet playback URLs.",
     "Store source attribution and review timestamps for every channel record.",
     "Treat all external URLs and playlist metadata as untrusted input."
-  ]
+  ],
+  "reliability_policy": {
+    "principle": "Never promise zero buffering. Reliability is measured per stream and can change without notice.",
+    "grades": {
+      "A": "Official broadcaster or authorized CDN; repeated successful tests from multiple networks/regions.",
+      "B": "Known broadcaster-origin stream; repeated tests, but limited geographic test coverage.",
+      "C": "Community-submitted public stream; intermittent or insufficient test history. Hidden from default catalogue.",
+      "rejected": "Dead, unstable, unauthorized, encrypted without entitlement, or rights unclear."
+    },
+    "checks": [
+      "HTTP/TLS reachability and playlist parsing",
+      "HLS/DASH manifest and segment availability",
+      "Playback probe for a bounded test window without recording or redistributing content",
+      "Repeated checks at different times and network regions where feasible",
+      "Monitor HTTP errors, startup failures, manifest age, segment gaps, and bitrate changes",
+      "Do not use a successful probe as evidence of copyright permission"
+    ],
+    "product_rules": [
+      "Only approved rights-reviewed channels can appear in the default catalogue.",
+      "Keep satellite FTA tuning records separate from internet stream endpoints.",
+      "Prefer official broadcaster/CDN endpoints over third-party relays.",
+      "Do not proxy or rehost streams without explicit authorization.",
+      "Show last checked time and reliability grade; automatically hide stale or failing streams."
+    ]
+  }
 }
