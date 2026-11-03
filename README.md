@@ -2,10 +2,22 @@
 
 RS TV is an independent Android streaming application project for phones, tablets, Android TV, and TV boxes.
 
+## Android foundation
+
+The initial Android application is built with Kotlin, Jetpack Compose, Android Gradle Plugin, and Media3 dependencies. The UI foundation is designed to support touch devices and Android TV/TV Box navigation. The initial screen is a placeholder; it does not yet load or play channel streams.
+
+Build locally with Gradle 8.9 and JDK 17:
+
+```bash
+gradle --no-daemon :app:assembleDebug
+```
+
+GitHub Actions builds a debug APK on changes to the Android app, Gradle configuration, or its workflow.
+
 ## Project direction
 
 - Adaptive touch and TV-remote interfaces.
-- Authorized free-to-air and official internet streams.
+- Authorized free-to-air and official internet streams only.
 - M3U/M3U8 playlists and XMLTV programme guides where permitted.
 - Channel catalogues organized by country, language, and category.
 - Optional Community VPN integration, subject to the security design below.
@@ -20,7 +32,9 @@ A VPN does not decrypt paid channels or grant streaming rights. Only streams tha
 
 ## Current status
 
-- Repository foundation: initialized.
-- Android application source/build configuration: not yet created.
-- Channel-source ingestion: not yet implemented.
+- Android project foundation: created on `android-foundation`.
+- Initial Compose home screen: created; channel playback is not wired yet.
+- Media3 dependencies: declared; player integration is pending.
+- Channel-source ingestion: candidate importer and catalogue planning are present; Android catalogue integration is pending.
+- RS TV logo: source image remains at [rs-tv-logo.png](rs-tv-logo.png); app resource integration is pending.
 - VPN: security design documented; no implementation or live service yet.
