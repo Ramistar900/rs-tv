@@ -1,96 +1,59 @@
-# RS TV Channel Catalog
+# RS TV Global Internet Catalogue
 
-This directory defines the source registry and catalogue rules for the RS TV channel library.
+RS TV is an internet-only catalogue and player. Satellite dishes, DVB tuners, orbital positions, and satellite frequencies are outside the product.
 
-## Global channel data import
+## Worldwide live-channel discovery
 
-See [import-plan.json](import-plan.json) for the structured API endpoints, field mapping, country-flag behavior, and admission rules. The initial metadata source is the IPTV-org API, which publishes separate datasets for channels, streams, countries, languages, categories, and logos. The API is a discovery source, not a guarantee of rights or stream uptime.
+The scheduled importer uses the IPTV-org structured API datasets for channels, streams, countries, languages, categories, logos, feeds, and the upstream blocklist. It joins each stream to its stable channel ID and retains country/language/category attribution.
 
-See [sources.json](sources.json) for all source records and review status.
+- **الكل** combines candidates from every country represented in the source.
+- Country filters use exact ISO 3166-1 alpha-2 metadata.
+- Channels without a source country are retained as `ZZ` with a neutral globe icon; no flag is guessed.
+- Categories and language labels are taken from source metadata.
+- Stream candidates must use HTTPS, have a host, and contain no URL credentials.
+- Duplicate stream URLs are removed per channel.
+- Adult, closed/replaced, blocklisted, and no-HTTPS-stream records are excluded.
+- Every generated record remains `candidate`, `not_reviewed`, and `unrated`.
 
-## Internet-channel presentation
+See [sources.json](sources.json) for the source registry and [import-plan.json](import-plan.json) for the source/field contract.
 
-The internet channel browser is organized by country and shows each country's flag beside its name.
-
-- Provide a first option named **الكل** (All).
-- **الكل** displays all approved channels from every country in one combined continuous list/grid.
-- Each country option shows its national flag and country name, for example 🇹🇷 تركيا and 🇮🇶 العراق.
-- Selecting a country filters the same catalogue view to that country's approved channels.
-- In **الكل**, show each channel's country flag and country name on its card/row.
-- Use exact ISO country codes and country metadata for flags. Never infer a flag from language or channel name.
-- Unknown country mapping: show a neutral globe icon and the known country label.
-- Search, category, and language filters must preserve country attribution.
-- De-duplicate by stable channel ID.
-
-## Internet channels
-
-- Use the structured channels and streams datasets to discover candidates.
-- Public M3U playlists can be used as an additional discovery/validation source.
-- Official free streaming services should initially be linked as official services. Do not extract or re-host their streams without permission.
-- A publicly reachable M3U/M3U8 URL is not evidence of permission to redistribute it.
-
-## Worldwide satellite directory
-
-The satellite catalogue is a separate worldwide directory grouped vertically by satellite/orbital position (for example Nilesat, Arabsat, Suhail Sat, Yahsat, and other verified positions). Each channel row shows its name and verified country flag. The **كل الأقمار** view combines the groups without losing satellite attribution.
-
-Read [Global Satellite Catalogue](../docs/SATELLITE-CATALOG.md) and validate records against [satellite-catalog.schema.json](satellite-catalog.schema.json). The model stores satellite positions, channel identities, and transmissions as separate entities so one channel can be carried by multiple satellites without duplicating its identity.
-
-Satellite records include frequency (MHz), polarization, symbol rate (ksps), FEC, DVB standard, encryption status, source, and last verification time. Satellite tuning data is never an internet stream URL. Live satellite reception requires compatible DVB-S/S2/S2X tuner hardware; listing the data alone does not enable reception on a phone or TV.
-
-FTA is a reception/encryption property, not permission to rebroadcast. Keep encrypted/paid services separate and never bypass conditional access, DRM, or provider entitlements. Do not invent frequencies or mark records verified without reliable source evidence.
-
-## Admission states
-
-- `candidate`: imported from a discovery source; not reviewed.
-- `stream_checked`: internet URL was tested; rights remain unverified.
-- `rights_reviewed`: reliable evidence supports the intended catalogue use.
-- `approved`: passes the applicable technical and rights review.
-- `rejected`: unavailable, paid/encrypted without authorization, or rights are unclear.
-
-Only `approved` channels appear in the default playable catalogue. Imported API records must never be marked approved automatically.
-
-## Reliability
-
-- Grade each internet stream using repeated playback checks at different times and, where feasible, network locations.
-- Prefer official broadcaster/CDN sources over third-party relays.
-- Show last checked time and reliability grade.
-- Hide stale or repeatedly failing streams from the default catalogue.
-- Never promise zero buffering; upstream networks and viewer connections are outside RS TV's control.
-- Health checks must be rate-limited and must not record or re-host content.
-
-## Encrypted channels — later phase
-
-Keep encrypted/paid channels out of the free catalogue. A later directory may list channel identity, country, language, official provider, and legal subscription route. Playback requires valid provider authorization; do not include leaked playlists, decryption keys, or unauthorized streams.
-
-## Automated internet candidate import
-
-The scheduled importer is implemented at `tools/import_channel_candidates.py`.
-It downloads channels, streams, countries, languages, categories, logos, feeds,
-and the upstream blocklist, joins records by stable channel ID, and writes
-`catalog/generated/candidates.json`.
-
-Run locally with Python 3:
+Run the importer locally:
 
 ```sh
 python -m unittest discover -s tools -p 'test_*.py' -v
 python tools/import_channel_candidates.py
 ```
 
-GitHub Actions runs the same tests and refreshes the candidate file daily
-(`.github/workflows/refresh-channel-candidates.yml`) or on manual dispatch.
-The generated file is a review queue only: every record is marked
-`candidate`, rights status `not_reviewed`, and reliability `unrated`.
-It is not a playable/approved playlist. Adult, closed/replaced, blocklisted,
-country-less, and no-stream records are excluded from this candidate output.
+GitHub Actions refreshes `catalog/generated/candidates.json` daily and when the importer changes. The generated file is a discovery/review queue, not a ready-to-play or rights-cleared playlist. The importer does not guarantee that every country or broadcaster is represented; it is limited to upstream source coverage.
 
-## Playback quality: 4K / FHD / HD / SD
+## YouTube live broadcasts
 
-The internet player should expose Auto plus the available stream variants in these
-classes: 4K UHD (2160p), Full HD (1080p), HD (720p), and SD (480p/576p or
-lower). Do not invent a quality variant when the provider does not supply it.
-Source labels imported by the candidate importer are hints, not verified
-resolution. The player must inspect the selected HLS/DASH variant or decoded
-video dimensions and only then display a verified quality badge. Auto is the
-default and should adapt to bandwidth/device capability. Never upscale an SD
-or HD source and label it as native 4K. If the source has only one rendition,
-only that rendition is selectable.
+YouTube live discovery is designed around the official YouTube Data API v3 search endpoint with `type=video` and `eventType=live`. It requires a protected `YOUTUBE_API_KEY`. Results depend on search terms, supported languages/regions, quota, and availability; they are not a complete index of all YouTube live channels. Playback must use the official YouTube watch route or approved official player integration. RS TV must not extract or rehost YouTube media streams.
+
+## Official broadcaster websites and internet services
+
+A universal index of every live broadcaster website does not exist. Add verified official website entries by country and use the broadcaster's permitted embed/player. When embedding is unavailable or not permitted, open the broadcaster website or official service app. Do not scrape protected players or reverse-engineer private APIs.
+
+FAST services such as Pluto TV, Rakuten TV Live, and Samsung TV Plus remain official-service links. Their channel availability, geographic restrictions, and device support are controlled by their operators; RS TV will not extract their streams.
+
+## Films and series catalogue
+
+TMDB can provide international movie/TV metadata, including titles, descriptions, artwork, seasons, episodes, and availability metadata where offered. It requires a `TMDB_API_KEY`, attribution, and compliance with its current terms. TMDB metadata is not a film/episode stream and does not grant playback or redistribution rights. Commercial licensing must be reviewed separately.
+
+Internet Archive can be searched for collection metadata, but every item needs an item-level rights check before being described as free or public-domain content. A listing alone is not sufficient rights evidence.
+
+For every film/series record, keep metadata provider, country availability, official watch provider or item-level rights evidence, attribution, and last review time. Never add pirated streams or bypass DRM/subscriptions.
+
+## Admission states and reliability
+
+- `candidate`: imported from a discovery source; not reviewed.
+- `stream_checked`: technical URL/playback probe passed; rights remain unverified.
+- `rights_reviewed`: evidence supports the intended catalogue use.
+- `approved`: passes both technical and rights review.
+- `rejected`: unavailable, unauthorized, paid/encrypted without entitlement, or rights unclear.
+
+Only `approved` sources can appear in the default playable catalogue. Technical reachability is not copyright permission. Prefer official broadcaster/CDN endpoints, preserve source attribution, show last checked time, and hide stale or repeatedly failing streams. Never promise zero buffering.
+
+## Quality labels
+
+Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p), Full HD (1080p), HD (720p), or SD only when the stream actually provides that rendition. Auto is the default; never upscale and label as native 4K.

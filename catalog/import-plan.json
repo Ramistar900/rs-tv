@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "RS TV",
-  "mode": "scheduled_candidate_import",
+  "mode": "scheduled_worldwide_internet_candidate_import",
   "language": "ar",
+  "scope": "internet_only",
   "endpoints": {
     "channels": "https://iptv-org.github.io/api/channels.json",
     "streams": "https://iptv-org.github.io/api/streams.json",
@@ -26,7 +27,6 @@
     "stream_channel_id": "streams[].channel",
     "stream_url": "streams[].url",
     "stream_quality_label": "streams[].label",
-    "stream_user_agent": "streams[].user_agent",
     "country_name": "countries[].name",
     "country_flag": "countries[].flag",
     "language_codes": "countries[].languages",
@@ -39,21 +39,52 @@
   "country_filter": {
     "all_value": "ALL",
     "all_label_ar": "الكل",
-    "all_behavior": "Show every approved channel from every country in one combined continuous list. Keep the flag and country name visible on every channel card.",
-    "country_behavior": "Filter the same catalogue by exact ISO country code.",
-    "flag_source": "countries.json",
-    "unknown_country_behavior": "Show neutral globe icon and country label if available; never guess a flag from language."
+    "all_behavior": "Show all imported candidates from every represented country in one combined list; keep country attribution on every record.",
+    "country_behavior": "Filter the same catalogue by exact ISO 3166-1 alpha-2 country code.",
+    "unknown_country_behavior": "Keep the candidate under ZZ with a neutral globe icon; never infer country from language or channel name."
+  },
+  "youtube_live_discovery": {
+    "provider": "YouTube Data API v3",
+    "endpoint": "https://www.googleapis.com/youtube/v3/search",
+    "required_parameters": [
+      "part=snippet",
+      "type=video",
+      "eventType=live"
+    ],
+    "credential": "YOUTUBE_API_KEY",
+    "playback_policy": "Use the official YouTube watch URL/player only; never extract or rehost the media stream.",
+    "coverage_note": "Search results are query-, quota-, language-, and region-dependent, not a complete inventory of all live YouTube channels."
+  },
+  "official_web_channels": {
+    "source": "Official broadcaster websites and authorized embeds",
+    "import_mode": "country-by-country verified directory",
+    "playback_policy": "Use official embeddable player when allowed; otherwise open the broadcaster website.",
+    "limitation": "There is no universal index of every global broadcaster website."
+  },
+  "movie_and_series_discovery": {
+    "metadata_provider": "TMDB",
+    "endpoint": "https://api.themoviedb.org/3",
+    "credential": "TMDB_API_KEY",
+    "purpose": "Titles, descriptions, posters, seasons, episode metadata, and region-specific watch-provider discovery where offered.",
+    "playback_policy": "Metadata is not a video stream and does not grant playback or redistribution rights.",
+    "attribution": "Display provider attribution and comply with current TMDB terms. Recheck licensing before commercial use."
+  },
+  "public_collection_media": {
+    "provider": "Internet Archive Advanced Search",
+    "endpoint": "https://archive.org/advancedsearch.php",
+    "purpose": "Discover candidate film/TV collection records.",
+    "admission": "Check item-level rights and permitted playback before showing an item as free/legal to watch."
   },
   "admission": {
     "imported_status": "candidate",
     "default_catalogue_status": "candidate",
     "required_before_approval": [
-      "stable_channel_id",
-      "country_code_verified",
-      "stream_url_tested_repeatedly",
+      "stable_channel_or_media_id",
+      "country_and_language_metadata_verified",
+      "stream_or_official_playback_route_tested",
       "official_or_authorized_source_evidence",
       "rights_review_passed",
-      "logo_attribution_checked"
+      "attribution_checked"
     ],
     "reject_if": [
       "paid_or_encrypted_without_valid_provider_entitlement",
@@ -64,8 +95,8 @@
     ]
   },
   "reliability": {
-    "grade_A": "Official broadcaster or authorized CDN, repeated successful playback checks across times and network locations.",
-    "grade_B": "Known broadcaster-origin source with repeated checks but limited coverage.",
+    "grade_A": "Official broadcaster or authorized CDN; repeated successful tests across times and network locations.",
+    "grade_B": "Known broadcaster-origin source; repeated tests, but limited coverage.",
     "grade_C": "Community stream with insufficient or intermittent checks; hidden from default catalogue.",
     "recheck_required": true,
     "no_zero_buffering_promise": true,
@@ -74,7 +105,7 @@
   "update_policy": {
     "metadata_refresh_hours": 24,
     "stream_health_checks": "scheduled and rate-limited; never run from every client device",
-    "stale_stream_action": "hide from default catalogue pending recheck",
+    "stale_stream_action": "hide from default approved catalogue pending recheck",
     "preserve_source_attribution": true
   },
   "important": "This is a discovery/import contract. Imported records are candidates, not automatically free, authorized, stable, or approved.",
@@ -84,7 +115,7 @@
     "workflow": ".github/workflows/refresh-channel-candidates.yml",
     "output": "catalog/generated/candidates.json",
     "refresh": "Daily at 04:23 UTC and manual workflow dispatch",
-    "safety": "Generated records remain candidate/not_reviewed and are never directly playable."
+    "safety": "Generated records remain candidate/not_reviewed and are never directly playable until reviewed."
   },
   "quality_profiles": {
     "UHD_4K": {
@@ -108,5 +139,5 @@
       "note": "Do not claim a resolution until measured during playback."
     }
   },
-  "quality_selection": "Auto by default; allow manual selection only among variants actually supplied by the stream. Source metadata is a hint, not verified resolution. Never upscale and label as native 4K."
+  "quality_selection": "Auto by default; allow manual selection only among variants actually supplied by the stream. Never upscale and label as native 4K."
 }

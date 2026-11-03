@@ -1,27 +1,29 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "RS TV",
-  "purpose": "Candidate source registry for lawful free-to-watch channel discovery. A source entry is not proof that every channel or stream may be redistributed.",
+  "purpose": "Worldwide discovery registry for internet live channels and legal film/series metadata. Every external record is a candidate until source, availability, and rights are checked.",
   "sources": [
     {
       "id": "iptv-org-api",
-      "name": "IPTV-org structured catalogue API",
-      "type": "channel_metadata_api",
+      "name": "IPTV-org structured worldwide channel catalogue",
+      "type": "internet_channel_metadata_api",
       "url": "https://iptv-org.github.io/api/channels.json",
       "related_endpoints": {
         "streams": "https://iptv-org.github.io/api/streams.json",
         "countries": "https://iptv-org.github.io/api/countries.json",
         "languages": "https://iptv-org.github.io/api/languages.json",
         "categories": "https://iptv-org.github.io/api/categories.json",
-        "logos": "https://iptv-org.github.io/api/logos.json"
+        "logos": "https://iptv-org.github.io/api/logos.json",
+        "feeds": "https://iptv-org.github.io/api/feeds.json",
+        "blocklist": "https://iptv-org.github.io/api/blocklist.json"
       },
-      "status": "discovery_metadata_only_requires_channel_and_rights_review",
-      "notes": "Structured channel IDs, country codes, language/category metadata, stream references, and logo metadata. Do not treat the API's presence or a reachable stream as rights clearance or guaranteed uptime."
+      "status": "automated_global_discovery_candidates_only",
+      "notes": "Worldwide structured channel metadata. Community stream references are not proof of permission, free access, or uptime. The importer keeps candidate/not_reviewed status."
     },
     {
-      "id": "iptv-org-main",
-      "name": "IPTV-org public playlist",
-      "type": "internet_playlist",
+      "id": "iptv-org-playlists",
+      "name": "IPTV-org public M3U playlists",
+      "type": "internet_playlist_discovery",
       "url": "https://iptv-org.github.io/iptv/index.m3u",
       "groupings": {
         "country": "https://iptv-org.github.io/iptv/index.country.m3u",
@@ -30,15 +32,47 @@
         "arab_region": "https://iptv-org.github.io/iptv/regions/arab.m3u"
       },
       "status": "candidate_source_requires_channel_level_review",
-      "notes": "Publicly available community playlist; verify each channel, stream origin, availability, and redistribution rights before bundling."
+      "notes": "Community-maintained playlist discovery source. Do not assume stream reachability means authorized redistribution."
     },
     {
-      "id": "lyngsat-fta",
-      "name": "LyngSat Free TV directory",
-      "type": "satellite_fta_reference",
-      "url": "https://www.lyngsat.com/freetv/",
-      "status": "reference_only_requires_manual_verification",
-      "notes": "Use for FTA channel, satellite, and transponder research. Frequency data is not an internet stream and does not grant redistribution rights."
+      "id": "youtube-live-api",
+      "name": "YouTube live broadcasts",
+      "type": "official_live_video_discovery_api",
+      "url": "https://www.googleapis.com/youtube/v3/search",
+      "status": "integration_requires_youtube_data_api_key",
+      "required_parameters": [
+        "part=snippet",
+        "type=video",
+        "eventType=live"
+      ],
+      "credential": "YOUTUBE_API_KEY",
+      "playback": "Open the official YouTube watch page or approved official player integration; do not extract or rehost YouTube media streams.",
+      "notes": "Search results depend on query, quota, language, and region; they are not a complete inventory of every worldwide YouTube live channel."
+    },
+    {
+      "id": "official-broadcaster-sites",
+      "name": "Official broadcaster live websites",
+      "type": "official_website_directory",
+      "status": "manual_or_partner_verified_catalogue",
+      "playback": "Use official embed/player links where permitted; otherwise open the broadcaster website.",
+      "notes": "No universal index covers every broadcaster website. Add entries by country with the official domain and source attribution; never scrape protected players or bypass access controls."
+    },
+    {
+      "id": "tmdb-movie-tv-metadata",
+      "name": "The Movie Database movie and TV metadata",
+      "type": "movie_series_metadata_api",
+      "url": "https://api.themoviedb.org/3",
+      "status": "integration_requires_tmdb_api_key_and_terms_review",
+      "credential": "TMDB_API_KEY",
+      "notes": "Metadata, titles, descriptions, posters, and discovery only. TMDB metadata does not provide streaming rights or playback. Follow attribution and licensing requirements; commercial use requires separate review."
+    },
+    {
+      "id": "internet-archive-media",
+      "name": "Internet Archive media discovery",
+      "type": "public_collection_metadata_search",
+      "url": "https://archive.org/advancedsearch.php",
+      "status": "item_level_rights_review_required",
+      "notes": "Searchable public collection metadata. Review the rights/usage information for each item; do not treat an Archive listing as automatic public-domain clearance."
     },
     {
       "id": "pluto-tv",
@@ -46,7 +80,7 @@
       "type": "official_free_streaming_service",
       "url": "https://pluto.tv/where-to-watch",
       "status": "official_service_link_only",
-      "notes": "Free ad-supported service; availability and playback are controlled by the service and may vary by country/device. Do not extract or rehost its streams."
+      "notes": "Availability and playback are controlled by the service and may vary by country/device. Do not extract or rehost streams."
     },
     {
       "id": "rakuten-tv-live",
@@ -54,7 +88,7 @@
       "type": "official_free_streaming_service",
       "url": "https://support.rakuten.tv/hc/en-us/articles/360016822920-Live-TV",
       "status": "official_service_link_only",
-      "notes": "Official free ad-supported channels; availability varies by country and device. Do not extract or rehost its streams."
+      "notes": "Availability varies by country and device. Use official service playback."
     },
     {
       "id": "samsung-tv-plus",
@@ -62,78 +96,57 @@
       "type": "official_free_streaming_service",
       "url": "https://www.samsungtvplus.com/help-center.html",
       "status": "official_service_link_only",
-      "notes": "Free ad-supported service with device and regional restrictions. Do not extract or rehost its streams."
-    },
-    {
-      "id": "satstar-fta",
-      "name": "SatStar free-to-air satellite directory",
-      "type": "satellite_fta_reference",
-      "url": "https://www.satstar.net/",
-      "status": "reference_only_requires_manual_verification",
-      "notes": "Additional worldwide FTA satellite reference. Verify each channel and transponder against an operator or satellite-provider source before publication; this is tuning metadata, not an internet stream."
+      "notes": "Device and regional restrictions apply. Do not extract or rehost streams."
     }
   ],
   "channel_record_required_fields": [
     "channel_id",
     "name",
-    "country_code",
+    "country_code_or_unknown",
     "languages",
     "categories",
-    "logo_url",
+    "official_website_or_stream_source",
     "delivery_type",
-    "stream_url",
-    "stream_format",
     "source_id",
-    "official_channel_or_rights_evidence",
     "rights_review_status",
     "last_stream_check_utc",
     "last_metadata_review_utc"
   ],
-  "satellite_record_fields": [
-    "channel_id",
-    "satellite_name",
-    "orbital_position",
-    "frequency_mhz",
-    "polarization",
-    "symbol_rate",
-    "fec",
-    "standard",
-    "encryption_status",
-    "languages",
-    "country_code",
-    "source_url",
-    "last_verified_utc"
+  "media_record_required_fields": [
+    "provider_id",
+    "media_type",
+    "title",
+    "original_language",
+    "release_year",
+    "poster_attribution",
+    "metadata_source",
+    "legal_watch_provider_or_item_rights_evidence",
+    "availability_country",
+    "last_metadata_review_utc"
   ],
   "rules": [
-    "Do not mark a channel as rights-cleared solely because a stream is publicly reachable.",
+    "Do not mark a channel, film, or episode rights-cleared solely because a page or stream is publicly reachable.",
     "Do not include paid, encrypted, DRM-protected, leaked, or unauthorized streams.",
-    "Do not scrape, extract, proxy, or rehost streams from official FAST services without written permission.",
-    "Keep satellite reception data separate from internet playback URLs.",
-    "Store source attribution and review timestamps for every channel record.",
-    "Treat all external URLs and playlist metadata as untrusted input."
+    "Do not scrape, extract, proxy, or rehost streams from official platforms without written permission.",
+    "Open YouTube and restricted broadcaster content through official playback routes.",
+    "Keep metadata discovery separate from a playable video source.",
+    "Preserve source attribution, country/region availability, and review timestamps.",
+    "Treat all external URLs and metadata as untrusted input."
   ],
   "reliability_policy": {
-    "principle": "Never promise zero buffering. Reliability is measured per stream and can change without notice.",
+    "principle": "Never promise zero buffering. Reliability is measured per source and can change without notice.",
     "grades": {
       "A": "Official broadcaster or authorized CDN; repeated successful tests from multiple networks/regions.",
-      "B": "Known broadcaster-origin stream; repeated tests, but limited geographic test coverage.",
-      "C": "Community-submitted public stream; intermittent or insufficient test history. Hidden from default catalogue.",
+      "B": "Known broadcaster-origin stream; repeated tests, but limited coverage.",
+      "C": "Community-submitted public stream; intermittent or insufficient test history. Hidden from the default approved catalogue.",
       "rejected": "Dead, unstable, unauthorized, encrypted without entitlement, or rights unclear."
     },
-    "checks": [
-      "HTTP/TLS reachability and playlist parsing",
-      "HLS/DASH manifest and segment availability",
-      "Playback probe for a bounded test window without recording or redistributing content",
-      "Repeated checks at different times and network regions where feasible",
-      "Monitor HTTP errors, startup failures, manifest age, segment gaps, and bitrate changes",
-      "Do not use a successful probe as evidence of copyright permission"
-    ],
     "product_rules": [
-      "Only approved rights-reviewed channels can appear in the default catalogue.",
-      "Keep satellite FTA tuning records separate from internet stream endpoints.",
-      "Prefer official broadcaster/CDN endpoints over third-party relays.",
-      "Do not proxy or rehost streams without explicit authorization.",
-      "Show last checked time and reliability grade; automatically hide stale or failing streams."
+      "Only rights-reviewed and technically approved internet channels appear in the default playable catalogue.",
+      "Prefer official broadcaster/CDN sources over third-party relays.",
+      "Show source, last checked time, and reliability grade.",
+      "Hide stale or repeatedly failing streams from the default catalogue.",
+      "Do not use successful technical playback checks as evidence of copyright permission."
     ]
   }
 }

@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.AlertDialog
@@ -98,7 +97,6 @@ private enum class RSTVTab(
     LIVE("البث المباشر", Icons.Outlined.Tv),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
-    SATELLITES("الأقمار", Icons.Outlined.Public),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
 }
 
@@ -531,7 +529,6 @@ private fun ScreenBody(
             onImportGuide = onImportGuide,
             modifier = modifier
         )
-        RSTVTab.SATELLITES -> SatelliteContent(modifier = modifier)
         RSTVTab.SETTINGS -> SettingsContent(
             status = status,
             onImportPlaylist = onImportPlaylist,
@@ -567,7 +564,7 @@ private fun HomeContent(
                 ) {
                     Text("عالم التلفزيون بين يديك", color = SoftWhite, fontSize = 25.sp, fontWeight = FontWeight.Black)
                     Text(
-                        "قوائمك المحلية، البث المباشر، دليل البرامج، ودليل الأقمار في تطبيق واحد.",
+                        "قوائم البث المباشر، دليل البرامج، ومصادر قنوات الإنترنت في مكان واحد.",
                         color = MutedText,
                         fontSize = 14.sp
                     )
@@ -604,8 +601,8 @@ private fun HomeContent(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("الأقمار الصناعية", "دليل مستقل عن الإنترنت", "فتح", Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.SATELLITES)
+                FeatureCard("قنوات الإنترنت", "قوائم IPTV المستوردة", "فتح", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.LIVE)
                 }
                 FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.weight(1f)) {
                     onNavigate(RSTVTab.FAVORITES)
@@ -932,65 +929,6 @@ private fun ProgrammeCard(programme: GuideProgramme) {
             Text("$start  —  $end  •  ${programme.channelId}", color = MutedText, fontSize = 11.sp)
             programme.description?.let {
                 Text(it, color = MutedText, fontSize = 12.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SatelliteContent(modifier: Modifier = Modifier) {
-    val references = listOf("نايل سات", "عرب سات", "سهيل سات", "ياه سات")
-    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("دليل الأقمار الصناعية", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-        Text(
-            "قسم مستقل عن روابط IPTV. ستظهر بيانات الضبط والقنوات فقط بعد توثيقها من مصادر فنية.",
-            color = MutedText,
-            fontSize = 12.sp
-        )
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                SatelliteInfoCard(
-                    title = "كل الأقمار",
-                    description = "لم يتم إدخال قاعدة بيانات ترددات عالمية معتمدة في هذه النسخة."
-                )
-            }
-            items(references) { name ->
-                SatelliteInfoCard(
-                    title = name,
-                    description = "قسم مُعدّ لاستقبال بيانات موثقة؛ لا توجد ترددات معتمدة معروضة حالياً."
-                )
-            }
-            item {
-                Text(
-                    "ملاحظة: استقبال البث الفضائي الفعلي يحتاج جهاز DVB-S/S2/S2X متوافقاً. عرض اسم القمر لا يعني أن الهاتف يستطيع ضبط الطبق.",
-                    color = MutedText,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SatelliteInfoCard(title: String, description: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = PanelBlack),
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(Icons.Outlined.Public, contentDescription = null, tint = AccentRed)
-            Column {
-                Text(title, color = SoftWhite, fontWeight = FontWeight.Bold)
-                Text(description, color = MutedText, fontSize = 11.sp)
             }
         }
     }

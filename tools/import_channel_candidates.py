@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Import IPTV-org metadata into a review-only RS TV candidate catalogue.
-
-This tool does not establish broadcast rights or stream reliability. Every
-record is emitted with status=candidate and is excluded from the playable
-catalogue until separately reviewed and approved.
-"""
+"""Import worldwide IPTV-org metadata as review-only RS TV candidates."""
 from __future__ import annotations
 
 import argparse
@@ -14,6 +9,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from urllib.error import URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 BASE = "https://iptv-org.github.io/api"
@@ -27,7 +23,7 @@ ENDPOINTS = {
     "feeds": f"{BASE}/feeds.json",
     "blocklist": f"{BASE}/blocklist.json",
 }
-USER_AGENT = "RS-TV-CatalogueImporter/1.0 (+https://github.com/Ramistar900/rs-tv)"
+USER_AGENT = "RS-TV-CatalogueImporter/1.1 (+https://github.com/Ramistar900/rs-tv)"
 
 
 def fetch_json(url: str, timeout: int = 45):
@@ -46,10 +42,19 @@ def fetch_json(url: str, timeout: int = 45):
 
 
 def valid_stream_url(value):
-    if not isinstance(value, str):
+    """Accept HTTPS candidates only; reject credentials and hostless URLs."""
+    if not isinstance(value, str) or not value.strip():
         return False
-    value = value.strip()
-    return value.startswith("https://") or value.startswith("http://")
+    try:
+        parsed = urlsplit(value.strip())
+        return (
+            parsed.scheme.lower() == "https"
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+        )
+    except ValueError:
+        return False
 
 
 def normalize_quality(*values):
@@ -68,46 +73,67 @@ def normalize_quality(*values):
 
 
 def build_catalog(data, generated_at):
-    channels = data["channels"]
     countries = {x.get("code"): x for x in data["countries"] if x.get("code")}
     languages = {x.get("code"): x.get("name") for x in data["languages"] if x.get("code")}
+    categories = {x.get("id"): x.get("name") for x in data["categories"] if x.get("id")}
     blocked = {x.get("channel") for x in data["blocklist"] if x.get("channel")}
+
     feeds_by_channel = defaultdict(list)
     for feed in data["feeds"]:
         if feed.get("channel"):
             feeds_by_channel[feed["channel"]].append(feed)
+
     logos_by_channel = defaultdict(list)
     for logo in data["logos"]:
         if logo.get("channel") and logo.get("url"):
             logos_by_channel[logo["channel"]].append(logo)
+
+    skipped = {
+        "nsfw": 0,
+        "closed_or_replaced": 0,
+        "blocklisted": 0,
+        "no_stream": 0,
+        "invalid_or_insecure_stream": 0,
+        "duplicate_stream": 0,
+    }
     streams_by_channel = defaultdict(list)
+    seen_streams_by_channel = defaultdict(set)
     for stream in data["streams"]:
         channel_id = stream.get("channel")
         url = stream.get("url")
-        if channel_id and valid_stream_url(url):
-            labels = stream.get("labels") or stream.get("label") or []
-            if isinstance(labels, str):
-                labels = [labels]
-            streams_by_channel[channel_id].append({
-                "title": stream.get("title"),
-                "url": url.strip(),
-                "quality": stream.get("quality"),
-                "labels": sorted(set(x for x in labels if isinstance(x, str))),
-                "quality_hint": normalize_quality(stream.get("quality"), stream.get("title"), *labels),
-                "quality_source_value": stream.get("quality") or stream.get("title") or " ".join(labels) or None,
-                "feed_id": stream.get("feed"),
-                "referrer": stream.get("referrer"),
-                "user_agent": stream.get("user_agent"),
-            })
+        if not channel_id:
+            continue
+        if not valid_stream_url(url):
+            skipped["invalid_or_insecure_stream"] += 1
+            continue
+        url = url.strip()
+        if url in seen_streams_by_channel[channel_id]:
+            skipped["duplicate_stream"] += 1
+            continue
+        seen_streams_by_channel[channel_id].add(url)
+        raw_labels = stream.get("labels") or stream.get("label") or []
+        if isinstance(raw_labels, str):
+            raw_labels = [raw_labels]
+        if not isinstance(raw_labels, list):
+            raw_labels = []
+        labels = sorted({item.strip() for item in raw_labels if isinstance(item, str) and item.strip()})
+        streams_by_channel[channel_id].append({
+            "title": stream.get("title"),
+            "url": url,
+            "quality": stream.get("quality"),
+            "labels": labels,
+            "quality_hint": normalize_quality(stream.get("quality"), stream.get("title"), *labels),
+            "quality_source_value": stream.get("quality") or stream.get("title") or " ".join(labels) or None,
+            "feed_id": stream.get("feed"),
+        })
 
     records = []
-    skipped = {"nsfw": 0, "closed_or_replaced": 0, "blocklisted": 0, "no_country": 0, "no_stream": 0}
-    seen = set()
-    for channel in channels:
+    seen_channel_ids = set()
+    for channel in data["channels"]:
         channel_id = channel.get("id")
-        if not channel_id or channel_id in seen:
+        if not channel_id or channel_id in seen_channel_ids:
             continue
-        seen.add(channel_id)
+        seen_channel_ids.add(channel_id)
         if channel.get("is_nsfw") is True:
             skipped["nsfw"] += 1
             continue
@@ -117,33 +143,40 @@ def build_catalog(data, generated_at):
         if channel_id in blocked:
             skipped["blocklisted"] += 1
             continue
-        country_code = channel.get("country")
-        country = countries.get(country_code, {})
-        if not country_code:
-            skipped["no_country"] += 1
-            continue
+
         streams = streams_by_channel.get(channel_id, [])
         if not streams:
             skipped["no_stream"] += 1
             continue
+
+        raw_country_code = channel.get("country")
+        country = countries.get(raw_country_code, {}) if raw_country_code else {}
+        country_code = raw_country_code or "ZZ"
         feed_rows = feeds_by_channel.get(channel_id, [])
-        feed_languages = sorted({code for feed in feed_rows for code in (feed.get("languages") or []) if code})
+        feed_languages = sorted({
+            code for feed in feed_rows
+            for code in (feed.get("languages") or [])
+            if isinstance(code, str) and code
+        })
         logo_rows = sorted(
             logos_by_channel.get(channel_id, []),
             key=lambda item: (not item.get("in_use", False), item.get("width") or 0),
             reverse=True,
         )
+        category_ids = channel.get("categories") or []
         records.append({
             "id": channel_id,
             "name": channel.get("name") or channel_id,
             "alternative_names": channel.get("alt_names") or [],
             "country": {
                 "code": country_code,
-                "name": country.get("name") or country_code,
+                "name": country.get("name") or raw_country_code or "غير محدد",
                 "flag": country.get("flag") or "🌐",
+                "mapping_status": "verified" if country else "unknown",
             },
             "languages": [{"code": code, "name": languages.get(code, code)} for code in feed_languages],
-            "categories": channel.get("categories") or [],
+            "categories": category_ids,
+            "category_names": [categories[code] for code in category_ids if code in categories],
             "website": channel.get("website"),
             "logo_url": logo_rows[0].get("url") if logo_rows else None,
             "streams": streams,
@@ -156,7 +189,8 @@ def build_catalog(data, generated_at):
         })
 
     records.sort(key=lambda item: (item["country"]["name"].casefold(), item["name"].casefold(), item["id"]))
-    return records, skipped
+    country_codes = sorted({item["country"]["code"] for item in records if item["country"]["code"] != "ZZ"})
+    return records, skipped, country_codes
 
 
 def main():
@@ -171,35 +205,39 @@ def main():
         data[key] = fetch_json(url, timeout=args.timeout)
 
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    records, skipped = build_catalog(data, generated_at)
+    records, skipped, country_codes = build_catalog(data, generated_at)
     output = {
-        "schema_version": 1,
-        "catalogue": "RS TV internet channel candidates",
+        "schema_version": 2,
+        "catalogue": "RS TV worldwide internet channel candidates",
         "generated_at_utc": generated_at,
         "source": "https://github.com/iptv-org/api",
+        "coverage_scope": "All country-coded channels with candidate HTTPS streams in the upstream datasets; not a claim that every broadcaster or country is represented.",
         "source_notice": "Discovery metadata only. Public reachability is not proof of free-to-watch status, redistribution rights, or stream stability.",
-        "playback_policy": "Only separately rights-reviewed and technically approved records may enter the playable catalogue.",
+        "playback_policy": "Only separately rights-reviewed and technically approved records may enter the playable catalogue. YouTube and official service links must use their own official playback routes.",
         "quality_profiles": {
             "UHD_4K": {"label": "4K UHD", "minimum_height": 2160},
             "FHD": {"label": "Full HD", "minimum_height": 1080},
             "HD": {"label": "HD", "minimum_height": 720},
             "SD": {"label": "SD", "maximum_height": 576},
-            "UNKNOWN": {"label": "Auto / unknown", "note": "Do not claim a resolution until measured during playback."}
+            "UNKNOWN": {"label": "Auto / unknown", "note": "Do not claim a resolution until measured during playback."},
         },
         "quality_selection": "Auto by default; manual selection only among variants actually exposed by the stream. Never upscale and label it as native 4K/FHD/HD.",
         "country_filter": {
             "all_value": "ALL",
-            "all_behavior": "Combine all approved countries in one list; retain each channel country flag and name.",
-            "country_behavior": "Filter by exact ISO 3166-1 alpha-2 country code."
+            "all_behavior": "Combine candidates from every represented country; retain each channel country flag and name.",
+            "country_behavior": "Filter by exact ISO 3166-1 alpha-2 country code. ZZ means the source did not identify a country.",
         },
         "counts": {
             "channels_source": len(data["channels"]),
             "streams_source": len(data["streams"]),
-            "candidate_channels_with_streams": len(records),
+            "candidate_channels_with_https_streams": len(records),
             "countries_source": len(data["countries"]),
-            "skipped": skipped
+            "countries_with_candidates": len(country_codes),
+            "candidate_country_codes": country_codes,
+            "unknown_country_candidates": sum(1 for item in records if item["country"]["code"] == "ZZ"),
+            "skipped": skipped,
         },
-        "records": records
+        "records": records,
     }
     directory = os.path.dirname(args.output)
     if directory:
