@@ -4,6 +4,7 @@ import java.net.URI
 
 internal data class RSTVChannel(
     val name: String,
+    val tvgId: String?,
     val group: String?,
     val logoUrl: String?,
     val streamUrl: String
@@ -28,6 +29,7 @@ internal object M3uPlaylistParser {
 
         data class PendingChannel(
             val name: String,
+            val tvgId: String?,
             val group: String?,
             val logoUrl: String?
         )
@@ -58,6 +60,7 @@ internal object M3uPlaylistParser {
 
                 pending = PendingChannel(
                     name = name,
+                    tvgId = attributes["tvg-id"]?.takeIf(String::isNotBlank),
                     group = attributes["group-title"]?.takeIf(String::isNotBlank),
                     logoUrl = attributes["tvg-logo"]?.takeIf(String::isNotBlank)
                 )
@@ -81,6 +84,7 @@ internal object M3uPlaylistParser {
             if (seenUrls.add(line)) {
                 channels += RSTVChannel(
                     name = channel.name,
+                    tvgId = channel.tvgId,
                     group = channel.group,
                     logoUrl = channel.logoUrl,
                     streamUrl = line
