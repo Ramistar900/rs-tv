@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.AlertDialog
@@ -37,6 +38,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,6 +99,7 @@ private enum class RSTVTab(
 ) {
     HOME("الرئيسية", Icons.Outlined.Home),
     LIVE("البث المباشر", Icons.Outlined.Tv),
+    WORLD("العالمية", Icons.Outlined.Public),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
@@ -134,6 +139,8 @@ private fun RSTVHome() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val channels = remember { mutableStateListOf<RSTVChannel>() }
+    val worldChannels = remember { mutableStateListOf<WorldChannelCandidate>() }
+    var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
     var selectedTab by remember { mutableStateOf(RSTVTab.HOME) }
@@ -186,6 +193,20 @@ private fun RSTVHome() {
             runCatching { withContext(Dispatchers.Default) { XmltvGuideParser.parse(savedGuide) } }
                 .onSuccess { programmes.addAll(it) }
                 .onFailure { status = "تعذر استعادة دليل البرامج المحفوظ" }
+        }
+        runCatching {
+            val catalogJson = withContext(Dispatchers.IO) {
+                context.assets.open("candidates.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            }
+            withContext(Dispatchers.Default) {
+                WorldChannelCatalogParser.parse(catalogJson)
+            }
+        }.onSuccess { imported ->
+            worldChannels.clear()
+            worldChannels.addAll(imported)
+            worldCatalogStatus = "تم تحميل ${imported.size} قناة مرشّحة من الكتالوج المضمّن"
+        }.onFailure {
+            worldCatalogStatus = "تعذر تحميل الكتالوج العالمي: ${it.message ?: "ملف غير متاح"}"
         }
     }
 
@@ -353,6 +374,8 @@ private fun RSTVHome() {
                         )
                         ScreenBody(
                             tab = selectedTab,
+                            worldChannels = worldChannels,
+                            worldCatalogStatus = worldCatalogStatus,
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
                                 else -> visibleChannels
@@ -387,6 +410,8 @@ private fun RSTVHome() {
                         )
                         ScreenBody(
                             tab = selectedTab,
+                            worldChannels = worldChannels,
+                            worldCatalogStatus = worldCatalogStatus,
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
                                 else -> visibleChannels
@@ -474,6 +499,8 @@ private fun TopHeader(
 @Composable
 private fun ScreenBody(
     tab: RSTVTab,
+    worldChannels: List<WorldChannelCandidate>,
+    worldCatalogStatus: String,
     channels: List<RSTVChannel>,
     recentChannels: List<RSTVChannel>,
     programmes: List<GuideProgramme>,
@@ -495,10 +522,16 @@ private fun ScreenBody(
     when (tab) {
         RSTVTab.HOME -> HomeContent(
             channelCount = channels.size,
+            worldChannelCount = worldChannels.size,
             recentChannels = recentChannels,
             onPlay = onPlay,
             onNavigate = onNavigate,
             onImportPlaylist = onImportPlaylist,
+            modifier = modifier
+        )
+        RSTVTab.WORLD -> WorldCatalogContent(
+            candidates = worldChannels,
+            catalogStatus = worldCatalogStatus,
             modifier = modifier
         )
         RSTVTab.LIVE -> LiveContent(
@@ -542,6 +575,7 @@ private fun ScreenBody(
 @Composable
 private fun HomeContent(
     channelCount: Int,
+    worldChannelCount: Int,
     recentChannels: List<RSTVChannel>,
     onPlay: (RSTVChannel) -> Unit,
     onNavigate: (RSTVTab) -> Unit,
@@ -601,8 +635,8 @@ private fun HomeContent(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("قنوات الإنترنت", "قوائم IPTV المستوردة", "فتح", Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.LIVE)
+                FeatureCard("القنوات العالمية", "${worldChannelCount} قناة مرشّحة من مصادر دولية", "استعراض", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.WORLD)
                 }
                 FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.weight(1f)) {
                     onNavigate(RSTVTab.FAVORITES)
@@ -754,6 +788,223 @@ private fun LiveContent(
                             onPlay = { onPlay(channel) },
                             onToggleFavorite = { onToggleFavorite(channel) }
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class WorldFilterOption(val key: String, val label: String)
+
+@Composable
+private fun WorldCatalogContent(
+    candidates: List<WorldChannelCandidate>,
+    catalogStatus: String,
+    modifier: Modifier = Modifier
+) {
+    var query by remember { mutableStateOf("") }
+    var selectedCountry by remember { mutableStateOf("ALL") }
+    var selectedCategory by remember { mutableStateOf("ALL") }
+    var selectedLanguage by remember { mutableStateOf("ALL") }
+
+    val countries = remember(candidates) {
+        listOf(WorldFilterOption("ALL", "كل الدول")) +
+            candidates.distinctBy { it.countryCode }
+                .sortedBy { it.countryName }
+                .map { WorldFilterOption(it.countryCode, "${dollar}{it.countryFlag} ${dollar}{it.countryName}") }
+    }
+    val categories = remember(candidates) {
+        val labels = linkedMapOf<String, String>()
+        candidates.forEach { channel ->
+            channel.categoryIds.forEachIndexed { index, id ->
+                labels.putIfAbsent(id, channel.categoryLabels.getOrNull(index) ?: id)
+            }
+        }
+        listOf(WorldFilterOption("ALL", "كل التصنيفات")) +
+            labels.map { (id, label) -> WorldFilterOption(id, label) }.sortedBy { it.label }
+    }
+    val languages = remember(candidates) {
+        val labels = linkedMapOf<String, String>()
+        candidates.forEach { channel ->
+            channel.languageSearchValues.forEachIndexed { index, code ->
+                labels.putIfAbsent(code, channel.languageLabels.getOrNull(index) ?: code)
+            }
+        }
+        listOf(WorldFilterOption("ALL", "كل اللغات")) +
+            labels.map { (code, label) -> WorldFilterOption(code, label) }.sortedBy { it.label }
+    }
+    val visibleCandidates = candidates.filter { channel ->
+        val matchesQuery = query.isBlank() ||
+            channel.name.contains(query, ignoreCase = true) ||
+            channel.alternativeNames.any { it.contains(query, ignoreCase = true) } ||
+            channel.countryName.contains(query, ignoreCase = true)
+        val matchesCountry = selectedCountry == "ALL" || channel.countryCode == selectedCountry
+        val matchesCategory = selectedCategory == "ALL" || selectedCategory in channel.categoryIds
+        val matchesLanguage = selectedLanguage == "ALL" || selectedLanguage in channel.languageSearchValues
+        matchesQuery && matchesCountry && matchesCategory && matchesLanguage
+    }
+    val uriHandler = LocalUriHandler.current
+
+    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("القنوات العالمية", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+        Text("تصفح قنوات الإنترنت حسب الدولة واللغة والتصنيف", color = MutedText, fontSize = 11.sp)
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("ابحث عن قناة أو دولة") }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            WorldFilterDropdown(
+                title = "الدولة",
+                selectedKey = selectedCountry,
+                options = countries,
+                onSelected = { selectedCountry = it },
+                modifier = Modifier.weight(1f)
+            )
+            WorldFilterDropdown(
+                title = "التصنيف",
+                selectedKey = selectedCategory,
+                options = categories,
+                onSelected = { selectedCategory = it },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        WorldFilterDropdown(
+            title = "اللغة",
+            selectedKey = selectedLanguage,
+            options = languages,
+            onSelected = { selectedLanguage = it },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = PanelRaised),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("${dollar}{visibleCandidates.size} / ${dollar}{candidates.size} قناة مرشّحة", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(catalogStatus, color = MutedText, fontSize = 10.sp)
+                Text(
+                    "هذه بيانات اكتشاف أولية. لا يوجد تشغيل مباشر قبل مراجعة الحقوق والتحقق من المصدر.",
+                    color = AccentRed,
+                    fontSize = 10.sp
+                )
+            }
+        }
+        if (visibleCandidates.isEmpty()) {
+            EmptyState(
+                title = if (candidates.isEmpty()) "الكتالوج العالمي غير متاح" else "لا توجد نتائج",
+                description = if (candidates.isEmpty()) {
+                    "تأكد من تضمين ملف القنوات العالمي في نسخة التطبيق."
+                } else {
+                    "غيّر الدولة أو اللغة أو التصنيف أو عبارة البحث."
+                }
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(visibleCandidates, key = { it.id }) { candidate ->
+                    WorldChannelCard(candidate) {
+                        candidate.websiteUrl?.let { url ->
+                            runCatching { uriHandler.openUri(url) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorldFilterDropdown(
+    title: String,
+    selectedKey: String,
+    options: List<WorldFilterOption>,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.key == selectedKey }?.label ?: title
+    Box(modifier) {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("$title: $selectedLabel", color = SoftWhite, maxLines = 1, fontSize = 11.sp)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 340.dp)
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label, fontSize = 12.sp) },
+                    onClick = {
+                        onSelected(option.key)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorldChannelCard(
+    channel: WorldChannelCandidate,
+    onOpenOfficialWebsite: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = PanelBlack),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(13.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(channel.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(
+                        "${dollar}{channel.countryFlag} ${dollar}{channel.countryName} • ${dollar}{channel.countryCode}",
+                        color = MutedText,
+                        fontSize = 10.sp
+                    )
+                }
+                Text("مرشّحة", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+            if (channel.languageLabels.isNotEmpty()) {
+                Text("اللغات: ${dollar}{channel.languageLabels.joinToString("، ")}", color = Silver, fontSize = 10.sp)
+            }
+            if (channel.categoryLabels.isNotEmpty()) {
+                Text("التصنيفات: ${dollar}{channel.categoryLabels.joinToString(" • ")}", color = MutedText, fontSize = 10.sp)
+            }
+            Text(
+                if (channel.candidateStreamCount > 0) {
+                    "${dollar}{channel.candidateStreamCount} رابط بث مبدئي • غير معتمد للتشغيل"
+                } else {
+                    "لا يوجد رابط بث ضمن بيانات المصدر"
+                },
+                color = MutedText,
+                fontSize = 10.sp
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "لم تُراجع حقوق البث بعد",
+                    color = AccentRed,
+                    fontSize = 10.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                if (channel.websiteUrl != null) {
+                    TextButton(onClick = onOpenOfficialWebsite) {
+                        Text("الموقع الرسمي", color = Silver, fontSize = 11.sp)
                     }
                 }
             }
