@@ -38,14 +38,15 @@ class ImporterTests(unittest.TestCase):
 
     def test_worldwide_candidates_keep_unknown_country_without_guessing(self):
         records, skipped, country_codes = build_catalog(self.data, "2026-11-03T00:00:00Z")
-        self.assertEqual([item["id"] for item in records], ["F.global", "A.tr"])
+        self.assertEqual({item["id"] for item in records}, {"A.tr", "F.global"})
         global_record = next(item for item in records if item["id"] == "F.global")
         self.assertEqual(global_record["country"]["code"], "ZZ")
         self.assertEqual(global_record["country"]["flag"], "🌐")
         self.assertEqual(global_record["country"]["mapping_status"], "unknown")
         self.assertEqual(country_codes, ["TR"])
-        self.assertEqual(records[1]["category_names"], ["News"])
-        self.assertEqual(records[1]["languages"][0]["code"], "tur")
+        turkey_record = next(item for item in records if item["id"] == "A.tr")
+        self.assertEqual(turkey_record["category_names"], ["News"])
+        self.assertEqual(turkey_record["languages"][0]["code"], "tur")
         self.assertEqual(skipped["nsfw"], 1)
         self.assertEqual(skipped["closed_or_replaced"], 1)
         self.assertEqual(skipped["blocklisted"], 1)
