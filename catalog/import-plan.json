@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "project": "RS TV",
+  "mode": "remote_catalogue_discovery",
+  "language": "ar",
+  "endpoints": {
+    "channels": "https://iptv-org.github.io/api/channels.json",
+    "streams": "https://iptv-org.github.io/api/streams.json",
+    "countries": "https://iptv-org.github.io/api/countries.json",
+    "languages": "https://iptv-org.github.io/api/languages.json",
+    "categories": "https://iptv-org.github.io/api/categories.json",
+    "logos": "https://iptv-org.github.io/api/logos.json",
+    "master_playlist": "https://iptv-org.github.io/iptv/index.m3u",
+    "country_playlists": "https://iptv-org.github.io/iptv/countries/{country_code_lowercase}.m3u",
+    "category_playlists": "https://iptv-org.github.io/iptv/categories/{category_id}.m3u",
+    "language_playlists": "https://iptv-org.github.io/iptv/languages/{language_code}.m3u"
+  },
+  "field_mapping": {
+    "channel_id": "channels[].id",
+    "channel_name": "channels[].name",
+    "country_code": "channels[].country",
+    "categories": "channels[].categories",
+    "official_website": "channels[].website",
+    "stream_channel_id": "streams[].channel",
+    "stream_url": "streams[].url",
+    "stream_quality_label": "streams[].label",
+    "stream_user_agent": "streams[].user_agent",
+    "country_name": "countries[].name",
+    "country_flag": "countries[].flag",
+    "language_codes": "countries[].languages"
+  },
+  "country_filter": {
+    "all_value": "ALL",
+    "all_label_ar": "الكل",
+    "all_behavior": "Show every approved channel from every country in one combined continuous list. Keep the flag and country name visible on every channel card.",
+    "country_behavior": "Filter the same catalogue by exact ISO country code.",
+    "flag_source": "countries.json",
+    "unknown_country_behavior": "Show neutral globe icon and country label if available; never guess a flag from language."
+  },
+  "admission": {
+    "imported_status": "candidate",
+    "default_catalogue_status": "approved",
+    "required_before_approval": [
+      "stable_channel_id",
+      "country_code_verified",
+      "stream_url_tested_repeatedly",
+      "official_or_authorized_source_evidence",
+      "rights_review_passed",
+      "logo_attribution_checked"
+    ],
+    "reject_if": [
+      "paid_or_encrypted_without_valid_provider_entitlement",
+      "DRM_or_access_control_bypass",
+      "stream_origin_or_rights_unclear",
+      "repeated_playback_failures",
+      "dead_or_malicious_url"
+    ]
+  },
+  "reliability": {
+    "grade_A": "Official broadcaster or authorized CDN, repeated successful playback checks across times and network locations.",
+    "grade_B": "Known broadcaster-origin source with repeated checks but limited coverage.",
+    "grade_C": "Community stream with insufficient or intermittent checks; hidden from default catalogue.",
+    "recheck_required": true,
+    "no_zero_buffering_promise": true,
+    "checks_must_not_record_or_rehost_streams": true
+  },
+  "update_policy": {
+    "metadata_refresh_hours": 24,
+    "stream_health_checks": "scheduled and rate-limited; never run from every client device",
+    "stale_stream_action": "hide from default catalogue pending recheck",
+    "preserve_source_attribution": true
+  },
+  "important": "This is a discovery/import contract. Imported records are candidates, not automatically free, authorized, stable, or approved."
+}
