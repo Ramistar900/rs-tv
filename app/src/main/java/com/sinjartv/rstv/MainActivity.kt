@@ -812,7 +812,7 @@ private fun WorldCatalogContent(
         listOf(WorldFilterOption("ALL", "كل الدول")) +
             candidates.distinctBy { it.countryCode }
                 .sortedBy { it.countryName }
-                .map { WorldFilterOption(it.countryCode, "${dollar}{it.countryFlag} ${dollar}{it.countryName}") }
+                .map { WorldFilterOption(it.countryCode, "${it.countryFlag} ${it.countryName}") }
     }
     val categories = remember(candidates) {
         val labels = linkedMapOf<String, String>()
@@ -885,7 +885,7 @@ private fun WorldCatalogContent(
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${dollar}{visibleCandidates.size} / ${dollar}{candidates.size} قناة مرشّحة", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("${visibleCandidates.size} / ${candidates.size} قناة مرشّحة", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text(catalogStatus, color = MutedText, fontSize = 10.sp)
                 Text(
                     "هذه بيانات اكتشاف أولية. لا يوجد تشغيل مباشر قبل مراجعة الحقوق والتحقق من المصدر.",
@@ -973,7 +973,7 @@ private fun WorldChannelCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(channel.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
-                        "${dollar}{channel.countryFlag} ${dollar}{channel.countryName} • ${dollar}{channel.countryCode}",
+                        "${channel.countryFlag} ${channel.countryName} • ${channel.countryCode}",
                         color = MutedText,
                         fontSize = 10.sp
                     )
@@ -981,14 +981,14 @@ private fun WorldChannelCard(
                 Text("مرشّحة", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
             }
             if (channel.languageLabels.isNotEmpty()) {
-                Text("اللغات: ${dollar}{channel.languageLabels.joinToString("، ")}", color = Silver, fontSize = 10.sp)
+                Text("اللغات: ${channel.languageLabels.joinToString("، ")}", color = Silver, fontSize = 10.sp)
             }
             if (channel.categoryLabels.isNotEmpty()) {
-                Text("التصنيفات: ${dollar}{channel.categoryLabels.joinToString(" • ")}", color = MutedText, fontSize = 10.sp)
+                Text("التصنيفات: ${channel.categoryLabels.joinToString(" • ")}", color = MutedText, fontSize = 10.sp)
             }
             Text(
                 if (channel.candidateStreamCount > 0) {
-                    "${dollar}{channel.candidateStreamCount} رابط بث مبدئي • غير معتمد للتشغيل"
+                    "${channel.candidateStreamCount} رابط بث مبدئي • غير معتمد للتشغيل"
                 } else {
                     "لا يوجد رابط بث ضمن بيانات المصدر"
                 },
