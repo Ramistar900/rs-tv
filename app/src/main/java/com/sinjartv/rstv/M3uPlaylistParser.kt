@@ -18,7 +18,7 @@ internal data class M3uParseResult(
 
 internal object M3uPlaylistParser {
     private val attributePattern =
-        Regex("""([A-Za-z0-9_-]+)\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s,]+))""")
+        Regex("""([A-Za-z0-9_-]+)[ ]*=[ ]*("([^"]*)"|'([^']*)'|([^ ,]+))""")
 
     fun parse(content: String): M3uParseResult {
         val lines = content.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
