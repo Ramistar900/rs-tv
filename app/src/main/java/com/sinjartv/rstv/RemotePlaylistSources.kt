@@ -155,7 +155,7 @@ internal object RemotePlaylistDownloader {
                 }
 
                 require(responseCode in 200..299) { "تعذر جلب القائمة (HTTP $responseCode)" }
-                val declaredLength = connection.getHeaderFieldLong("Content-Length", -1L)
+                val declaredLength = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
                 require(declaredLength <= MAX_BYTES) { "حجم القائمة أكبر من الحد المسموح" }
 
                 val bytes = ByteArrayOutputStream()
