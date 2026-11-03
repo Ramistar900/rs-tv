@@ -44,6 +44,20 @@ class M3uPlaylistParserTest {
     }
 
     @Test
+    fun rejectsCredentialBearingStreamUrls() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1,Credential URL
+            https://user:password@cdn.example/live.m3u8
+        """.trimIndent()
+
+        val result = M3uPlaylistParser.parse(playlist)
+
+        assertTrue(result.channels.isEmpty())
+        assertEquals(1, result.skippedUnsafeLinks)
+    }
+
+    @Test
     fun removesDuplicateStreamUrls() {
         val playlist = """
             #EXTM3U
