@@ -83,7 +83,8 @@ internal object M3uPlaylistParser {
             val isPageOnlyPlatform = pageOnlyPlatformHosts.any { blockedHost ->
                 host == blockedHost || host.endsWith(".$blockedHost")
             }
-            val isSecureHttps = streamUri?.scheme.equals("https", ignoreCase = true) &&
+            val isSecureHttps = streamUri != null &&
+                streamUri.scheme.equals("https", ignoreCase = true) &&
                 host.isNotBlank() &&
                 streamUri.userInfo == null &&
                 !isPageOnlyPlatform
