@@ -709,10 +709,10 @@ private fun HomeContent(
                     onNavigate(RSTVTab.MOVIES)
                 }
             }
-            item {
-                FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.fillMaxWidth()) {
-                    onNavigate(RSTVTab.FAVORITES)
-                }
+        }
+        item {
+            FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.fillMaxWidth()) {
+                onNavigate(RSTVTab.FAVORITES)
             }
         }
         if (recentChannels.isNotEmpty()) {
