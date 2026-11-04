@@ -26,12 +26,29 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
 private const val DiagnosticTimeoutMs = 20_000L
+
+private fun describePlaybackError(error: PlaybackException): String {
+    val causes = generateSequence(error.cause) { it.cause }.take(6).toList()
+    val httpError = causes.filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()
+    val causeTypes = causes.map { it.javaClass.simpleName }.filter { it.isNotBlank() }.distinct()
+
+    return buildString {
+        append("فشل الاختبار: ${error.errorCodeName} (${error.errorCode})")
+        if (httpError != null) {
+            append("\\nحالة الخادم: HTTP ${httpError.responseCode}")
+        }
+        if (causeTypes.isNotEmpty()) {
+            append("\\nتفاصيل السبب: ${causeTypes.joinToString(" ← ")}")
+        }
+    }
+}
 
 @Composable
 internal fun StreamPlaybackDiagnostic(streamUrl: String) {
@@ -57,7 +74,7 @@ internal fun StreamPlaybackDiagnostic(streamUrl: String) {
 
             override fun onPlayerError(error: PlaybackException) {
                 isTesting = false
-                result = "فشل اختبار التشغيل: ${error.errorCodeName}"
+                result = describePlaybackError(error)
                 diagnosticPlayer.pause()
             }
         }
