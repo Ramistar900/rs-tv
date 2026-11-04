@@ -396,9 +396,10 @@ private fun RSTVHome() {
     val favoriteUrls = remember(favouriteRevision) {
         LocalLibraryStore.favoriteStreams(context)
     }
-    val favoriteChannels = channels.filter { it.streamUrl in favoriteUrls }
+    val allKnownChannels = (channels + sourceLibraryChannels).distinctBy { it.streamUrl }
+    val favoriteChannels = allKnownChannels.filter { it.streamUrl in favoriteUrls }
     val recentChannels = LocalLibraryStore.history(context)
-        .mapNotNull { url -> channels.firstOrNull { it.streamUrl == url } }
+        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url } }
     val visibleChannels = channels.filter { channel ->
         searchQuery.isBlank() ||
             channel.name.contains(searchQuery, ignoreCase = true) ||
