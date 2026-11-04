@@ -51,7 +51,8 @@ internal object RemotePlaylistMerger {
         val path = uri.rawPath.orEmpty().ifEmpty { "/" }
         val query = uri.rawQuery?.let { "?" + it }.orEmpty()
         val headerProfile = httpHeaders.toSortedMap().entries.joinToString("&") { "${it.key}=${it.value}" }
-        return "$scheme://$host$port$path$query|headers:$headerProfile"
+        val canonicalUrl = "$scheme://$host$port$path$query"
+        return if (headerProfile.isEmpty()) canonicalUrl else "$canonicalUrl|headers:$headerProfile"
     }
 
     private fun betterValue(first: String, second: String): String =
