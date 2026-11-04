@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,7 +71,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -145,6 +149,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RSTVHome() {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scope = rememberCoroutineScope()
     val channels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
@@ -168,6 +174,15 @@ private fun RSTVHome() {
 
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                val currentUrl = mediaItem?.localConfiguration?.uri?.toString()
+                val currentChannel = (channels + sourceLibraryChannels).firstOrNull { it.streamUrl == currentUrl }
+                if (currentChannel != null) {
+                    selectedChannel = currentChannel
+                    status = "القناة الحالية: ${currentChannel.name}"
+                }
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 status = when (playbackState) {
                     Player.STATE_BUFFERING -> "جارٍ تحميل بث القناة..."
@@ -381,10 +396,13 @@ private fun RSTVHome() {
 
 
     fun playChannel(channel: RSTVChannel) {
+        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels).toList()
+        val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
+        val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
         status = "جارٍ تجهيز قناة ${channel.name}..."
         LocalLibraryStore.addToHistory(context, channel.streamUrl)
-        exoPlayer.setMediaItem(MediaItem.fromUri(channel.streamUrl))
+        exoPlayer.setMediaItems(queue.map { item -> MediaItem.fromUri(item.streamUrl) }, startIndex, 0L)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
@@ -515,6 +533,11 @@ private fun RSTVHome() {
                             recentChannels = recentChannels,
                             programmes = programmes.toList(),
                             selectedChannel = selectedChannel,
+                            isLandscape = isLandscape,
+                            onExitFullscreen = {
+                                exoPlayer.pause()
+                                selectedChannel = null
+                            },
                             searchQuery = searchQuery,
                             onSearchChange = { searchQuery = it },
                             onPlay = ::playChannel,
@@ -566,6 +589,11 @@ private fun RSTVHome() {
                             recentChannels = recentChannels,
                             programmes = programmes.toList(),
                             selectedChannel = selectedChannel,
+                            isLandscape = isLandscape,
+                            onExitFullscreen = {
+                                exoPlayer.pause()
+                                selectedChannel = null
+                            },
                             searchQuery = searchQuery,
                             onSearchChange = { searchQuery = it },
                             onPlay = ::playChannel,
@@ -610,14 +638,11 @@ private fun RSTVHome() {
 
 @Composable
 private fun BrandMark() {
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .background(AccentRed, RoundedCornerShape(12.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("RS", color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
-    }
+    Image(
+        painter = painterResource(id = R.drawable.ic_rs_tv),
+        contentDescription = "شعار RS TV",
+        modifier = Modifier.size(46.dp)
+    )
 }
 
 @Composable
@@ -666,6 +691,8 @@ private fun ScreenBody(
     recentChannels: List<RSTVChannel>,
     programmes: List<GuideProgramme>,
     selectedChannel: RSTVChannel?,
+    isLandscape: Boolean,
+    onExitFullscreen: () -> Unit,
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     onPlay: (RSTVChannel) -> Unit,
@@ -712,6 +739,8 @@ private fun ScreenBody(
         RSTVTab.LIVE -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
+            isLandscape = isLandscape,
+            onExitFullscreen = onExitFullscreen,
             searchQuery = searchQuery,
             onSearchChange = onSearchChange,
             onPlay = onPlay,
@@ -888,6 +917,8 @@ private fun FeatureCard(
 private fun LiveContent(
     channels: List<RSTVChannel>,
     selectedChannel: RSTVChannel?,
+    isLandscape: Boolean,
+    onExitFullscreen: () -> Unit,
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     onPlay: (RSTVChannel) -> Unit,
@@ -900,99 +931,152 @@ private fun LiveContent(
     onShowUserPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            if (showingSourceLibrary) "مكتبة مصادر IPTV المجمّعة" else "البث المباشر",
-            color = SoftWhite,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.Bold
-        )
-        if (showingSourceLibrary) {
-            TextButton(onClick = onShowUserPlaylist) {
-                Text("العودة إلى قائمتي المحلية", color = AccentRed)
-            }
-        }
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = onSearchChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("ابحث عن قناة أو مجموعة") }
-        )
-        if (selectedChannel != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = PanelBlack),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            selectedChannel.name,
-                            color = SoftWhite,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text("LIVE", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 11.sp)
+    BackHandler(enabled = isLandscape && selectedChannel != null) {
+        onExitFullscreen()
+    }
+
+    if (isLandscape && selectedChannel != null) {
+        Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { viewContext ->
+                    PlayerView(viewContext).apply {
+                        this.player = player
+                        useController = true
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        keepScreenOn = true
                     }
-                    AndroidView(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).aspectRatio(16f / 9f),
-                        factory = { viewContext ->
-                            PlayerView(viewContext).apply {
-                                this.player = player
-                                useController = true
-                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                            }
-                        },
-                        update = { view -> view.player = player }
+                },
+                update = { view ->
+                    view.player = player
+                    view.keepScreenOn = true
+                }
+            )
+            TextButton(
+                onClick = onExitFullscreen,
+                modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = Color.Black.copy(alpha = 0.65f),
+                    contentColor = SoftWhite
+                )
+            ) { Text("رجوع للقنوات") }
+            Text(
+                selectedChannel.name,
+                color = SoftWhite,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopEnd).padding(14.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
+    } else {
+        Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (showingSourceLibrary) "مكتبة مصادر IPTV المجمّعة" else "البث المباشر",
+                        color = SoftWhite,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Text(status, color = MutedText, fontSize = 11.sp)
-                    StreamPlaybackDiagnostic(selectedChannel.streamUrl)
+                    if (showingSourceLibrary) {
+                        TextButton(onClick = onShowUserPlaylist) {
+                            Text("العودة إلى قائمتي المحلية", color = AccentRed)
+                        }
+                    }
                 }
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("القنوات المتاحة: ${channels.size}", color = MutedText, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            if (skippedUnsafeLinks > 0) {
-                Text("تجاهلنا $skippedUnsafeLinks رابطاً غير متوافق أو غير آمن", color = AccentRed, fontSize = 10.sp)
-            }
-        }
-        if (channels.isEmpty()) {
-            if (searchQuery.isBlank()) {
-                EmptyState(
-                    title = "لا توجد قنوات بعد",
-                    description = "استورد قائمة M3U أو M3U8 من جهازك لعرض قنواتك هنا."
-                )
-            } else {
-                EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
-            }
-        } else {
-            val groupedChannels = channels.groupBy { it.group?.takeIf(String::isNotBlank) ?: "غير مصنّفة" }
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                groupedChannels.forEach { (groupName, groupChannels) ->
-                    item(key = "group-$groupName") {
-                        Text(
-                            "$groupName  •  ${groupChannels.size}",
-                            color = Silver,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-                        )
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("ابحث عن قناة أو مجموعة") }
+            )
+            if (selectedChannel != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                selectedChannel.name,
+                                color = SoftWhite,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text("LIVE", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        }
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                            val playerHeight = (maxHeight * 0.44f).coerceIn(170.dp, 340.dp)
+                            AndroidView(
+                                modifier = Modifier.fillMaxWidth().height(playerHeight),
+                                factory = { viewContext ->
+                                    PlayerView(viewContext).apply {
+                                        this.player = player
+                                        useController = true
+                                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                        keepScreenOn = true
+                                    }
+                                },
+                                update = { view ->
+                                    view.player = player
+                                    view.keepScreenOn = true
+                                }
+                            )
+                        }
+                        Text(status, color = MutedText, fontSize = 11.sp)
+                        StreamPlaybackDiagnostic(selectedChannel.streamUrl)
                     }
-                    items(groupChannels, key = { it.streamUrl }) { channel ->
-                        ChannelCard(
-                            channel = channel,
-                            active = selectedChannel?.streamUrl == channel.streamUrl,
-                            favorite = isFavorite(channel),
-                            onPlay = { onPlay(channel) },
-                            onToggleFavorite = { onToggleFavorite(channel) }
-                        )
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("القنوات المتاحة: ${channels.size}", color = MutedText, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                if (skippedUnsafeLinks > 0) {
+                    Text("تجاهلنا $skippedUnsafeLinks رابطاً غير متوافق أو غير آمن", color = AccentRed, fontSize = 10.sp)
+                }
+            }
+            if (channels.isEmpty()) {
+                if (searchQuery.isBlank()) {
+                    EmptyState(
+                        title = "لا توجد قنوات بعد",
+                        description = "استورد قائمة M3U أو M3U8 من جهازك لعرض قنواتك هنا."
+                    )
+                } else {
+                    EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
+                }
+            } else {
+                val groupedChannels = channels
+                    .groupBy { it.group?.takeIf(String::isNotBlank) ?: "غير مصنّفة" }
+                    .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    groupedChannels.forEach { (groupName, groupChannels) ->
+                        item(key = "group-$groupName") {
+                            Text(
+                                "$groupName  •  ${groupChannels.size}",
+                                color = Silver,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                        }
+                        items(groupChannels.sortedBy { it.name.lowercase(Locale.ROOT) }, key = { it.streamUrl }) { channel ->
+                            ChannelCard(
+                                channel = channel,
+                                active = selectedChannel?.streamUrl == channel.streamUrl,
+                                favorite = isFavorite(channel),
+                                onPlay = { onPlay(channel) },
+                                onToggleFavorite = { onToggleFavorite(channel) }
+                            )
+                        }
                     }
                 }
             }
