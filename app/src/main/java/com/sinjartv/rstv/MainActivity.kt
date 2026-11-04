@@ -482,7 +482,53 @@ private fun RSTVHome() {
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val wideLayout = maxWidth >= 840.dp
-            if (wideLayout) {
+            if (isLandscape && selectedChannel != null) {
+                ScreenBody(
+                    tab = selectedTab,
+                    worldChannels = worldChannels,
+                    worldCatalogStatus = worldCatalogStatus,
+                    remotePlaylistStatus = remotePlaylistStatus,
+                    sourceLibraryStatus = sourceLibraryStatus,
+                    sourceLibraryCount = sourceLibraryCount,
+                    onLoadRemotePlaylist = ::loadRemotePlaylist,
+                    onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                    onShowSourceLibrary = ::showSourceLibrary,
+                    onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
+                    channels = when {
+                        selectedTab == RSTVTab.FAVORITES -> favoriteChannels
+                        selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
+                        else -> visibleChannels
+                    },
+                    recentChannels = recentChannels,
+                    programmes = programmes.toList(),
+                    selectedChannel = selectedChannel,
+                    isLandscape = isLandscape,
+                    onExitFullscreen = {
+                        exoPlayer.pause()
+                        selectedChannel = null
+                    },
+                    searchQuery = searchQuery,
+                    onSearchChange = { searchQuery = it },
+                    onPlay = ::playChannel,
+                    onToggleFavorite = ::toggleFavourite,
+                    isFavorite = { it.streamUrl in favoriteUrls },
+                    player = exoPlayer,
+                    status = status,
+                    skippedUnsafeLinks = skippedUnsafeLinks,
+                    showingSourceLibrary = showingSourceLibrary,
+                    onShowUserPlaylist = {
+                        showingSourceLibrary = false
+                        selectedChannel = null
+                        searchQuery = ""
+                        status = "تمت العودة إلى قائمة المستخدم المحلية"
+                    },
+                    onNavigate = { selectedTab = it },
+                    onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
+                    onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
+                    onClear = { pendingClear = it },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (wideLayout) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     NavigationRail(
                         containerColor = PanelBlack,
