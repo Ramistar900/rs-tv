@@ -65,6 +65,34 @@ class RemotePlaylistMergerTest {
     }
 
     @Test
+    fun keepsDifferentHeaderProfilesAsSeparateSources() {
+        val first = RemoteSourceSnapshot(
+            id = "one", name = "One", provider = "Provider", attribution = null,
+            content = """
+                #EXTM3U
+                #EXTINF:-1,First
+                #EXTVLCOPT:http-user-agent=PlayerA
+                https://cdn.example/live.m3u8
+            """.trimIndent()
+        )
+        val second = RemoteSourceSnapshot(
+            id = "two", name = "Two", provider = "Provider", attribution = null,
+            content = """
+                #EXTM3U
+                #EXTINF:-1,Second
+                #EXTVLCOPT:http-user-agent=PlayerB
+                https://cdn.example/live.m3u8
+            """.trimIndent()
+        )
+
+        val merged = RemotePlaylistMerger.merge(listOf(first, second))
+
+        assertEquals(2, merged.size)
+        assertEquals("PlayerA", merged[0].httpHeaders["User-Agent"])
+        assertEquals("PlayerB", merged[1].httpHeaders["User-Agent"])
+    }
+
+    @Test
     fun stripsFragmentButPreservesQueryWhenBuildingCanonicalKey() {
         assertEquals(
             "https://cdn.example:8443/live.m3u8?token=abc",
