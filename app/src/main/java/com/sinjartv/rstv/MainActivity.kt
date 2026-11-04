@@ -80,6 +80,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -949,6 +950,7 @@ private fun LiveContent(
                         update = { view -> view.player = player }
                     )
                     Text(status, color = MutedText, fontSize = 11.sp)
+                    StreamPlaybackDiagnostic(selectedChannel.streamUrl)
                 }
             }
         }
