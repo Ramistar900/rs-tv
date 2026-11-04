@@ -82,7 +82,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
@@ -115,6 +118,10 @@ private enum class RSTVTab(
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
 }
+
+private val primaryNavigationTabs = listOf(
+    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES, RSTVTab.WORLD
+)
 
 private enum class ClearAction(val title: String, val message: String) {
     PLAYLIST("حذف القائمة المحفوظة", "سيتم حذف قائمة القنوات المحلية من هذا الجهاز."),
@@ -403,7 +410,14 @@ private fun RSTVHome() {
         selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
         LocalLibraryStore.addToHistory(context, channel.streamUrl)
-        exoPlayer.setMediaItems(queue.map { item -> MediaItem.fromUri(item.streamUrl) }, startIndex, 0L)
+        val mediaSources = queue.map { item ->
+            val httpFactory = DefaultHttpDataSource.Factory()
+                .setDefaultRequestProperties(item.httpHeaders)
+            val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+            DefaultMediaSourceFactory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(item.streamUrl))
+        }
+        exoPlayer.setMediaSources(mediaSources, startIndex, 0L)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
@@ -544,7 +558,7 @@ private fun RSTVHome() {
                             }
                         }
                     ) {
-                        RSTVTab.entries.forEach { tab ->
+                        primaryNavigationTabs.forEach { tab ->
                             NavigationRailItem(
                                 selected = selectedTab == tab,
                                 onClick = { selectedTab = tab },
@@ -907,8 +921,13 @@ private fun HomeContent(
             }
         }
         item {
-            FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.fillMaxWidth()) {
-                onNavigate(RSTVTab.FAVORITES)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.FAVORITES)
+                }
+                FeatureCard("الإعدادات", "إدارة القوائم ودليل البرامج", "فتح", Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.SETTINGS)
+                }
             }
         }
         if (recentChannels.isNotEmpty()) {
@@ -1018,12 +1037,17 @@ private fun LiveContent(
         }
     } else {
         Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BrandMark()
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         if (showingSourceLibrary) "مكتبة مصادر IPTV المجمّعة" else "البث المباشر",
                         color = SoftWhite,
-                        fontSize = 21.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                     if (showingSourceLibrary) {
@@ -1032,6 +1056,7 @@ private fun LiveContent(
                         }
                     }
                 }
+                Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
             }
             OutlinedTextField(
                 value = searchQuery,
@@ -1078,7 +1103,7 @@ private fun LiveContent(
                             )
                         }
                         Text(status, color = MutedText, fontSize = 11.sp)
-                        StreamPlaybackDiagnostic(selectedChannel.streamUrl)
+                        StreamPlaybackDiagnostic(selectedChannel.streamUrl, selectedChannel.httpHeaders)
                     }
                 }
             }
