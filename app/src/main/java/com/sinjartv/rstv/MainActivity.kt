@@ -681,7 +681,7 @@ private fun RSTVHome() {
                         containerColor = PanelBlack,
                         contentColor = SoftWhite
                     ) {
-                        RSTVTab.entries.forEach { tab ->
+                        primaryNavigationTabs.forEach { tab ->
                             NavigationBarItem(
                                 selected = selectedTab == tab,
                                 onClick = { selectedTab = tab },
