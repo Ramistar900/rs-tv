@@ -99,4 +99,59 @@ class M3uPlaylistParserTest {
         assertFalse(result.isValidPlaylist)
         assertTrue(result.channels.isEmpty())
     }
+
+    @Test
+    fun readsPerChannelVlcHttpHeaders() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1,Channel One
+            #EXTVLCOPT:http-user-agent=ExamplePlayer/1.0
+            #EXTVLCOPT:http-referrer=https://provider.example/
+            https://cdn.example/one.m3u8
+            #EXTINF:-1,Channel Two
+            https://cdn.example/two.m3u8
+        """.trimIndent()
+
+        val result = M3uPlaylistParser.parse(playlist)
+
+        assertEquals("ExamplePlayer/1.0", result.channels[0].httpHeaders["User-Agent"])
+        assertEquals("https://provider.example/", result.channels[0].httpHeaders["Referer"])
+        assertTrue(result.channels[1].httpHeaders.isEmpty())
+    }
+
+    @Test
+    fun readsSupportedHeadersFromExtHttpJsonAndRejectsUnsafeHeaders() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1,JSON headers
+            #EXTHTTP:{"User-Agent":"Player/2","Origin":"https://provider.example","Cookie":"session=secret"}
+            https://cdn.example/live.m3u8
+        """.trimIndent()
+
+        val headers = M3uPlaylistParser.parse(playlist).channels.single().httpHeaders
+
+        assertEquals("Player/2", headers["User-Agent"])
+        assertEquals("https://provider.example", headers["Origin"])
+        assertFalse(headers.containsKey("Cookie"))
+    }
+
+    @Test
+    fun keepsSameStreamWhenDifferentHeadersAreRequired() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1,First profile
+            #EXTVLCOPT:http-user-agent=PlayerA
+            https://cdn.example/live.m3u8
+            #EXTINF:-1,Second profile
+            #EXTVLCOPT:http-user-agent=PlayerB
+            https://cdn.example/live.m3u8
+        """.trimIndent()
+
+        val result = M3uPlaylistParser.parse(playlist)
+
+        assertEquals(2, result.channels.size)
+        assertEquals("PlayerA", result.channels[0].httpHeaders["User-Agent"])
+        assertEquals("PlayerB", result.channels[1].httpHeaders["User-Agent"])
+    }
+
 }
