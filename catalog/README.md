@@ -78,3 +78,8 @@ Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p),
 A separate read-only GitHub Actions workflow checks the eight configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is uploaded as the `rs-tv-playlist-quality-report` artifact.
 
 This audit does **not** request individual channel streams, measure playback uptime/bitrate/resolution, or review copyright. It never changes the candidate catalogue or promotes entries to approved. Every channel remains a candidate until separate technical playback and rights review are completed.
+
+
+## Bounded channel endpoint sampling
+
+The daily quality workflow also samples at most three HTTPS channel endpoints from each configured playlist. It requests at most 64 KiB per endpoint with an eight-second timeout, rejects non-public/unresolvable hosts, rejects cross-host or non-HTTPS redirects, and does not fetch HLS segments or play media. Results distinguish HTTP response, HLS/DASH manifest, media response, timeout, network error, forbidden/geo-restricted, not found, and unexpected content. This is a lightweight endpoint check only: it does not prove that a viewer can play the channel, verify video quality, or establish redistribution rights. Reports remain diagnostic and do not modify or approve catalogue entries.
