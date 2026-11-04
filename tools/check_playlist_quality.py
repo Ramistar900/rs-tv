@@ -152,7 +152,7 @@ def audit(fetcher=fetch_playlist) -> dict:
             content = fetcher(url)
             metrics = inspect_playlist(content)
             source_keys = {
-                canonical_url(line) for line in content.lstrip("\\ufeff").splitlines()
+                canonical_url(line) for line in content.lstrip("\ufeff").splitlines()
                 if line.strip() and not line.lstrip().startswith("#")
                 and canonical_url(line) is not None and not is_page_only_platform(line)
             }
