@@ -83,6 +83,42 @@ internal object RemotePlaylistSources {
             description = "قائمة مجتمعية إضافية لفئات الأخبار والرياضة والتعليم والطقس. مصدر ثانوي؛ يلزم فحص كل قناة وحقوقها.",
             playlistUrl = "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u",
             provider = "freecasthub/public-iptv"
+        ),
+        RemotePlaylistSource(
+            id = "m3upt-portuguese",
+            name = "M3UPT — البرتغال والقنوات البرتغالية",
+            description = "قائمة برتغالية تتضمن قنوات تلفزيونية وإذاعية وروابط بث دولية. بعض الإدخالات قد تكون غير HTTPS أو مقيدة جغرافياً أو مشفرة؛ يستورد التطبيق فقط الروابط التي يقبلها محلل الأمان.",
+            playlistUrl = "https://raw.githubusercontent.com/LITUATUI/M3UPT/main/M3U/M3UPT.m3u",
+            provider = "LITUATUI/M3UPT",
+            attribution = "قائمة مجتمعية لقنوات يصفها ناشرها بأنها رسمية ومجانية؛ افحص حقوق كل قناة وشروطها قبل اعتمادها."
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-country-index",
+            name = "IPTV-org — فهرس القنوات حسب الدولة",
+            description = "القائمة العالمية نفسها مرتبة في مجموعات الدول لتسهيل التصفح؛ ليست إضافة مستقلة إلى عدد القنوات بعد إزالة التكرار.",
+            playlistUrl = "https://iptv-org.github.io/iptv/index.country.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-language-index",
+            name = "IPTV-org — فهرس القنوات حسب اللغة",
+            description = "القائمة العالمية نفسها مرتبة حسب اللغة؛ تُدمج القنوات المتطابقة مع المصادر الأخرى.",
+            playlistUrl = "https://iptv-org.github.io/iptv/index.language.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-category-index",
+            name = "IPTV-org — فهرس القنوات حسب التصنيف",
+            description = "القائمة العالمية نفسها مرتبة حسب التصنيف مثل الأخبار والرياضة والأطفال والموسيقى؛ لا تُحسب التكرارات كقنوات جديدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/index.category.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-region-index",
+            name = "IPTV-org — فهرس القنوات حسب المنطقة",
+            description = "القائمة العالمية نفسها مرتبة حسب المناطق الجغرافية؛ هذا تنظيم إضافي وليس مصدراً مستقلاً لزيادة العدد الفريد.",
+            playlistUrl = "https://iptv-org.github.io/iptv/index.region.m3u",
+            provider = "iptv-org/iptv"
         )
     )
 
