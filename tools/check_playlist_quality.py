@@ -32,6 +32,7 @@ SOURCES = [
     ("iptv-org-turkey", "https://iptv-org.github.io/iptv/countries/tr.m3u"),
     ("free-tv", "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"),
     ("freecasthub", "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u"),
+    ("m3upt-portuguese", "https://raw.githubusercontent.com/LITUATUI/M3UPT/main/M3U/M3UPT.m3u"),
 ]
 
 
@@ -102,9 +103,12 @@ def inspect_playlist(content: str) -> dict:
         if not channel["name"] or channel["name"].lower() in {"unknown", "unnamed", "channel"}:
             missing_names += 1
 
+    eligible_unique = {canonical_url(channel["url"]) for channel in channels
+                       if canonical_url(channel["url"]) is not None and not is_page_only_platform(channel["url"])}
     return {
         "entries": len(channels),
         "unique_https_urls": len(seen),
+        "eligible_unique_https_urls": len(eligible_unique),
         "duplicate_urls": duplicates,
         "unsafe_or_non_https_urls": unsafe,
         "platform_page_links": page_links,
@@ -140,9 +144,21 @@ def fetch_playlist(url: str) -> str:
 
 def audit(fetcher=fetch_playlist) -> dict:
     results = []
+    source_unique_totals = 0
+    global_unique_streams = set()
+    total_entries = 0
     for source_id, url in SOURCES:
         try:
-            metrics = inspect_playlist(fetcher(url))
+            content = fetcher(url)
+            metrics = inspect_playlist(content)
+            source_keys = {
+                canonical_url(line) for line in content.lstrip("\\ufeff").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+                and canonical_url(line) is not None and not is_page_only_platform(line)
+            }
+            source_unique_totals += len(source_keys)
+            global_unique_streams.update(source_keys)
+            total_entries += metrics["entries"]
             results.append({"source_id": source_id, "url": url, "status": "ok", **metrics})
         except Exception as exc:  # report each source independently; one outage must not hide others
             results.append({"source_id": source_id, "url": url, "status": "error", "error": str(exc)[:240]})
@@ -156,6 +172,9 @@ def audit(fetcher=fetch_playlist) -> dict:
         "approval_effect": "none; all entries remain candidates until separate technical and rights review",
         "sources_checked": len(results),
         "sources_available": successful,
+        "total_playlist_entries": total_entries,
+        "unique_eligible_stream_urls_across_sources": len(global_unique_streams),
+        "duplicate_stream_urls_across_sources": source_unique_totals - len(global_unique_streams),
         "sources": results,
     }
 
