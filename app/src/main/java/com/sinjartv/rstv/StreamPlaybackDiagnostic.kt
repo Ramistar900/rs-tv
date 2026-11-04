@@ -27,7 +27,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
@@ -51,9 +54,9 @@ private fun describePlaybackError(error: PlaybackException): String {
 }
 
 @Composable
-internal fun StreamPlaybackDiagnostic(streamUrl: String) {
+internal fun StreamPlaybackDiagnostic(streamUrl: String, httpHeaders: Map<String, String> = emptyMap()) {
     val context = LocalContext.current
-    val diagnosticPlayer = remember(context, streamUrl) {
+    val diagnosticPlayer = remember(context, streamUrl, httpHeaders) {
         ExoPlayer.Builder(context).build().apply {
             volume = 0f
         }
@@ -128,7 +131,11 @@ internal fun StreamPlaybackDiagnostic(streamUrl: String) {
                         diagnosticPlayer.stop()
                         diagnosticPlayer.clearMediaItems()
                         diagnosticPlayer.volume = 0f
-                        diagnosticPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
+                        val httpFactory = DefaultHttpDataSource.Factory().setDefaultRequestProperties(httpHeaders)
+                        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+                        val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
+                            .createMediaSource(MediaItem.fromUri(streamUrl))
+                        diagnosticPlayer.setMediaSource(mediaSource)
                         diagnosticPlayer.prepare()
                         diagnosticPlayer.playWhenReady = true
                     }
