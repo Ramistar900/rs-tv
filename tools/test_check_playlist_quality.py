@@ -25,7 +25,7 @@ class PlaylistQualityTests(unittest.TestCase):
         self.assertEqual(result["eligible_unique_https_urls"], 1)
 
     @patch("check_playlist_quality.SOURCES", [("one", "https://list.example/one"), ("two", "https://list.example/two")])
-    def test_audit_reports_global_unique_streams_and_cross_source_duplicates(self, _):
+    def test_audit_reports_global_unique_streams_and_cross_source_duplicates(self):
         playlists = {
             "https://list.example/one": "#EXTM3U\n#EXTINF:-1,One\nhttps://news.example/live.m3u8\n#EXTINF:-1,Page\nhttps://youtube.com/watch?v=abc\n",
             "https://list.example/two": "#EXTM3U\n#EXTINF:-1,Duplicate\nhttps://news.example/live.m3u8\n#EXTINF:-1,Two\nhttps://sports.example/live.m3u8\n",
