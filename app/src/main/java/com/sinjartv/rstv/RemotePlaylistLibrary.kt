@@ -18,7 +18,7 @@ internal object RemotePlaylistMerger {
             if (!parsed.isValidPlaylist) return@forEach
 
             parsed.channels.forEach { channel ->
-                val key = canonicalStreamKey(channel.streamUrl)
+                val key = canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
                 val incoming = channel.copy(
                     sourceIds = setOf(snapshot.id),
                     sourceNames = setOf(snapshot.name),
@@ -43,14 +43,15 @@ internal object RemotePlaylistMerger {
         return merged.values.toList()
     }
 
-    fun canonicalStreamKey(streamUrl: String): String {
+    fun canonicalStreamKey(streamUrl: String, httpHeaders: Map<String, String> = emptyMap()): String {
         val uri = runCatching { URI(streamUrl) }.getOrNull() ?: return streamUrl
         val scheme = uri.scheme?.lowercase() ?: return streamUrl
         val host = uri.host?.lowercase() ?: return streamUrl
         val port = if (uri.port == -1 || uri.port == 443) "" else ":" + uri.port
         val path = uri.rawPath.orEmpty().ifEmpty { "/" }
         val query = uri.rawQuery?.let { "?" + it }.orEmpty()
-        return "$scheme://$host$port$path$query"
+        val headerProfile = httpHeaders.toSortedMap().entries.joinToString("&") { "${it.key}=${it.value}" }
+        return "$scheme://$host$port$path$query|headers:$headerProfile"
     }
 
     private fun betterValue(first: String, second: String): String =
