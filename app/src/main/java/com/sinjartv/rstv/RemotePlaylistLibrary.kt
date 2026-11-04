@@ -47,9 +47,9 @@ internal object RemotePlaylistMerger {
         val uri = runCatching { URI(streamUrl) }.getOrNull() ?: return streamUrl
         val scheme = uri.scheme?.lowercase() ?: return streamUrl
         val host = uri.host?.lowercase() ?: return streamUrl
-        val port = if (uri.port == -1 || uri.port == 443) "" else ":\u0024{uri.port}"
+        val port = if (uri.port == -1 || uri.port == 443) "" else ":" + uri.port
         val path = uri.rawPath.orEmpty().ifEmpty { "/" }
-        val query = uri.rawQuery?.let { "?\u0024it" }.orEmpty()
+        val query = uri.rawQuery?.let { "?" + it }.orEmpty()
         return "$scheme://$host$port$path$query"
     }
 
