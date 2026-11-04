@@ -1,6 +1,8 @@
 import unittest
 
-from check_playlist_quality import canonical_url, inspect_playlist, is_page_only_platform
+from unittest.mock import patch
+
+from check_playlist_quality import audit, canonical_url, inspect_playlist, is_page_only_platform
 
 
 class PlaylistQualityTests(unittest.TestCase):
@@ -17,6 +19,21 @@ class PlaylistQualityTests(unittest.TestCase):
     def test_rejects_non_https_and_credentials(self):
         self.assertIsNone(canonical_url("http://example.org/live"))
         self.assertIsNone(canonical_url("https://user:pass@example.org/live"))
+
+    def test_eligible_unique_urls_exclude_platform_pages(self):
+        result = inspect_playlist("""#EXTM3U\n#EXTINF:-1,Direct\nhttps://news.example/live.m3u8\n#EXTINF:-1,YouTube\nhttps://youtube.com/watch?v=abc\n""")
+        self.assertEqual(result["eligible_unique_https_urls"], 1)
+
+    @patch("check_playlist_quality.SOURCES", [("one", "https://list.example/one"), ("two", "https://list.example/two")])
+    def test_audit_reports_global_unique_streams_and_cross_source_duplicates(self, _):
+        playlists = {
+            "https://list.example/one": "#EXTM3U\\n#EXTINF:-1,One\\nhttps://news.example/live.m3u8\\n#EXTINF:-1,Page\\nhttps://youtube.com/watch?v=abc\\n",
+            "https://list.example/two": "#EXTM3U\\n#EXTINF:-1,Duplicate\\nhttps://news.example/live.m3u8\\n#EXTINF:-1,Two\\nhttps://sports.example/live.m3u8\\n",
+        }
+        report = audit(lambda url: playlists[url])
+        self.assertEqual(report["sources_checked"], 2)
+        self.assertEqual(report["unique_eligible_stream_urls_across_sources"], 2)
+        self.assertEqual(report["duplicate_stream_urls_across_sources"], 1)
 
     def test_platform_pages_are_not_direct_streams(self):
         self.assertTrue(is_page_only_platform("https://www.youtube.com/watch?v=abc"))
