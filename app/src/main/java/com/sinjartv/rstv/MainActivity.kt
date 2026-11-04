@@ -114,7 +114,8 @@ private enum class RSTVTab(
 private enum class ClearAction(val title: String, val message: String) {
     PLAYLIST("حذف القائمة المحفوظة", "سيتم حذف قائمة القنوات المحلية من هذا الجهاز."),
     HISTORY("مسح سجل المشاهدة", "سيتم مسح سجل القنوات التي شاهدتها."),
-    FAVORITES("مسح المفضلة", "سيتم إزالة جميع القنوات من قائمة المفضلة.")
+    FAVORITES("مسح المفضلة", "سيتم إزالة جميع القنوات من قائمة المفضلة."),
+    SOURCE_LIBRARY("مسح مكتبة مصادر IPTV", "سيتم حذف نسخ قوائم المصادر المجمّعة فقط، دون حذف قائمة المستخدم أو المفضلة.")
 }
 
 class MainActivity : ComponentActivity() {
@@ -145,6 +146,9 @@ private fun RSTVHome() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val channels = remember { mutableStateListOf<RSTVChannel>() }
+    val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
+    var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
+    var sourceLibraryCount by remember { mutableIntStateOf(0) }
     var worldChannels by remember { mutableStateOf<List<WorldChannelCandidate>>(emptyList()) }
     var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
@@ -193,6 +197,20 @@ private fun RSTVHome() {
                 skippedUnsafeLinks = parsed.skippedUnsafeLinks
                 status = "تمت استعادة ${parsed.channels.size} قناة محفوظة"
             }
+        }
+        runCatching {
+            val savedSources = withContext(Dispatchers.IO) {
+                LocalLibraryStore.loadRemoteSources(context)
+            }
+            val mergedSources = withContext(Dispatchers.Default) {
+                RemotePlaylistMerger.merge(savedSources)
+            }
+            sourceLibraryChannels.clear()
+            sourceLibraryChannels.addAll(mergedSources)
+            sourceLibraryCount = savedSources.size
+            sourceLibraryStatus = "تمت استعادة ${savedSources.size} قوائم مصدر و${mergedSources.size} قناة بعد إزالة التكرار"
+        }.onFailure {
+            sourceLibraryStatus = "تعذر استعادة مكتبة المصادر: ${it.message ?: "خطأ غير معروف"}"
         }
         val savedGuide = withContext(Dispatchers.IO) {
             LocalLibraryStore.loadGuide(context)
@@ -309,6 +327,57 @@ private fun RSTVHome() {
         }
     }
 
+    fun addRemotePlaylistToLibrary(source: RemotePlaylistSource) {
+        remotePlaylistStatus = "جارٍ إضافة ${source.name} إلى مكتبة المصادر..."
+        scope.launch {
+            runCatching {
+                val content = withContext(Dispatchers.IO) {
+                    RemotePlaylistDownloader.download(source)
+                }
+                val parsed = withContext(Dispatchers.Default) {
+                    M3uPlaylistParser.parse(content)
+                }
+                require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
+                require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في هذه القائمة" }
+
+                val snapshot = RemoteSourceSnapshot(
+                    id = source.id,
+                    name = source.name,
+                    provider = source.provider,
+                    attribution = source.attribution,
+                    content = content
+                )
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.saveRemoteSource(context, snapshot)
+                }
+                val savedSources = withContext(Dispatchers.IO) {
+                    LocalLibraryStore.loadRemoteSources(context)
+                }
+                val mergedSources = withContext(Dispatchers.Default) {
+                    RemotePlaylistMerger.merge(savedSources)
+                }
+                sourceLibraryChannels.clear()
+                sourceLibraryChannels.addAll(mergedSources)
+                sourceLibraryCount = savedSources.size
+                sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر و${mergedSources.size} قناة فريدة"
+                remotePlaylistStatus = "تمت إضافة ${parsed.channels.size} قناة من ${source.name}. قائمتك الحالية لم تتغير."
+            }.onFailure { error ->
+                remotePlaylistStatus = "تعذرت إضافة ${source.name}: ${error.message ?: "خطأ غير معروف"}"
+            }
+        }
+    }
+
+    fun showSourceLibrary() {
+        channels.clear()
+        channels.addAll(sourceLibraryChannels)
+        selectedChannel = null
+        searchQuery = ""
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        status = "تعرض الآن مكتبة المصادر المجمّعة. قائمة المستخدم الأصلية محفوظة كما هي."
+        selectedTab = RSTVTab.LIVE
+    }
+
     fun playChannel(channel: RSTVChannel) {
         selectedChannel = channel
         status = "جارٍ تجهيز قناة ${channel.name}..."
@@ -359,6 +428,13 @@ private fun RSTVHome() {
                             LocalLibraryStore.clearFavorites(context)
                             favouriteRevision++
                             status = "تم مسح المفضلة"
+                        }
+                        ClearAction.SOURCE_LIBRARY -> {
+                            LocalLibraryStore.clearRemoteSources(context)
+                            sourceLibraryChannels.clear()
+                            sourceLibraryCount = 0
+                            sourceLibraryStatus = "تم مسح مكتبة المصادر"
+                            status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
                         }
                     }
                     pendingClear = null
@@ -417,7 +493,11 @@ private fun RSTVHome() {
                             worldChannels = worldChannels,
                             worldCatalogStatus = worldCatalogStatus,
                             remotePlaylistStatus = remotePlaylistStatus,
+                            sourceLibraryStatus = sourceLibraryStatus,
+                            sourceLibraryCount = sourceLibraryCount,
                             onLoadRemotePlaylist = ::loadRemotePlaylist,
+                            onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                            onShowSourceLibrary = ::showSourceLibrary,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
@@ -456,7 +536,11 @@ private fun RSTVHome() {
                             worldChannels = worldChannels,
                             worldCatalogStatus = worldCatalogStatus,
                             remotePlaylistStatus = remotePlaylistStatus,
+                            sourceLibraryStatus = sourceLibraryStatus,
+                            sourceLibraryCount = sourceLibraryCount,
                             onLoadRemotePlaylist = ::loadRemotePlaylist,
+                            onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                            onShowSourceLibrary = ::showSourceLibrary,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when (selectedTab) {
                                 RSTVTab.FAVORITES -> favoriteChannels
@@ -548,7 +632,11 @@ private fun ScreenBody(
     worldChannels: List<WorldChannelCandidate>,
     worldCatalogStatus: String,
     remotePlaylistStatus: String,
+    sourceLibraryStatus: String,
+    sourceLibraryCount: Int,
     onLoadRemotePlaylist: (RemotePlaylistSource) -> Unit,
+    onAddSourceToLibrary: (RemotePlaylistSource) -> Unit,
+    onShowSourceLibrary: () -> Unit,
     onOpenOfficialUrl: (String) -> Unit,
     channels: List<RSTVChannel>,
     recentChannels: List<RSTVChannel>,
@@ -580,7 +668,11 @@ private fun ScreenBody(
         )
         RSTVTab.SOURCES -> OnlineSourcesContent(
             status = remotePlaylistStatus,
+            sourceLibraryStatus = sourceLibraryStatus,
+            sourceLibraryCount = sourceLibraryCount,
             onLoadPlaylist = onLoadRemotePlaylist,
+            onAddToLibrary = onAddSourceToLibrary,
+            onShowLibrary = onShowSourceLibrary,
             onOpenOfficialUrl = onOpenOfficialUrl,
             modifier = modifier
         )
@@ -870,7 +962,11 @@ private fun LiveContent(
 @Composable
 private fun OnlineSourcesContent(
     status: String,
+    sourceLibraryStatus: String,
+    sourceLibraryCount: Int,
     onLoadPlaylist: (RemotePlaylistSource) -> Unit,
+    onAddToLibrary: (RemotePlaylistSource) -> Unit,
+    onShowLibrary: () -> Unit,
     onOpenOfficialUrl: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -889,11 +985,19 @@ private fun OnlineSourcesContent(
             colors = CardDefaults.cardColors(containerColor = PanelRaised),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(status, color = SoftWhite, fontSize = 11.sp)
+                Text(sourceLibraryStatus, color = Silver, fontSize = 10.sp)
+                Button(
+                    onClick = onShowLibrary,
+                    enabled = sourceLibraryCount > 0,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
+                ) {
+                    Text("عرض المكتبة المجمّعة (${sourceLibraryCount} مصدر)")
+                }
                 Text(
-                    "تنبيه: تحميل مصدر جديد يستبدل قائمة القنوات المحلية الحالية. تُقبل روابط HTTPS فقط. قد تتوقف القنوات أو تُقيّد جغرافياً، والإتاحة العامة لا تثبت وحدها حقوق إعادة البث.",
-                    color = AccentRed,
+                    "إضافة مصدر إلى المكتبة لا تستبدل قائمتك الحالية. التشغيل المنفرد فقط يستبدل القائمة النشطة. تُقبل روابط HTTPS فقط؛ وقد تتوقف القنوات أو تُقيّد جغرافياً، والإتاحة العامة لا تثبت حقوق إعادة البث.",
+                    color = MutedText,
                     fontSize = 10.sp
                 )
             }
@@ -922,11 +1026,14 @@ private fun OnlineSourcesContent(
                             Text(it, color = MutedText, fontSize = 9.sp)
                         }
                         Button(
-                            onClick = { onLoadPlaylist(source) },
+                            onClick = { onAddToLibrary(source) },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("تحميل واستبدال القائمة")
+                            Text("إضافة إلى المكتبة المجمّعة")
+                        }
+                        TextButton(onClick = { onLoadPlaylist(source) }) {
+                            Text("تشغيل منفرد واستبدال القائمة النشطة", color = Silver, fontSize = 11.sp)
                         }
                     }
                 }
@@ -1236,6 +1343,14 @@ private fun ChannelCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(channel.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 Text(channel.group ?: "بدون تصنيف", color = MutedText, fontSize = 10.sp)
+                if (channel.sourceNames.isNotEmpty()) {
+                    Text(
+                        "المصادر: ${channel.sourceNames.joinToString("، ")}",
+                        color = Silver,
+                        fontSize = 9.sp,
+                        maxLines = 2
+                    )
+                }
             }
             IconButton(onClick = onToggleFavorite) {
                 Icon(
@@ -1378,6 +1493,9 @@ private fun SettingsContent(
         }
         item {
             SettingsAction("مسح المفضلة", "إزالة القنوات المحفوظة كمفضلة", { onClear(ClearAction.FAVORITES) })
+        }
+        item {
+            SettingsAction("مسح مكتبة مصادر IPTV", "حذف النسخ المجمّعة فقط مع إبقاء قائمة المستخدم والمفضلة", { onClear(ClearAction.SOURCE_LIBRARY) })
         }
         item {
             Card(

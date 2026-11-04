@@ -7,7 +7,10 @@ internal data class RSTVChannel(
     val tvgId: String?,
     val group: String?,
     val logoUrl: String?,
-    val streamUrl: String
+    val streamUrl: String,
+    val sourceIds: Set<String> = emptySet(),
+    val sourceNames: Set<String> = emptySet(),
+    val sourceProviders: Set<String> = emptySet()
 )
 
 internal data class M3uParseResult(
