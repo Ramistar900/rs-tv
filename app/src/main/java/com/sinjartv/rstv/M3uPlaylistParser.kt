@@ -1,5 +1,6 @@
 package com.sinjartv.rstv
 
+import org.json.JSONObject
 import java.net.URI
 
 internal data class RSTVChannel(
@@ -8,6 +9,7 @@ internal data class RSTVChannel(
     val group: String?,
     val logoUrl: String?,
     val streamUrl: String,
+    val httpHeaders: Map<String, String> = emptyMap(),
     val sourceIds: Set<String> = emptySet(),
     val sourceNames: Set<String> = emptySet(),
     val sourceProviders: Set<String> = emptySet()
@@ -29,6 +31,15 @@ internal object M3uPlaylistParser {
         "dailymotion.com", "facebook.com", "fb.watch", "fbcdn.net",
         "instagram.com", "tiktok.com", "rumble.com"
     )
+    private val supportedHeaderNames = mapOf(
+        "user-agent" to "User-Agent",
+        "http-user-agent" to "User-Agent",
+        "referer" to "Referer",
+        "referrer" to "Referer",
+        "http-referrer" to "Referer",
+        "origin" to "Origin",
+        "accept" to "Accept"
+    )
 
     fun parse(content: String): M3uParseResult {
         val lines = content.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
@@ -40,11 +51,12 @@ internal object M3uPlaylistParser {
             val name: String,
             val tvgId: String?,
             val group: String?,
-            val logoUrl: String?
+            val logoUrl: String?,
+            val httpHeaders: MutableMap<String, String> = linkedMapOf()
         )
 
         val channels = mutableListOf<RSTVChannel>()
-        val seenUrls = mutableSetOf<String>()
+        val seenEntries = mutableSetOf<String>()
         var pending: PendingChannel? = null
         var skippedUnsafeLinks = 0
         var invalidEntries = 0
@@ -76,6 +88,20 @@ internal object M3uPlaylistParser {
                 continue
             }
 
+            if (line.startsWith("#EXTVLCOPT:", ignoreCase = true)) {
+                pending?.let { channel -> parseVlcOption(line.substringAfter(':'))?.let { (key, value) ->
+                    channel.httpHeaders[key] = value
+                } }
+                continue
+            }
+
+            if (line.startsWith("#EXTHTTP:", ignoreCase = true)) {
+                pending?.let { channel -> parseHttpJson(line.substringAfter(':')).forEach { (key, value) ->
+                    channel.httpHeaders[key] = value
+                } }
+                continue
+            }
+
             if (line.startsWith('#')) continue
 
             val channel = pending ?: continue
@@ -97,13 +123,16 @@ internal object M3uPlaylistParser {
                 continue
             }
 
-            if (seenUrls.add(line)) {
+            val headers = channel.httpHeaders.toMap()
+            val entryKey = line + headers.toSortedMap().entries.joinToString("|") { "${it.key}=${it.value}" }
+            if (seenEntries.add(entryKey)) {
                 channels += RSTVChannel(
                     name = channel.name,
                     tvgId = channel.tvgId,
                     group = channel.group,
                     logoUrl = channel.logoUrl,
-                    streamUrl = line
+                    streamUrl = line,
+                    httpHeaders = headers
                 )
             } else {
                 invalidEntries++
@@ -112,6 +141,35 @@ internal object M3uPlaylistParser {
 
         if (pending != null) invalidEntries++
         return M3uParseResult(channels, skippedUnsafeLinks, invalidEntries, true)
+    }
+
+    private fun parseVlcOption(option: String): Pair<String, String>? {
+        val separator = option.indexOf('=')
+        if (separator <= 0) return null
+        val rawName = option.substring(0, separator).trim().lowercase()
+        val rawValue = option.substring(separator + 1).trim().trim('"', '\'')
+        return safeHeader(rawName, rawValue)
+    }
+
+    private fun parseHttpJson(json: String): Map<String, String> {
+        return runCatching {
+            val objectValue = JSONObject(json)
+            buildMap {
+                val keys = objectValue.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = objectValue.optString(key).trim()
+                    safeHeader(key, value)?.let { (header, safeValue) -> put(header, safeValue) }
+                }
+            }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun safeHeader(rawName: String, rawValue: String): Pair<String, String>? {
+        val headerName = supportedHeaderNames[rawName.trim().lowercase()] ?: return null
+        val value = rawValue.trim()
+        if (value.isBlank() || value.length > 1024 || '\r' in value || '\n' in value) return null
+        return headerName to value
     }
 
     private fun findTitleSeparator(value: String): Int {
