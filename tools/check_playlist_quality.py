@@ -72,7 +72,6 @@ def inspect_playlist(content: str) -> dict:
             if pending is not None:
                 malformed_entries += 1
             title = line.rsplit(",", 1)[-1].strip() if "," in line else ""
-            attrs = dict(re.findall(r'([\\w-]+)=(?:"([^"]*)"|\\'([^\\']*)\\'|([^ ,]+))', line))
             pending = {"name": title, "has_tvg_id": "tvg-id" in line.lower(), "has_group": "group-title" in line.lower()}
             continue
         if line.startswith("#"):
@@ -166,9 +165,9 @@ def main():
     parser.add_argument("--output", default="quality-report.json")
     args = parser.parse_args()
     report = audit()
-    with open(args.output, "w", encoding="utf-8", newline="\\n") as handle:
+    with open(args.output, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=2)
-        handle.write("\\n")
+        handle.write("\n")
     print(json.dumps({k: v for k, v in report.items() if k != "sources"}, ensure_ascii=False))
     for item in report["sources"]:
         if item["status"] == "ok":
