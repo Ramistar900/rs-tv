@@ -34,7 +34,8 @@ The **مصادر IPTV** screen offers user-initiated M3U downloads from several 
 - **Doubo Public Channel Directory**: worldwide, Türkiye, and Arabic-language lists. Its publisher describes a daily build with an official-domain/allowlisted-host policy and first-media-segment checks. The link selection/index data is CC BY 4.0; RS TV credits the directory. This is not a licence to redistribute the underlying programmes.
 - **IPTV-org playlists**: worldwide, Arab-region, and Türkiye lists. This is a large community-maintained discovery catalogue; availability and rights vary by channel.
 - **Free-TV/IPTV**: a smaller quality-focused community list whose README says it targets channels officially offered free in at least one market; regional blocks can apply.
-- **FreeCastHub public IPTV**: an experimental small supplementary list, never treated as independently rights-cleared.
+- **FreeCastHub public IPTV**: an experimental supplementary list; its category files are subsets of the same catalogue and are not counted as new sources.
+- **M3UPT**: a Portuguese community playlist with international entries; non-HTTPS, restricted, encrypted, and unsupported entries are filtered by the app parser and still require technical and rights review.
 
 The app downloads only the selected playlist, checks HTTPS and a size limit, validates redirects against the source's exact host, parses HTTPS entries, and stores the playlist locally. Selecting another source **replaces the active local playlist**. Selecting a source again fetches its latest published list. Official broadcaster destinations (Al Jazeera Arabic/English, CGTN, Euronews and NASA+) open the broadcaster's own website/player instead of extracting or proxying its media.
 
@@ -75,7 +76,7 @@ Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p),
 
 ## Automated playlist quality audit
 
-A separate read-only GitHub Actions workflow checks the eight configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is uploaded as the `rs-tv-playlist-quality-report` artifact.
+A separate read-only GitHub Actions workflow checks the nine configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, eligible direct-stream URL counts, global unique stream URLs across all sources, cross-source duplicates, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is uploaded as the `rs-tv-playlist-quality-report` artifact.
 
 This audit does **not** request individual channel streams, measure playback uptime/bitrate/resolution, or review copyright. It never changes the candidate catalogue or promotes entries to approved. Every channel remains a candidate until separate technical playback and rights review are completed.
 
