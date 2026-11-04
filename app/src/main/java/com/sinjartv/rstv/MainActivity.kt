@@ -400,6 +400,7 @@ private fun RSTVHome() {
         val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
         val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
+        selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
         LocalLibraryStore.addToHistory(context, channel.streamUrl)
         exoPlayer.setMediaItems(queue.map { item -> MediaItem.fromUri(item.streamUrl) }, startIndex, 0L)
