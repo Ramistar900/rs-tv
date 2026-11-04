@@ -1,0 +1,47 @@
+name: RS TV Playlist Source Quality Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 5 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "tools/check_playlist_quality.py"
+      - "tools/test_check_playlist_quality.py"
+      - ".github/workflows/playlist-quality-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rs-tv-playlist-quality-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run audit unit tests
+        run: python -m unittest discover -s tools -p 'test_*.py' -v
+
+      - name: Audit public playlist sources
+        run: python tools/check_playlist_quality.py --output quality-report.json
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: rs-tv-playlist-quality-report
+          path: quality-report.json
+          retention-days: 14

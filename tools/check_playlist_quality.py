@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Read-only quality audit for RS TV's public M3U discovery sources.
+
+This checks playlist endpoint availability and M3U structure/URL hygiene.
+It does not probe channel streams, grant rights, or approve channels.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+MAX_BYTES = 12 * 1024 * 1024
+TIMEOUT_SECONDS = 20
+USER_AGENT = "RS-TV-PlaylistQualityAudit/1.0 (+https://github.com/Ramistar900/rs-tv)"
+PAGE_ONLY_HOSTS = {
+    "youtube.com", "youtu.be", "googlevideo.com", "twitch.tv", "ttvnw.net",
+    "dailymotion.com", "facebook.com", "fb.watch", "fbcdn.net",
+    "instagram.com", "tiktok.com", "rumble.com",
+}
+SOURCES = [
+    ("doubo-world", "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.m3u"),
+    ("doubo-turkey", "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/tr.m3u"),
+    ("doubo-arabic", "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/languages/ara.m3u"),
+    ("iptv-org-world", "https://iptv-org.github.io/iptv/index.m3u"),
+    ("iptv-org-arab", "https://iptv-org.github.io/iptv/regions/arab.m3u"),
+    ("iptv-org-turkey", "https://iptv-org.github.io/iptv/countries/tr.m3u"),
+    ("free-tv", "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"),
+    ("freecasthub", "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u"),
+]
+
+
+def canonical_url(value: str) -> str | None:
+    try:
+        parsed = urlsplit(value.strip())
+        if parsed.scheme.lower() != "https" or not parsed.hostname:
+            return None
+        if parsed.username is not None or parsed.password is not None:
+            return None
+        host = parsed.hostname.lower()
+        port = parsed.port
+        netloc = host if port in (None, 443) else f"{host}:{port}"
+        return urlunsplit(("https", netloc, parsed.path or "/", parsed.query, ""))
+    except ValueError:
+        return None
+
+
+def is_page_only_platform(value: str) -> bool:
+    try:
+        host = (urlsplit(value).hostname or "").lower()
+        return any(host == blocked or host.endswith("." + blocked) for blocked in PAGE_ONLY_HOSTS)
+    except ValueError:
+        return False
+
+
+def inspect_playlist(content: str) -> dict:
+    lines = [line.strip() for line in content.lstrip("\ufeff").splitlines() if line.strip()]
+    if not lines or not lines[0].upper().startswith("#EXTM3U"):
+        raise ValueError("Response is not an M3U playlist")
+
+    channels = []
+    pending = None
+    orphan_urls = 0
+    malformed_entries = 0
+    for line in lines[1:]:
+        if line.upper().startswith("#EXTINF:"):
+            if pending is not None:
+                malformed_entries += 1
+            title = line.rsplit(",", 1)[-1].strip() if "," in line else ""
+            attrs = dict(re.findall(r'([\\w-]+)=(?:"([^"]*)"|\\'([^\\']*)\\'|([^ ,]+))', line))
+            pending = {"name": title, "has_tvg_id": "tvg-id" in line.lower(), "has_group": "group-title" in line.lower()}
+            continue
+        if line.startswith("#"):
+            continue
+        if pending is None:
+            orphan_urls += 1
+            continue
+        channels.append({"url": line, **pending})
+        pending = None
+    if pending is not None:
+        malformed_entries += 1
+
+    seen = set()
+    duplicates = 0
+    unsafe = 0
+    page_links = 0
+    missing_names = 0
+    for channel in channels:
+        key = canonical_url(channel["url"])
+        if key is None:
+            unsafe += 1
+        elif key in seen:
+            duplicates += 1
+        else:
+            seen.add(key)
+        if is_page_only_platform(channel["url"]):
+            page_links += 1
+        if not channel["name"] or channel["name"].lower() in {"unknown", "unnamed", "channel"}:
+            missing_names += 1
+
+    return {
+        "entries": len(channels),
+        "unique_https_urls": len(seen),
+        "duplicate_urls": duplicates,
+        "unsafe_or_non_https_urls": unsafe,
+        "platform_page_links": page_links,
+        "missing_channel_names": missing_names,
+        "orphan_stream_urls": orphan_urls,
+        "incomplete_extinf_entries": malformed_entries,
+    }
+
+
+class SameHostHttpsRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        old = urlsplit(req.full_url)
+        new = urlsplit(newurl)
+        if new.scheme.lower() != "https" or (new.hostname or "").lower() != (old.hostname or "").lower():
+            raise HTTPError(newurl, code, "Redirect rejected: HTTPS same-host redirects only", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def fetch_playlist(url: str) -> str:
+    parsed = urlsplit(url)
+    if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("Configured source URL must be HTTPS without credentials")
+    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/vnd.apple.mpegurl,audio/x-mpegurl,text/plain"})
+    opener = build_opener(SameHostHttpsRedirectHandler())
+    with opener.open(request, timeout=TIMEOUT_SECONDS) as response:
+        if response.status != 200:
+            raise RuntimeError(f"HTTP {response.status}")
+        payload = response.read(MAX_BYTES + 1)
+    if len(payload) > MAX_BYTES:
+        raise ValueError("Playlist exceeds 12 MiB audit limit")
+    return payload.decode("utf-8-sig")
+
+
+def audit(fetcher=fetch_playlist) -> dict:
+    results = []
+    for source_id, url in SOURCES:
+        try:
+            metrics = inspect_playlist(fetcher(url))
+            results.append({"source_id": source_id, "url": url, "status": "ok", **metrics})
+        except Exception as exc:  # report each source independently; one outage must not hide others
+            results.append({"source_id": source_id, "url": url, "status": "error", "error": str(exc)[:240]})
+    successful = sum(item["status"] == "ok" for item in results)
+    return {
+        "schema_version": 1,
+        "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "purpose": "Read-only playlist source and M3U structure audit",
+        "channel_stream_probes_performed": 0,
+        "rights_review_performed": False,
+        "approval_effect": "none; all entries remain candidates until separate technical and rights review",
+        "sources_checked": len(results),
+        "sources_available": successful,
+        "sources": results,
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", default="quality-report.json")
+    args = parser.parse_args()
+    report = audit()
+    with open(args.output, "w", encoding="utf-8", newline="\\n") as handle:
+        json.dump(report, handle, ensure_ascii=False, indent=2)
+        handle.write("\\n")
+    print(json.dumps({k: v for k, v in report.items() if k != "sources"}, ensure_ascii=False))
+    for item in report["sources"]:
+        if item["status"] == "ok":
+            print(f'{item["source_id"]}: {item["entries"]} entries, {item["unique_https_urls"]} unique HTTPS, {item["duplicate_urls"]} duplicates, {item["unsafe_or_non_https_urls"]} unsafe')
+        else:
+            print(f'{item["source_id"]}: ERROR {item["error"]}', file=sys.stderr)
+    if report["sources_available"] == 0:
+        raise SystemExit("No playlist source could be audited")
+
+
+if __name__ == "__main__":
+    main()

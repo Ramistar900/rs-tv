@@ -71,3 +71,10 @@ Only `approved` sources can appear in the default playable catalogue. Technical 
 ## Quality labels
 
 Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p), Full HD (1080p), HD (720p), or SD only when the stream actually provides that rendition. Auto is the default; never upscale and label as native 4K.
+
+
+## Automated playlist quality audit
+
+A separate read-only GitHub Actions workflow checks the eight configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is uploaded as the `rs-tv-playlist-quality-report` artifact.
+
+This audit does **not** request individual channel streams, measure playback uptime/bitrate/resolution, or review copyright. It never changes the candidate catalogue or promotes entries to approved. Every channel remains a candidate until separate technical playback and rights review are completed.
