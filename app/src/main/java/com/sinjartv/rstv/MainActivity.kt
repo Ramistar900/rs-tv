@@ -149,6 +149,7 @@ private fun RSTVHome() {
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
+    var showingSourceLibrary by remember { mutableStateOf(false) }
     var worldChannels by remember { mutableStateOf<List<WorldChannelCandidate>>(emptyList()) }
     var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
@@ -368,15 +369,15 @@ private fun RSTVHome() {
     }
 
     fun showSourceLibrary() {
-        channels.clear()
-        channels.addAll(sourceLibraryChannels)
+        showingSourceLibrary = true
         selectedChannel = null
         searchQuery = ""
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
-        status = "تعرض الآن مكتبة المصادر المجمّعة. قائمة المستخدم الأصلية محفوظة كما هي."
+        status = "تعرض الآن مكتبة المصادر المجمّعة. قائمتك المحلية محفوظة دون تغيير."
         selectedTab = RSTVTab.LIVE
     }
+
 
     fun playChannel(channel: RSTVChannel) {
         selectedChannel = channel
@@ -399,6 +400,11 @@ private fun RSTVHome() {
     val recentChannels = LocalLibraryStore.history(context)
         .mapNotNull { url -> channels.firstOrNull { it.streamUrl == url } }
     val visibleChannels = channels.filter { channel ->
+        searchQuery.isBlank() ||
+            channel.name.contains(searchQuery, ignoreCase = true) ||
+            channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
+    }
+    val visibleSourceLibraryChannels = sourceLibraryChannels.filter { channel ->
         searchQuery.isBlank() ||
             channel.name.contains(searchQuery, ignoreCase = true) ||
             channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
@@ -499,8 +505,9 @@ private fun RSTVHome() {
                             onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
-                            channels = when (selectedTab) {
-                                RSTVTab.FAVORITES -> favoriteChannels
+                            channels = when {
+                                selectedTab == RSTVTab.FAVORITES -> favoriteChannels
+                                selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                                 else -> visibleChannels
                             },
                             recentChannels = recentChannels,
@@ -514,6 +521,13 @@ private fun RSTVHome() {
                             player = exoPlayer,
                             status = status,
                             skippedUnsafeLinks = skippedUnsafeLinks,
+                            showingSourceLibrary = showingSourceLibrary,
+                            onShowUserPlaylist = {
+                                showingSourceLibrary = false
+                                selectedChannel = null
+                                searchQuery = ""
+                                status = "تمت العودة إلى قائمة المستخدم المحلية"
+                            },
                             onNavigate = { selectedTab = it },
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                             onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
@@ -542,8 +556,9 @@ private fun RSTVHome() {
                             onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
-                            channels = when (selectedTab) {
-                                RSTVTab.FAVORITES -> favoriteChannels
+                            channels = when {
+                                selectedTab == RSTVTab.FAVORITES -> favoriteChannels
+                                selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                                 else -> visibleChannels
                             },
                             recentChannels = recentChannels,
@@ -557,6 +572,13 @@ private fun RSTVHome() {
                             player = exoPlayer,
                             status = status,
                             skippedUnsafeLinks = skippedUnsafeLinks,
+                            showingSourceLibrary = showingSourceLibrary,
+                            onShowUserPlaylist = {
+                                showingSourceLibrary = false
+                                selectedChannel = null
+                                searchQuery = ""
+                                status = "تمت العودة إلى قائمة المستخدم المحلية"
+                            },
                             onNavigate = { selectedTab = it },
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                             onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
@@ -650,6 +672,8 @@ private fun ScreenBody(
     player: ExoPlayer,
     status: String,
     skippedUnsafeLinks: Int,
+    showingSourceLibrary: Boolean,
+    onShowUserPlaylist: () -> Unit,
     onNavigate: (RSTVTab) -> Unit,
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
@@ -694,6 +718,8 @@ private fun ScreenBody(
             player = player,
             status = status,
             skippedUnsafeLinks = skippedUnsafeLinks,
+            showingSourceLibrary = showingSourceLibrary,
+            onShowUserPlaylist = onShowUserPlaylist,
             modifier = modifier
         )
         RSTVTab.FAVORITES -> ChannelLibraryContent(
@@ -868,10 +894,22 @@ private fun LiveContent(
     player: ExoPlayer,
     status: String,
     skippedUnsafeLinks: Int,
+    showingSourceLibrary: Boolean,
+    onShowUserPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("البث المباشر", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+        Text(
+            if (showingSourceLibrary) "مكتبة مصادر IPTV المجمّعة" else "البث المباشر",
+            color = SoftWhite,
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Bold
+        )
+        if (showingSourceLibrary) {
+            TextButton(onClick = onShowUserPlaylist) {
+                Text("العودة إلى قائمتي المحلية", color = AccentRed)
+            }
+        }
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchChange,
