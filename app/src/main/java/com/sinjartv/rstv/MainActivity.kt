@@ -72,7 +72,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalUriHandler
@@ -157,8 +156,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RSTVHome() {
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scope = rememberCoroutineScope()
     val channels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
@@ -1147,7 +1144,7 @@ private fun LiveContent(
     onShowUserPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    BackHandler(enabled = isLandscape && selectedChannel != null) {
+    BackHandler(enabled = isFullscreenPlayer && selectedChannel != null) {
         onExitFullscreen()
     }
 
