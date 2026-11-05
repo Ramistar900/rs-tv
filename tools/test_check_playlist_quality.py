@@ -35,6 +35,18 @@ class PlaylistQualityTests(unittest.TestCase):
         self.assertEqual(report["unique_eligible_stream_urls_across_sources"], 2)
         self.assertEqual(report["duplicate_stream_urls_across_sources"], 1)
 
+
+    @patch("check_playlist_quality.SOURCES", [
+        ("doubo-sports", "https://playlist.example/doubo-sports.m3u"),
+        ("iptv-org-sports", "https://playlist.example/sports.m3u"),
+        ("iptv-org-movies", "https://playlist.example/movies.m3u"),
+        ("iptv-org-series", "https://playlist.example/series.m3u"),
+    ])
+    def test_audit_registry_includes_specialized_sports_and_film_sources(self):
+        from check_playlist_quality import SOURCES
+        ids = {source_id for source_id, _ in SOURCES}
+        self.assertTrue({"doubo-sports", "iptv-org-sports", "iptv-org-movies", "iptv-org-series"} <= ids)
+
     def test_platform_pages_are_not_direct_streams(self):
         self.assertTrue(is_page_only_platform("https://www.youtube.com/watch?v=abc"))
         self.assertFalse(is_page_only_platform("https://news.example.org/live.m3u8"))
