@@ -38,6 +38,8 @@ The **مصادر IPTV** screen offers user-initiated M3U downloads from several 
 - **M3UPT**: a Portuguese community playlist with international entries; non-HTTPS, restricted, encrypted, and unsupported entries are filtered by the app parser and still require technical and rights review.
 - **Romaxa55 World IPTV**: a large community aggregation that states it checks its collected channel URLs every six hours. It is treated as one additional discovery feed, not as an independent origin for every channel; the RS TV library deduplicates its URLs against all other feeds. Its own automated checks do not establish playback on every device, geographic availability, or redistribution rights.
 
+The app also exposes IPTV-org category slices for animation, auto, business, classic, comedy, cooking, culture, documentary, education, entertainment, family, general, kids, legislative, lifestyle, music, news, outdoor, public, relax, religious, science, travel, and weather. These are official category paths documented by the upstream project. They are alternate views of the same global dataset, not 24 independent channel inventories; exact stream URLs are deduplicated by the RS TV catalogue and health scanner. Adult and undefined categories are intentionally excluded.
+
 The app downloads only the selected playlist, checks HTTPS and a size limit, validates redirects against the source's exact host, parses HTTPS entries, and stores the playlist locally. Selecting another source **replaces the active local playlist**. Selecting a source again fetches its latest published list. Official broadcaster destinations (Al Jazeera Arabic/English, CGTN, Euronews and NASA+) open the broadcaster's own website/player instead of extracting or proxying its media.
 
 These playlists include traditional linear television brands and channels that may also be carried by satellite, but the app receives them through their online streams. It does not tune a satellite dish or emulate a satellite receiver.
@@ -107,7 +109,7 @@ Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p),
 
 ## Automated playlist quality audit
 
-A separate read-only GitHub Actions workflow checks the ten configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, eligible direct-stream URL counts, global unique stream URLs across all sources, cross-source duplicates, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is published in the GitHub Actions run summary; an artifact ZIP is also attempted when repository artifact storage is available.
+A separate read-only GitHub Actions workflow checks the configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, eligible direct-stream URL counts, global unique stream URLs across all sources, cross-source duplicates, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is published in the GitHub Actions run summary; an artifact ZIP is also attempted when repository artifact storage is available.
 
 This audit does **not** request individual channel streams, measure playback uptime/bitrate/resolution, or review copyright. It never changes the candidate catalogue or promotes entries to approved. Every channel remains a candidate until separate technical playback and rights review are completed.
 
