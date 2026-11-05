@@ -31,8 +31,8 @@ https://four.example/live.m3u8
             return {"status": "responded", "response_kind": "hls_manifest"}
         with patch("probe_channel_streams.SOURCES", [("fixture", "https://playlist.example/list.m3u")]):
             report = run_audit(lambda _: playlist, fake_probe)
-        self.assertEqual(report["samples_attempted"], 3)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(report["samples_attempted"], 4)
+        self.assertEqual(len(calls), 4)
         self.assertTrue(all("youtube.com" not in url for url in calls))
 
     def test_report_never_claims_playback_or_rights(self):
