@@ -33,7 +33,7 @@ SOURCES = [
     ("free-tv", "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"),
     ("freecasthub", "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u"),
     ("m3upt-portuguese", "https://raw.githubusercontent.com/LITUATUI/M3UPT/main/M3U/M3UPT.m3u"),
-    ("romaxa-world-auto-checked", "https://romaxa55.github.io/world_ip_tv/output/index.m3u"),
+    ("romaxa-world-auto-checked", "https://raw.githubusercontent.com/Romaxa55/world_ip_tv/master/output/index.m3u"),
 ]
 
 
