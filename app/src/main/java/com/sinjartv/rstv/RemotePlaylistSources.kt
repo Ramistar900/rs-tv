@@ -96,7 +96,7 @@ internal object RemotePlaylistSources {
             id = "romaxa-world-auto-checked",
             name = "World IPTV — فهرس عالمي بفحص دوري",
             description = "قائمة تجميعية عالمية يعلن ناشرها فحص روابطها وتحديثها كل عدة ساعات. قد تتضمن روابط مكررة أو مقيدة جغرافياً؛ تُزال التكرارات في مكتبة RS TV، ولا يُعد فحص الناشر إثباتاً لحقوق البث.",
-            playlistUrl = "https://romaxa55.github.io/world_ip_tv/output/index.m3u",
+            playlistUrl = "https://raw.githubusercontent.com/Romaxa55/world_ip_tv/master/output/index.m3u",
             provider = "Romaxa55/world_ip_tv",
             attribution = "مصدر تجميعي مجتمعي؛ تُحفظ نسبة المصدر، وتبقى حقوق كل قناة بحاجة إلى مراجعة مستقلة."
         ),
