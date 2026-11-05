@@ -31,6 +31,15 @@ internal data class OfficialLiveDestination(
 )
 
 internal object RemotePlaylistSources {
+    val worldLibraryBundleIds = listOf(
+        "doubo-world",
+        "doubo-arabic",
+        "doubo-turkey",
+        "iptv-org-world",
+        "iptv-org-arab",
+        "iptv-org-turkey"
+    )
+
     val playlists = listOf(
         RemotePlaylistSource(
             id = "doubo-world",
