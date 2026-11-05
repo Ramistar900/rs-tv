@@ -177,6 +177,7 @@ private fun RSTVHome() {
     var skippedUnsafeLinks by remember { mutableIntStateOf(0) }
     var favouriteRevision by remember { mutableIntStateOf(0) }
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
+    var isFullscreenPlayer by remember { mutableStateOf(false) }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
     val exoPlayer = player
 
@@ -392,6 +393,79 @@ private fun RSTVHome() {
         }
     }
 
+    fun addWorldPlaylistsToLibrary() {
+        val sources = RemotePlaylistSources.worldLibraryBundleIds.mapNotNull { id ->
+            RemotePlaylistSources.playlists.firstOrNull { it.id == id }
+        }
+        if (sources.isEmpty()) {
+            remotePlaylistStatus = "لا توجد مصادر عالمية مهيأة حالياً."
+            return
+        }
+
+        remotePlaylistStatus = "جارٍ تحديث مكتبة القنوات العالمية من ${sources.size} قوائم عامة..."
+        scope.launch {
+            val imported = mutableListOf<Pair<String, Int>>()
+            val failures = mutableListOf<String>()
+
+            sources.forEach { source ->
+                runCatching {
+                    val content = withContext(Dispatchers.IO) {
+                        RemotePlaylistDownloader.download(source)
+                    }
+                    val parsed = withContext(Dispatchers.Default) {
+                        M3uPlaylistParser.parse(content)
+                    }
+                    require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
+                    require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في القائمة" }
+
+                    val snapshot = RemoteSourceSnapshot(
+                        id = source.id,
+                        name = source.name,
+                        provider = source.provider,
+                        attribution = source.attribution,
+                        content = content
+                    )
+                    withContext(Dispatchers.IO) {
+                        LocalLibraryStore.saveRemoteSource(context, snapshot)
+                    }
+                    imported += source.name to parsed.channels.size
+                }.onFailure { error ->
+                    failures += "${source.name}: ${error.message ?: "تعذر الاستيراد"}"
+                }
+            }
+
+            val savedSources = withContext(Dispatchers.IO) {
+                LocalLibraryStore.loadRemoteSources(context)
+            }
+            val mergedSources = withContext(Dispatchers.Default) {
+                RemotePlaylistMerger.merge(savedSources)
+            }
+            sourceLibraryChannels.clear()
+            sourceLibraryChannels.addAll(mergedSources)
+            sourceLibraryCount = savedSources.size
+            sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر و${mergedSources.size} قناة فريدة"
+
+            if (imported.isNotEmpty()) {
+                isFullscreenPlayer = false
+                showingSourceLibrary = true
+                selectedTab = RSTVTab.LIVE
+                status = "تم تحديث مكتبة القنوات العالمية دون استبدال قائمتك المحلية"
+            }
+
+            remotePlaylistStatus = buildString {
+                if (imported.isNotEmpty()) {
+                    append("تم استيراد ${imported.size} من ${sources.size} مصادر عالمية؛ المكتبة تضم ${mergedSources.size} قناة فريدة.")
+                } else {
+                    append("لم ينجح استيراد أي مصدر عالمي.")
+                }
+                if (failures.isNotEmpty()) {
+                    append(" تعذّر: ")
+                    append(failures.joinToString(" • "))
+                }
+            }
+        }
+    }
+
     fun showSourceLibrary() {
         showingSourceLibrary = true
         selectedChannel = null
@@ -498,7 +572,7 @@ private fun RSTVHome() {
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val wideLayout = maxWidth >= 840.dp
-            if (isLandscape && selectedChannel != null) {
+            if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
                     worldChannels = worldChannels,
@@ -509,6 +583,7 @@ private fun RSTVHome() {
                     onLoadRemotePlaylist = ::loadRemotePlaylist,
                     onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                     onShowSourceLibrary = ::showSourceLibrary,
+                    onAddWorldSources = ::addWorldPlaylistsToLibrary,
                     onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                     channels = when {
                         selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -518,11 +593,9 @@ private fun RSTVHome() {
                     recentChannels = recentChannels,
                     programmes = programmes.toList(),
                     selectedChannel = selectedChannel,
-                    isLandscape = isLandscape,
-                    onExitFullscreen = {
-                        exoPlayer.pause()
-                        selectedChannel = null
-                    },
+                    isFullscreenPlayer = isFullscreenPlayer,
+                    onExitFullscreen = { isFullscreenPlayer = false },
+                    onEnterFullscreen = { isFullscreenPlayer = true },
                     searchQuery = searchQuery,
                     onSearchChange = { searchQuery = it },
                     onPlay = ::playChannel,
@@ -586,6 +659,7 @@ private fun RSTVHome() {
                             onLoadRemotePlaylist = ::loadRemotePlaylist,
                             onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
+                            onAddWorldSources = ::addWorldPlaylistsToLibrary,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -595,11 +669,9 @@ private fun RSTVHome() {
                             recentChannels = recentChannels,
                             programmes = programmes.toList(),
                             selectedChannel = selectedChannel,
-                            isLandscape = isLandscape,
-                            onExitFullscreen = {
-                                exoPlayer.pause()
-                                selectedChannel = null
-                            },
+                            isFullscreenPlayer = isFullscreenPlayer,
+                            onExitFullscreen = { isFullscreenPlayer = false },
+                            onEnterFullscreen = { isFullscreenPlayer = true },
                             searchQuery = searchQuery,
                             onSearchChange = { searchQuery = it },
                             onPlay = ::playChannel,
@@ -642,6 +714,7 @@ private fun RSTVHome() {
                             onLoadRemotePlaylist = ::loadRemotePlaylist,
                             onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
+                            onAddWorldSources = ::addWorldPlaylistsToLibrary,
                             onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -651,11 +724,9 @@ private fun RSTVHome() {
                             recentChannels = recentChannels,
                             programmes = programmes.toList(),
                             selectedChannel = selectedChannel,
-                            isLandscape = isLandscape,
-                            onExitFullscreen = {
-                                exoPlayer.pause()
-                                selectedChannel = null
-                            },
+                            isFullscreenPlayer = isFullscreenPlayer,
+                            onExitFullscreen = { isFullscreenPlayer = false },
+                            onEnterFullscreen = { isFullscreenPlayer = true },
                             searchQuery = searchQuery,
                             onSearchChange = { searchQuery = it },
                             onPlay = ::playChannel,
@@ -695,6 +766,30 @@ private fun RSTVHome() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerWatermark(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(7.dp))
+            .padding(horizontal = 7.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_rs_tv),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            alpha = 0.52f
+        )
+        Text(
+            "RS TV",
+            color = SoftWhite.copy(alpha = 0.62f),
+            fontWeight = FontWeight.Black,
+            fontSize = 10.sp
+        )
     }
 }
 
@@ -748,13 +843,15 @@ private fun ScreenBody(
     onLoadRemotePlaylist: (RemotePlaylistSource) -> Unit,
     onAddSourceToLibrary: (RemotePlaylistSource) -> Unit,
     onShowSourceLibrary: () -> Unit,
+    onAddWorldSources: () -> Unit,
     onOpenOfficialUrl: (String) -> Unit,
     channels: List<RSTVChannel>,
     recentChannels: List<RSTVChannel>,
     programmes: List<GuideProgramme>,
     selectedChannel: RSTVChannel?,
-    isLandscape: Boolean,
+    isFullscreenPlayer: Boolean,
     onExitFullscreen: () -> Unit,
+    onEnterFullscreen: () -> Unit,
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     onPlay: (RSTVChannel) -> Unit,
@@ -794,6 +891,10 @@ private fun ScreenBody(
         RSTVTab.WORLD -> WorldCatalogContent(
             candidates = worldChannels,
             catalogStatus = worldCatalogStatus,
+            sourceLibraryStatus = sourceLibraryStatus,
+            sourceLibraryCount = sourceLibraryCount,
+            remotePlaylistStatus = remotePlaylistStatus,
+            onAddWorldSources = onAddWorldSources,
             modifier = modifier
         )
         RSTVTab.YOUTUBE -> YouTubeLiveContent(modifier = modifier)
@@ -801,8 +902,9 @@ private fun ScreenBody(
         RSTVTab.LIVE -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
-            isLandscape = isLandscape,
+            isFullscreenPlayer = isFullscreenPlayer,
             onExitFullscreen = onExitFullscreen,
+            onEnterFullscreen = onEnterFullscreen,
             searchQuery = searchQuery,
             onSearchChange = onSearchChange,
             onPlay = onPlay,
@@ -1030,8 +1132,9 @@ private fun FeatureCard(
 private fun LiveContent(
     channels: List<RSTVChannel>,
     selectedChannel: RSTVChannel?,
-    isLandscape: Boolean,
+    isFullscreenPlayer: Boolean,
     onExitFullscreen: () -> Unit,
+    onEnterFullscreen: () -> Unit,
     searchQuery: String,
     onSearchChange: (String) -> Unit,
     onPlay: (RSTVChannel) -> Unit,
@@ -1048,7 +1151,7 @@ private fun LiveContent(
         onExitFullscreen()
     }
 
-    if (isLandscape && selectedChannel != null) {
+    if (isFullscreenPlayer && selectedChannel != null) {
         Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -1072,7 +1175,8 @@ private fun LiveContent(
                     containerColor = Color.Black.copy(alpha = 0.65f),
                     contentColor = SoftWhite
                 )
-            ) { Text("رجوع للقنوات") }
+            ) { Text("تصغير المشغل") }
+            PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(18.dp))
             Text(
                 selectedChannel.name,
                 color = SoftWhite,
@@ -1105,13 +1209,6 @@ private fun LiveContent(
                 }
                 Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
             }
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("ابحث عن قناة أو مجموعة") }
-            )
             if (selectedChannel != null) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1130,11 +1227,18 @@ private fun LiveContent(
                                 modifier = Modifier.weight(1f)
                             )
                             Text("LIVE", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                            TextButton(onClick = onEnterFullscreen) {
+                                Text("تكبير", color = Silver, fontSize = 11.sp)
+                            }
                         }
-                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                            val playerHeight = (maxHeight * 0.44f).coerceIn(170.dp, 340.dp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .background(Color.Black)
+                        ) {
                             AndroidView(
-                                modifier = Modifier.fillMaxWidth().height(playerHeight),
+                                modifier = Modifier.fillMaxSize(),
                                 factory = { viewContext ->
                                     PlayerView(viewContext).apply {
                                         this.player = player
@@ -1148,12 +1252,20 @@ private fun LiveContent(
                                     view.keepScreenOn = true
                                 }
                             )
+                            PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(10.dp))
                         }
                         Text(status, color = MutedText, fontSize = 11.sp)
                         StreamPlaybackDiagnostic(selectedChannel.streamUrl, selectedChannel.httpHeaders)
                     }
                 }
             }
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("ابحث عن قناة أو مجموعة") }
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("القنوات المتاحة: ${channels.size}", color = MutedText, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 if (skippedUnsafeLinks > 0) {
@@ -1338,6 +1450,10 @@ private data class WorldFilterOption(val key: String, val label: String)
 private fun WorldCatalogContent(
     candidates: List<WorldChannelCandidate>,
     catalogStatus: String,
+    sourceLibraryStatus: String,
+    sourceLibraryCount: Int,
+    remotePlaylistStatus: String,
+    onAddWorldSources: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
@@ -1386,6 +1502,36 @@ private fun WorldCatalogContent(
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("القنوات العالمية", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
         Text("تصفح قنوات الإنترنت حسب الدولة واللغة والتصنيف", color = MutedText, fontSize = 11.sp)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = PanelRaised),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("مكتبة بث عالمية داخل التطبيق", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    "تحميل القوائم العالمية والعربية والتركية إلى مكتبة IPTV المجمّعة، ثم تشغيل القنوات من المشغّل الداخلي. تتم إزالة روابط البث المكررة، وتبقى قائمتك المحلية محفوظة.",
+                    color = MutedText,
+                    fontSize = 10.sp
+                )
+                Button(
+                    onClick = onAddWorldSources,
+                    enabled = !remotePlaylistStatus.startsWith("جارٍ تحديث مكتبة القنوات العالمية"),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("تحميل القنوات العالمية وتشغيلها")
+                }
+                Text("المكتبة الحالية: $sourceLibraryCount مصادر", color = Silver, fontSize = 10.sp)
+                Text(sourceLibraryStatus, color = MutedText, fontSize = 10.sp)
+                Text(remotePlaylistStatus, color = SoftWhite, fontSize = 10.sp)
+                Text(
+                    "إسناد الفهارس: Doubo Public Channel Directory (CC BY 4.0) وIPTV-org. ترخيص الفهرس لا يمنح حقوق محتوى القنوات؛ قد تختلف الإتاحة حسب الدولة.",
+                    color = AccentRed,
+                    fontSize = 9.sp
+                )
+            }
+        }
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -1541,7 +1687,7 @@ private fun WorldChannelCard(
                 )
                 if (channel.websiteUrl != null) {
                     TextButton(onClick = onOpenOfficialWebsite) {
-                        Text("الموقع الرسمي", color = Silver, fontSize = 11.sp)
+                        Text("موقع القناة", color = Silver, fontSize = 11.sp)
                     }
                 }
             }
