@@ -18,7 +18,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from check_playlist_quality import SOURCES, fetch_playlist, inspect_playlist, canonical_url, is_page_only_platform
 
-MAX_SAMPLES_PER_SOURCE = 3
+MAX_SAMPLES_PER_SOURCE = 6
 MAX_RESPONSE_BYTES = 64 * 1024
 TIMEOUT_SECONDS = 8
 USER_AGENT = "RS-TV-Bounded-Stream-Probe/1.0 (+https://github.com/Ramistar900/rs-tv)"
@@ -101,16 +101,25 @@ def run_audit(playlist_fetcher=fetch_playlist, stream_probe=probe_stream) -> dic
                 elif pending is not None:
                     pairs.append((pending, line))
                     pending = None
-            samples, seen = [], set()
+            eligible, seen = [], set()
             for name, url in pairs:
                 key = canonical_url(url)
                 if not key or key in seen or is_page_only_platform(url):
                     continue
                 seen.add(key)
+                eligible.append((name, url))
+            sample_count = min(MAX_SAMPLES_PER_SOURCE, len(eligible))
+            if sample_count == 1:
+                selected = [eligible[0]]
+            elif sample_count > 1:
+                indexes = [round(i * (len(eligible) - 1) / (sample_count - 1)) for i in range(sample_count)]
+                selected = [eligible[index] for index in indexes]
+            else:
+                selected = []
+            samples = []
+            for name, url in selected:
                 result = stream_probe(url)
                 samples.append({"channel": name[:120], **result})
-                if len(samples) >= MAX_SAMPLES_PER_SOURCE:
-                    break
             source_results.append({
                 "source_id": source_id,
                 "playlist_entries": stats["entries"],
