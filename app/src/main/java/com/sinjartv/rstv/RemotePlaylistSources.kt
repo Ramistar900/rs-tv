@@ -57,6 +57,14 @@ internal object RemotePlaylistSources {
             attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory."
         ),
         RemotePlaylistSource(
+            id = "doubo-sports",
+            name = "Doubo — الرياضة العالمية",
+            description = "قائمة رياضية متخصصة يعلن الدليل أنها تضم نحو 100 قناة مجانية متاحة للعامة؛ أزلناها من العدّ المزدوج عند دمجها مع المصادر العالمية، وتظل كل قناة بحاجة إلى فحص مستقل.",
+            playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/sports.m3u",
+            provider = "Doubo Public Channel Directory",
+            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها."
+        ),
+        RemotePlaylistSource(
             id = "iptv-org-world",
             name = "IPTV-org — العالم",
             description = "فهرس مجتمعي واسع لقنوات الإنترنت، مقسّم بحسب الدول واللغات والتصنيفات. الروابط مرشحة وليست كلها مضمونة أو مرخصة.",
@@ -75,6 +83,27 @@ internal object RemotePlaylistSources {
             name = "IPTV-org — تركيا",
             description = "قنوات مصنفة لتركيا في فهرس IPTV-org.",
             playlistUrl = "https://iptv-org.github.io/iptv/countries/tr.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-sports",
+            name = "IPTV-org — القنوات الرياضية",
+            description = "قائمة مستقلة للقنوات المصنفة رياضية حول العالم. هي قائمة اكتشاف مجتمعية؛ الروابط قد تتوقف أو تُقيّد جغرافياً ولا تُعد معتمدة للحقوق تلقائياً.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/sports.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-movies",
+            name = "IPTV-org — قنوات الأفلام",
+            description = "قنوات تلفزيونية خطية تعرض أفلاماً وفق جدول بث؛ ليست مكتبة أفلام حسب الطلب.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/movies.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-series",
+            name = "IPTV-org — قنوات المسلسلات",
+            description = "قنوات تلفزيونية خطية تعرض المسلسلات والبرامج وفق جدول بث؛ وليست خدمة مشاهدة حسب الطلب.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/series.m3u",
             provider = "iptv-org/iptv"
         ),
         RemotePlaylistSource(
