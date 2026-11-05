@@ -227,6 +227,40 @@
       "url": "https://iptv-org.github.io/iptv/categories/series.m3u",
       "status": "candidate_source_requires_channel_level_review",
       "notes": "Linear channels that schedule series and TV programmes, not an on-demand series library. Entries overlap the global catalogue and require per-channel technical and rights review."
+    },
+    {
+      "id": "iptv-org-category-playlists",
+      "name": "IPTV-org worldwide category playlists",
+      "type": "internet_playlist_category_discovery",
+      "url": "https://github.com/iptv-org/iptv/blob/master/PLAYLISTS.md",
+      "related_endpoints": {
+        "animation": "https://iptv-org.github.io/iptv/categories/animation.m3u",
+        "auto": "https://iptv-org.github.io/iptv/categories/auto.m3u",
+        "business": "https://iptv-org.github.io/iptv/categories/business.m3u",
+        "classic": "https://iptv-org.github.io/iptv/categories/classic.m3u",
+        "comedy": "https://iptv-org.github.io/iptv/categories/comedy.m3u",
+        "cooking": "https://iptv-org.github.io/iptv/categories/cooking.m3u",
+        "culture": "https://iptv-org.github.io/iptv/categories/culture.m3u",
+        "documentary": "https://iptv-org.github.io/iptv/categories/documentary.m3u",
+        "education": "https://iptv-org.github.io/iptv/categories/education.m3u",
+        "entertainment": "https://iptv-org.github.io/iptv/categories/entertainment.m3u",
+        "family": "https://iptv-org.github.io/iptv/categories/family.m3u",
+        "general": "https://iptv-org.github.io/iptv/categories/general.m3u",
+        "kids": "https://iptv-org.github.io/iptv/categories/kids.m3u",
+        "legislative": "https://iptv-org.github.io/iptv/categories/legislative.m3u",
+        "lifestyle": "https://iptv-org.github.io/iptv/categories/lifestyle.m3u",
+        "music": "https://iptv-org.github.io/iptv/categories/music.m3u",
+        "news": "https://iptv-org.github.io/iptv/categories/news.m3u",
+        "outdoor": "https://iptv-org.github.io/iptv/categories/outdoor.m3u",
+        "public": "https://iptv-org.github.io/iptv/categories/public.m3u",
+        "relax": "https://iptv-org.github.io/iptv/categories/relax.m3u",
+        "religious": "https://iptv-org.github.io/iptv/categories/religious.m3u",
+        "science": "https://iptv-org.github.io/iptv/categories/science.m3u",
+        "travel": "https://iptv-org.github.io/iptv/categories/travel.m3u",
+        "weather": "https://iptv-org.github.io/iptv/categories/weather.m3u"
+      },
+      "status": "candidate_source_requires_channel_level_review",
+      "notes": "Expanded category-specific views of the same IPTV-org worldwide channel dataset. These endpoints improve discovery and browsing but are subsets/overlaps of the master and must never be added to unique channel totals as independent channels. Excludes adult and undefined categories. Technical checks and public reachability do not establish rights."
     }
   ],
   "channel_record_required_fields": [
