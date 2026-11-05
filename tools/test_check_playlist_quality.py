@@ -39,6 +39,7 @@ class PlaylistQualityTests(unittest.TestCase):
     def test_audit_registry_includes_specialized_sports_and_film_sources(self):
         ids = {source_id for source_id, _ in SOURCES}
         self.assertTrue({"doubo-sports", "iptv-org-sports", "iptv-org-movies", "iptv-org-series"} <= ids)
+        self.assertTrue({"iptv-org-animation", "iptv-org-auto", "iptv-org-business", "iptv-org-classic", "iptv-org-comedy", "iptv-org-cooking", "iptv-org-culture", "iptv-org-documentary", "iptv-org-education", "iptv-org-entertainment", "iptv-org-family", "iptv-org-general", "iptv-org-kids", "iptv-org-legislative", "iptv-org-lifestyle", "iptv-org-music", "iptv-org-news", "iptv-org-outdoor", "iptv-org-public", "iptv-org-relax", "iptv-org-religious", "iptv-org-science", "iptv-org-travel", "iptv-org-weather"} <= ids)
 
     def test_platform_pages_are_not_direct_streams(self):
         self.assertTrue(is_page_only_platform("https://www.youtube.com/watch?v=abc"))
