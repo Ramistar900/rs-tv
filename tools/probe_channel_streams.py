@@ -19,8 +19,9 @@ from urllib.parse import urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
 
-from check_playlist_quality import canonical_url
+from check_playlist_quality import SOURCES, canonical_url, fetch_playlist, inspect_playlist, is_page_only_platform
 
+MAX_SAMPLES_PER_SOURCE = 6
 MAX_RESPONSE_BYTES = 64 * 1024
 SEGMENT_SAMPLE_BYTES = 8 * 1024
 TIMEOUT_SECONDS = 7
@@ -206,6 +207,71 @@ def probe_stream(url: str) -> dict:
         }
     except Exception as exc:
         return _http_failure(exc)
+
+
+
+def run_audit(playlist_fetcher=fetch_playlist, stream_probe=probe_stream) -> dict:
+    """Compatibility source sampler retained alongside the rotating full scan."""
+    source_results = []
+    for source_id, source_url in SOURCES:
+        try:
+            playlist = playlist_fetcher(source_url)
+            stats = inspect_playlist(playlist)
+            lines = [line.strip() for line in playlist.lstrip("\ufeff").splitlines() if line.strip()]
+            pairs, pending = [], None
+            for line in lines[1:]:
+                if line.upper().startswith("#EXTINF:"):
+                    pending = line.rsplit(",", 1)[-1].strip() if "," in line else ""
+                elif line.startswith("#"):
+                    continue
+                elif pending is not None:
+                    pairs.append((pending, line))
+                    pending = None
+            eligible, seen = [], set()
+            for name, url in pairs:
+                key = canonical_url(url)
+                if not key or key in seen or is_page_only_platform(url):
+                    continue
+                seen.add(key)
+                eligible.append((name, url))
+            sample_count = min(MAX_SAMPLES_PER_SOURCE, len(eligible))
+            indexes = [round(i * (len(eligible) - 1) / (sample_count - 1))
+                       for i in range(sample_count)] if sample_count > 1 else ([0] if sample_count else [])
+            samples = []
+            for index in indexes:
+                name, url = eligible[index]
+                samples.append({"channel": name[:120], **stream_probe(url)})
+            source_results.append({
+                "source_id": source_id,
+                "playlist_entries": stats["entries"],
+                "samples_attempted": len(samples),
+                "samples": samples,
+            })
+        except Exception as exc:
+            source_results.append({
+                "source_id": source_id,
+                "source_error": str(exc)[:180],
+                "samples_attempted": 0,
+                "samples": [],
+            })
+    totals = {}
+    for source in source_results:
+        for sample in source["samples"]:
+            status = sample["status"]
+            totals[status] = totals.get(status, 0) + 1
+    return {
+        "schema_version": 2,
+        "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "purpose": "Small evenly distributed source sample; see channel health scan for rotating batch checks",
+        "max_samples_per_source": MAX_SAMPLES_PER_SOURCE,
+        "max_response_bytes_per_probe": MAX_RESPONSE_BYTES,
+        "channel_playback_tested": False,
+        "rights_review_performed": False,
+        "approval_effect": "none; endpoint or first-segment reachability does not prove full playback or redistribution rights",
+        "samples_attempted": sum(item["samples_attempted"] for item in source_results),
+        "status_totals": totals,
+        "sources": source_results,
+    }
 
 
 def main():
