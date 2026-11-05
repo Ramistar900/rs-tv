@@ -15,6 +15,10 @@ on:
       - "tools/test_probe_channel_streams.py"
       - "tools/scan_channel_health.py"
       - "tools/test_scan_channel_health.py"
+      - "app/src/main/java/com/sinjartv/rstv/RemotePlaylistSources.kt"
+      - "app/src/test/java/com/sinjartv/rstv/RemotePlaylistSourcesTest.kt"
+      - "catalog/sources.json"
+      - "catalog/README.md"
       - ".github/workflows/playlist-quality-audit.yml"
 
 permissions:
