@@ -286,7 +286,7 @@ def main():
     if args.output:
         with open(args.output, "w", encoding="utf-8") as handle:
             json.dump(report, handle, ensure_ascii=False, indent=2)
-            handle.write("\\n")
+            handle.write("\n")
     print(json.dumps({key: value for key, value in report.items() if key != "sources"}, ensure_ascii=False))
     for source in report["sources"]:
         print(f'{source["source_id"]}: {source["samples_attempted"]} samples; ' +
