@@ -107,6 +107,174 @@ internal object RemotePlaylistSources {
             provider = "iptv-org/iptv"
         ),
         RemotePlaylistSource(
+            id = "iptv-org-animation",
+            name = "IPTV-org — الرسوم المتحركة",
+            description = "قائمة قنوات الرسوم المتحركة العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/animation.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-auto",
+            name = "IPTV-org — السيارات",
+            description = "قائمة قنوات السيارات العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/auto.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-business",
+            name = "IPTV-org — الأعمال",
+            description = "قائمة قنوات الأعمال العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/business.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-classic",
+            name = "IPTV-org — الكلاسيكيات",
+            description = "قائمة قنوات الكلاسيكيات العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/classic.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-comedy",
+            name = "IPTV-org — الكوميديا",
+            description = "قائمة قنوات الكوميديا العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/comedy.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-cooking",
+            name = "IPTV-org — الطبخ",
+            description = "قائمة قنوات الطبخ العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/cooking.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-culture",
+            name = "IPTV-org — الثقافة",
+            description = "قائمة قنوات الثقافة العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/culture.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-documentary",
+            name = "IPTV-org — الوثائقيات",
+            description = "قائمة قنوات الوثائقيات العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/documentary.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-education",
+            name = "IPTV-org — التعليم",
+            description = "قائمة قنوات التعليم العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/education.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-entertainment",
+            name = "IPTV-org — الترفيه",
+            description = "قائمة قنوات الترفيه العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/entertainment.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-family",
+            name = "IPTV-org — العائلة",
+            description = "قائمة قنوات العائلة العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/family.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-general",
+            name = "IPTV-org — المنوعات",
+            description = "قائمة قنوات المنوعات العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/general.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-kids",
+            name = "IPTV-org — الأطفال",
+            description = "قائمة قنوات الأطفال العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/kids.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-legislative",
+            name = "IPTV-org — البرلمان والسياسة",
+            description = "قائمة قنوات البرلمان والسياسة العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/legislative.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-lifestyle",
+            name = "IPTV-org — أسلوب الحياة",
+            description = "قائمة قنوات أسلوب الحياة العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/lifestyle.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-music",
+            name = "IPTV-org — الموسيقى",
+            description = "قائمة قنوات الموسيقى العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/music.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-news",
+            name = "IPTV-org — الأخبار",
+            description = "قائمة قنوات الأخبار العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/news.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-outdoor",
+            name = "IPTV-org — الأنشطة الخارجية",
+            description = "قائمة قنوات الأنشطة الخارجية العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/outdoor.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-public",
+            name = "IPTV-org — الخدمة العامة",
+            description = "قائمة قنوات الخدمة العامة العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/public.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-relax",
+            name = "IPTV-org — الاسترخاء",
+            description = "قائمة قنوات الاسترخاء العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/relax.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-religious",
+            name = "IPTV-org — الدينية",
+            description = "قائمة قنوات الدينية العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/religious.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-science",
+            name = "IPTV-org — العلوم",
+            description = "قائمة قنوات العلوم العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/science.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-travel",
+            name = "IPTV-org — السفر",
+            description = "قائمة قنوات السفر العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/travel.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-weather",
+            name = "IPTV-org — الطقس",
+            description = "قائمة قنوات الطقس العالمية من فهرس IPTV-org. قد تتداخل مع الفهرس العالمي والتصنيفات الأخرى؛ تزال الروابط المتطابقة عند الدمج ولا تعني القائمة وحدها أن كل قناة تعمل أو أن حقوقها مؤكدة.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/weather.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
             id = "free-tv",
             name = "Free-TV — قائمة منتقاة",
             description = "قائمة مجتمعية تفضّل الجودة وقلة الروابط، وتقول إنها تقتصر على القنوات المجانية رسمياً. قد تكون بعض القنوات مقيدة جغرافياً.",
