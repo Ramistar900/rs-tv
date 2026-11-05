@@ -1228,28 +1228,37 @@ private fun LiveContent(
                                 Text("تكبير", color = Silver, fontSize = 11.sp)
                             }
                         }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .background(Color.Black)
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            AndroidView(
-                                modifier = Modifier.fillMaxSize(),
-                                factory = { viewContext ->
-                                    PlayerView(viewContext).apply {
-                                        this.player = player
-                                        useController = true
-                                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                                        keepScreenOn = true
+                            val playerHeight = (maxHeight * 0.6f)
+                                .coerceAtMost(280.dp)
+                                .coerceAtMost(maxWidth * 9f / 16f)
+                            val playerWidth = playerHeight * 16f / 9f
+                            Box(
+                                modifier = Modifier
+                                    .width(playerWidth)
+                                    .height(playerHeight)
+                                    .background(Color.Black)
+                            ) {
+                                AndroidView(
+                                    modifier = Modifier.fillMaxSize(),
+                                    factory = { viewContext ->
+                                        PlayerView(viewContext).apply {
+                                            this.player = player
+                                            useController = true
+                                            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                            keepScreenOn = true
+                                        }
+                                    },
+                                    update = { view ->
+                                        view.player = player
+                                        view.keepScreenOn = true
                                     }
-                                },
-                                update = { view ->
-                                    view.player = player
-                                    view.keepScreenOn = true
-                                }
-                            )
-                            PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(10.dp))
+                                )
+                                PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(10.dp))
+                            }
                         }
                         Text(status, color = MutedText, fontSize = 11.sp)
                         StreamPlaybackDiagnostic(selectedChannel.streamUrl, selectedChannel.httpHeaders)
