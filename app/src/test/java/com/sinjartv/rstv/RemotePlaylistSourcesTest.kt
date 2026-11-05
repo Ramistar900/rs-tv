@@ -55,6 +55,20 @@ class RemotePlaylistSourcesTest {
         assertTrue(!portuguese.attribution.isNullOrBlank())
     }
 
+
+    @Test
+    fun officialSportsAndFilmDestinationsAreCategorizedSeparately() {
+        val destinations = RemotePlaylistSources.officialDestinations.associateBy { it.id }
+        assertTrue(destinations.getValue("fifa-plus").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("eurovision-sport").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("red-bull-tv").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("trt-spor").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("rakuten-tv-free").category == OfficialDestinationCategory.MOVIES)
+        assertTrue(destinations.getValue("pluto-tv").category == OfficialDestinationCategory.MOVIES)
+        assertTrue(destinations.getValue("internet-archive-movies").category == OfficialDestinationCategory.MOVIES)
+        assertTrue(destinations.values.any { it.category == OfficialDestinationCategory.GENERAL })
+    }
+
     @Test
     fun officialDestinationsUseHttps() {
         assertTrue(RemotePlaylistSources.officialDestinations.isNotEmpty())
