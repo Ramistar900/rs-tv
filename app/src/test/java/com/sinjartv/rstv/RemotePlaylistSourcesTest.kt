@@ -48,7 +48,7 @@ class RemotePlaylistSourcesTest {
             assertTrue(sources.getValue(id).provider == "iptv-org/iptv")
         }
         val romaxa = sources.getValue("romaxa-world-auto-checked")
-        assertTrue(romaxa.playlistUrl == "https://romaxa55.github.io/world_ip_tv/output/index.m3u")
+        assertTrue(romaxa.playlistUrl == "https://raw.githubusercontent.com/Romaxa55/world_ip_tv/master/output/index.m3u")
         assertTrue(romaxa.provider == "Romaxa55/world_ip_tv")
         val portuguese = sources.getValue("m3upt-portuguese")
         assertTrue(portuguese.playlistUrl.endsWith("/M3UPT.m3u"))
