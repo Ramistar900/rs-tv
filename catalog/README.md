@@ -48,6 +48,12 @@ RS TV includes a separate official-service directory grouped into sports and fil
 
 ### Sports
 
+The app's **مصادر IPTV** list now also includes two direct category playlists for sports discovery:
+- **Doubo Sports**: a separate daily-updated M3U. Doubo currently lists 100 sports channels in its directory; this is a publisher-reported count, not 100 independently verified working streams.
+- **IPTV-org Sports**: a worldwide category playlist. It overlaps the main IPTV-org index and country lists, so the RS TV source merger removes exact duplicate stream URLs.
+
+The app also exposes dedicated **IPTV-org Movies** and **IPTV-org Series** linear-channel lists. These are scheduled TV channels, not on-demand movie files. The health scan includes these category lists, but deduplicates their exact stream URLs across all worldwide feeds.
+
 - **FIFA+** — selected live football matches, archive matches and original programming. The live schedule and rights vary by competition and territory.
 - **Eurovision Sport** — free live events, replays and highlights across sports such as athletics, aquatics, cycling and combat sports. Individual event rights and availability can vary by country.
 - **Red Bull TV** — selected live events, replays, sports films and documentaries, including motorsport and action sports; event coverage varies by region.
