@@ -64,6 +64,16 @@ class RemotePlaylistSourcesTest {
     }
 
     @Test
+    fun worldQuickImportBundleUsesKnownWorldwideArabicAndTurkishSources() {
+        val knownIds = RemotePlaylistSources.playlists.map { it.id }.toSet()
+        assertTrue(RemotePlaylistSources.worldLibraryBundleIds.isNotEmpty())
+        assertTrue(RemotePlaylistSources.worldLibraryBundleIds.size == RemotePlaylistSources.worldLibraryBundleIds.distinct().size)
+        RemotePlaylistSources.worldLibraryBundleIds.forEach { id ->
+            assertTrue("Unknown world bundle source: $id", id in knownIds)
+        }
+    }
+
+    @Test
     fun groupedIndexesAreExplicitlySameProviderAndPortugueseListHasAttribution() {
         val sources = RemotePlaylistSources.playlists.associateBy { it.id }
         val indexes = listOf(
