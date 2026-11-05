@@ -9,7 +9,7 @@ RS TV is an independent Android TV app for phones, tablets, Android TV, and TV b
 - Local M3U/M3U8 import, channel name/group search, and HTTPS stream playback.
 - In-app online source directory for worldwide, Arab-region, Arabic-language, and Türkiye M3U lists from IPTV-org and Doubo, plus Free-TV and FreeCastHub supplementary lists.
 - User-initiated remote playlist download with HTTPS-only connections, exact-host redirect allowlisting, response-size and timeout limits; the selected source replaces the active local playlist.
-- Official external live destinations for Al Jazeera Arabic/English, CGTN, Euronews, and NASA+.
+- Official external live destinations grouped into sports (FIFA+, Eurovision Sport, Red Bull TV, TRT Spor, Fubo Sports Network), movies/series (Rakuten TV Free, Pluto TV, Tubi, Plex, Internet Archive), and general broadcasters. Each opens the official service; regional availability and rights vary.
 - Local persistence for the imported playlist, favorites, and recent channel history.
 - XMLTV programme-guide import, secure XML parsing, and channel matching through M3U `tvg-id` and XMLTV `channel` IDs.
 - Android TV launcher entry and a dedicated TV banner; custom vector launcher icon.
@@ -20,6 +20,7 @@ RS TV is an independent Android TV app for phones, tablets, Android TV, and TV b
 
 - Automated worldwide internet-channel candidate import from the IPTV-org structured catalogue, with country, language, category, logo, feed, and blocklist metadata.
 - The global candidate file is refreshed daily and remains a review queue. It is not automatically treated as free, authorized, stable, or ready to play.
+- A rotating daily health scan checks up to 600 globally deduplicated HTTPS stream URLs, including the first HLS media segment where possible; a pass is not a full device playback test or rights approval.
 - YouTube live discovery is planned through the official YouTube Data API and requires a protected `YOUTUBE_API_KEY`; results use official YouTube playback routes.
 - Official broadcaster websites and internet services are added as verified external/embedded sources, according to each provider's rules.
 - International movie and series metadata can be discovered through TMDB after configuring `TMDB_API_KEY` and attribution. Metadata is separate from streaming rights and playback.
