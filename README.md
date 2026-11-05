@@ -7,7 +7,7 @@ RS TV is an independent Android TV app for phones, tablets, Android TV, and TV b
 - Adaptive navigation: bottom navigation on compact screens and a navigation rail on wide screens/TV layouts.
 - Arabic-first interface with a black, red, and silver visual identity.
 - Local M3U/M3U8 import, channel name/group search, and HTTPS stream playback.
-- In-app online source directory for worldwide, Arab-region, Arabic-language, and Türkiye M3U lists from IPTV-org and Doubo, plus Free-TV and FreeCastHub supplementary lists.
+- In-app online source directory for worldwide, Arab-region, Arabic-language, and Türkiye M3U lists from IPTV-org and Doubo, plus dedicated sports, movies and series category playlists, and Free-TV/FreeCastHub supplementary lists.
 - User-initiated remote playlist download with HTTPS-only connections, exact-host redirect allowlisting, response-size and timeout limits; the selected source replaces the active local playlist.
 - Official external live destinations grouped into sports (FIFA+, Eurovision Sport, Red Bull TV, TRT Spor, Fubo Sports Network), movies/series (Rakuten TV Free, Pluto TV, Tubi, Plex, Internet Archive), and general broadcasters. Each opens the official service; regional availability and rights vary.
 - Local persistence for the imported playlist, favorites, and recent channel history.
