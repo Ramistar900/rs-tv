@@ -44,8 +44,49 @@ jobs:
       - name: Probe a small sample of channel endpoints
         run: python tools/probe_channel_streams.py --output stream-probe-report.json
 
+      - name: Publish audit summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          with open("quality-report.json", encoding="utf-8") as handle:
+              quality = json.load(handle)
+          with open("stream-probe-report.json", encoding="utf-8") as handle:
+              probes = json.load(handle)
+
+          lines = [
+              "# RS TV IPTV source audit",
+              "",
+              f"- Sources available: **{quality['sources_available']}/{quality['sources_checked']}**",
+              f"- Raw playlist entries: **{quality.get('total_playlist_entries', 0):,}**",
+              f"- Unique eligible HTTPS stream URLs across sources: **{quality.get('unique_eligible_stream_urls_across_sources', 0):,}**",
+              f"- Duplicate stream URLs across sources: **{quality.get('duplicate_stream_urls_across_sources', 0):,}**",
+              f"- Endpoint samples: **{probes['samples_attempted']}**",
+              f"- HTTP responses: **{probes['status_totals'].get('responded', 0)}**",
+              "",
+              "> HTTP response is not a full playback test and does not establish broadcast rights.",
+              "",
+              "| Source | Entries | Unique eligible HTTPS |",
+              "|---|---:|---:|",
+          ]
+          for source in quality["sources"]:
+              if source["status"] == "ok":
+                  lines.append(f"| {source['source_id']} | {source['entries']:,} | {source['eligible_unique_https_urls']:,} |")
+              else:
+                  lines.append(f"| {source['source_id']} | ERROR | — |")
+          lines.extend(["", "## Endpoint sample results", "", "| Source | Channel | Result |", "|---|---|---|"])
+          for source in probes["sources"]:
+              for sample in source["samples"]:
+                  lines.append(f"| {source['source_id']} | {sample.get('channel', '—')} | {sample['status']} |")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+              handle.write("\\n".join(lines) + "\\n")
+          PY
+
       - name: Upload quality reports
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: rs-tv-playlist-quality-report
           path: |
