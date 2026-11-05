@@ -11,6 +11,8 @@ on:
       - "tools/test_check_playlist_quality.py"
       - "tools/probe_channel_streams.py"
       - "tools/test_probe_channel_streams.py"
+      - "tools/scan_channel_health.py"
+      - "tools/test_scan_channel_health.py"
       - ".github/workflows/playlist-quality-audit.yml"
 
 permissions:
@@ -23,7 +25,7 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - name: Check out main
         uses: actions/checkout@v4
@@ -43,6 +45,40 @@ jobs:
 
       - name: Probe a small sample of channel endpoints
         run: python tools/probe_channel_streams.py --output stream-probe-report.json
+
+      - name: Rotate and test a global batch of unique stream URLs
+        run: python tools/scan_channel_health.py --limit 600 --workers 24 --output channel-health-report.json
+
+      - name: Publish global channel health summary
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          with open("channel-health-report.json", encoding="utf-8") as handle:
+              report = json.load(handle)
+          lines = [
+              "",
+              "# Global stream health batch",
+              "",
+              f"- Unique HTTPS streams discovered across sources: **{report['total_unique_https_streams_discovered']:,}**",
+              f"- Checked in this run: **{report['streams_checked_this_batch']:,}**",
+              f"- Batch: **{report['batch_index'] + 1}/{report['batch_count']}**",
+              f"- HLS first segments with bytes received: **{report['hls_first_segments_checked']:,}**",
+              f"- Direct media responses with bytes received: **{report['direct_media_bytes_checked']:,}**",
+              "",
+              "| Result | Count |",
+              "|---|---:|",
+          ]
+          for status, count in sorted(report["status_totals"].items()):
+              lines.append(f"| {status} | {count:,} |")
+          lines.extend([
+              "",
+              "> A first-segment or byte response is a stronger endpoint check, not a full device playback test. It does not grant or establish broadcast rights.",
+          ])
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+              handle.write("\\n".join(lines) + "\\n")
+          PY
 
       - name: Publish audit summary
         run: |
@@ -91,4 +127,5 @@ jobs:
           path: |
             quality-report.json
             stream-probe-report.json
+            channel-health-report.json
           retention-days: 14
