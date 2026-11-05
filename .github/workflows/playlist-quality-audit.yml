@@ -1,6 +1,8 @@
 name: RS TV Playlist Source Quality Audit
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: "47 5 * * *"
@@ -27,10 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Check out main
+      - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,15 +41,19 @@ jobs:
         run: python -m unittest discover -s tools -p 'test_*.py' -v
 
       - name: Audit public playlist sources
+        if: github.event_name != 'pull_request'
         run: python tools/check_playlist_quality.py --output quality-report.json
 
       - name: Probe a small sample of channel endpoints
+        if: github.event_name != 'pull_request'
         run: python tools/probe_channel_streams.py --output stream-probe-report.json
 
       - name: Rotate and test a global batch of unique stream URLs
+        if: github.event_name != 'pull_request'
         run: python tools/scan_channel_health.py --limit 600 --workers 24 --output channel-health-report.json
 
       - name: Publish global channel health summary
+        if: github.event_name != 'pull_request'
         run: |
           python - <<'PY'
           import json
@@ -77,10 +81,11 @@ jobs:
               "> A first-segment or byte response is a stronger endpoint check, not a full device playback test. It does not grant or establish broadcast rights.",
           ])
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
-              handle.write("\\n".join(lines) + "\\n")
+              handle.write("\n".join(lines) + "\n")
           PY
 
       - name: Publish audit summary
+        if: github.event_name != 'pull_request'
         run: |
           python - <<'PY'
           import json
@@ -99,7 +104,7 @@ jobs:
               f"- Unique eligible HTTPS stream URLs across sources: **{quality.get('unique_eligible_stream_urls_across_sources', 0):,}**",
               f"- Duplicate stream URLs across sources: **{quality.get('duplicate_stream_urls_across_sources', 0):,}**",
               f"- Endpoint samples: **{probes['samples_attempted']}**",
-              f"- HTTP responses: **{probes['status_totals'].get('responded', 0)}**",
+              f"- HLS first-segment checks: **{probes['status_totals'].get('playback_segment_checked', 0)}**",
               "",
               "> HTTP response is not a full playback test and does not establish broadcast rights.",
               "",
@@ -116,10 +121,11 @@ jobs:
               for sample in source["samples"]:
                   lines.append(f"| {source['source_id']} | {sample.get('channel', '—')} | {sample['status']} |")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
-              handle.write("\\n".join(lines) + "\\n")
+              handle.write("\n".join(lines) + "\n")
           PY
 
       - name: Upload quality reports
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         continue-on-error: true
         with:
