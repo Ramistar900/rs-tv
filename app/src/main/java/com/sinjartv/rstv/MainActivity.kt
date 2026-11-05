@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -97,12 +98,12 @@ import java.util.Date
 import java.util.Locale
 
 private val ScreenBlack = Color(0xFF08090C)
-private val PanelBlack = Color(0xFF17191F)
-private val PanelRaised = Color(0xFF20232B)
-private val AccentRed = Color(0xFFD71920)
-private val SoftWhite = Color(0xFFF4F4F4)
-private val MutedText = Color(0xFFADB2BD)
-private val Silver = Color(0xFFB7BEC9)
+private val PanelBlack = Color(0xFF151515)
+private val PanelRaised = Color(0xFF211D12)
+private val AccentRed = Color(0xFFD6B45A)
+private val SoftWhite = Color(0xFFF7F3E8)
+private val MutedText = Color(0xFFAAA49A)
+private val Silver = Color(0xFFE3D1A0)
 
 private enum class RSTVTab(
     val title: String,
@@ -851,31 +852,60 @@ private fun HomeContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .border(1.dp, AccentRed.copy(alpha = 0.34f), RoundedCornerShape(24.dp)),
                 colors = CardDefaults.cardColors(containerColor = PanelRaised),
-                shape = RoundedCornerShape(22.dp)
+                shape = RoundedCornerShape(24.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(22.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(13.dp)
                 ) {
-                    Text("عالم التلفزيون بين يديك", color = SoftWhite, fontSize = 25.sp, fontWeight = FontWeight.Black)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(62.dp)
+                                .background(Color(0xFF302714), RoundedCornerShape(18.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.royal_smart_tv),
+                                contentDescription = "التلفاز الذكي",
+                                tint = AccentRed,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("RS TV", color = AccentRed, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                            Text("عالم الترفيه بين يديك", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                            Text("تجربة مشاهدة عالمية بتصميم ملكي", color = MutedText, fontSize = 11.sp)
+                        }
+                    }
                     Text(
-                        "قوائم البث المباشر، دليل البرامج، ومصادر قنوات الإنترنت في مكان واحد.",
-                        color = MutedText,
-                        fontSize = 14.sp
+                        "قنوات مباشرة ومصادر عالمية ومكتبة ترفيهية، في واجهة واحدة سهلة الاستخدام.",
+                        color = Silver,
+                        fontSize = 13.sp
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Button(
-                            onClick = onImportPlaylist,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
-                        ) { Text("إضافة قائمة قنوات") }
-                        TextButton(onClick = { onNavigate(RSTVTab.LIVE) }) {
-                            Text("البث المباشر", color = SoftWhite)
+                            onClick = { onNavigate(RSTVTab.LIVE) },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(painterResource(R.drawable.royal_play), contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("ابدأ المشاهدة", fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(onClick = onImportPlaylist) {
+                            Icon(painterResource(R.drawable.royal_playlist), contentDescription = null, tint = AccentRed, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("إضافة قائمة", color = SoftWhite)
                         }
                     }
                 }
@@ -883,49 +913,52 @@ private fun HomeContent(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("القنوات", channelCount.toString(), Modifier.weight(1f))
-                StatCard("المشاهدة الأخيرة", recentChannels.size.toString(), Modifier.weight(1f))
+                StatCard("القنوات المحمّلة", channelCount.toString(), Modifier.weight(1f))
+                StatCard("آخر المشاهدات", recentChannels.size.toString(), Modifier.weight(1f))
             }
         }
         item {
-            Text("استكشف RS TV", color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("اكتشف RS TV", color = SoftWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("اختصاراتك", color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("البث المباشر", "قنواتك المستوردة", "فتح", Modifier.weight(1f)) {
+                FeatureCard("البث المباشر", "شاهد قنواتك وقوائمك", "مشاهدة الآن", R.drawable.royal_smart_tv, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.LIVE)
                 }
-                FeatureCard("دليل البرامج", "ملفات XMLTV", "فتح", Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.GUIDE)
-                }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("القنوات العالمية", "${worldChannelCount} قناة مرشّحة من مصادر دولية", "استعراض", Modifier.weight(1f)) {
+                FeatureCard("القنوات العالمية", "$worldChannelCount قناة مرشّحة", "استكشف العالم", R.drawable.royal_apps_grid, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.WORLD)
                 }
-                FeatureCard("YouTube المباشر", "اكتشاف البث عبر YouTube الرسمي", "استكشاف", Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.YOUTUBE)
-                }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("مصادر IPTV", "قوائم عالمية وعربية وتركية قابلة للتحديث", "تحميل القنوات", Modifier.weight(1f)) {
+                FeatureCard("مصادر IPTV", "قوائم بث قابلة للتحديث", "إدارة المصادر", R.drawable.royal_playlist, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.SOURCES)
                 }
-                FeatureCard("الأفلام والمسلسلات", "كتالوج معلوماتي منفصل عن حقوق المشاهدة", "فتح المكتبة", Modifier.weight(1f)) {
+                FeatureCard("الأفلام والمسلسلات", "اكتشف مكتبة الترفيه", "فتح المكتبة", R.drawable.royal_media_video, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.MOVIES)
                 }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("المفضلة", "قنواتك المختارة", "فتح", Modifier.weight(1f)) {
+                FeatureCard("YouTube المباشر", "اكتشاف البث الرسمي", "استكشاف", R.drawable.royal_play, Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.YOUTUBE)
+                }
+                FeatureCard("دليل البرامج", "مواعيد وبرامج القنوات", "عرض الدليل", R.drawable.royal_apps_grid, Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.GUIDE)
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FeatureCard("المفضلة", "قنواتك المحفوظة", "فتح المفضلة", R.drawable.royal_account, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.FAVORITES)
                 }
-                FeatureCard("الإعدادات", "إدارة القوائم ودليل البرامج", "فتح", Modifier.weight(1f)) {
+                FeatureCard("الإعدادات", "تخصيص وإدارة التطبيق", "فتح الإعدادات", R.drawable.royal_settings, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.SETTINGS)
                 }
             }
@@ -960,25 +993,39 @@ private fun FeatureCard(
     title: String,
     description: String,
     action: String,
+    iconRes: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.heightIn(min = 112.dp).clickable(onClick = onClick),
+        modifier = modifier.heightIn(min = 132.dp)
+            .border(1.dp, AccentRed.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = PanelBlack),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(18.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.fillMaxWidth().padding(13.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Text(title, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(description, color = MutedText, fontSize = 11.sp)
-            Text(action, color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Box(
+                modifier = Modifier.size(42.dp)
+                    .background(Color(0xFF302714), RoundedCornerShape(13.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = title,
+                    tint = AccentRed,
+                    modifier = Modifier.size(27.dp)
+                )
+            }
+            Text(title, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(description, color = MutedText, fontSize = 10.sp, maxLines = 2)
+            Text(action, color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
     }
 }
-
 @Composable
 private fun LiveContent(
     channels: List<RSTVChannel>,
