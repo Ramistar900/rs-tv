@@ -77,7 +77,7 @@ Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p),
 
 ## Automated playlist quality audit
 
-A separate read-only GitHub Actions workflow checks the ten configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, eligible direct-stream URL counts, global unique stream URLs across all sources, cross-source duplicates, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is uploaded as the `rs-tv-playlist-quality-report` artifact.
+A separate read-only GitHub Actions workflow checks the ten configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, eligible direct-stream URL counts, global unique stream URLs across all sources, cross-source duplicates, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is published in the GitHub Actions run summary; an artifact ZIP is also attempted when repository artifact storage is available.
 
 This audit does **not** request individual channel streams, measure playback uptime/bitrate/resolution, or review copyright. It never changes the candidate catalogue or promotes entries to approved. Every channel remains a candidate until separate technical playback and rights review are completed.
 
