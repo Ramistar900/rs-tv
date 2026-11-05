@@ -137,7 +137,18 @@ jobs:
             echo "No stream health state changes to commit"
           else
             git commit -m "chore: refresh IPTV stream health state"
-            git push
+            # Other scheduled catalogue workflows may update main in parallel.
+            # Rebase this state-only commit onto the latest main before pushing.
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+              echo "Push attempt $attempt failed; retrying against the latest main"
+            done
+            echo "Unable to persist health state after three rebase attempts"
+            exit 1
           fi
 
       - name: Upload quality reports
