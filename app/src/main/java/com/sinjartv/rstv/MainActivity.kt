@@ -1236,27 +1236,50 @@ private fun OnlineSourcesContent(
                 }
             }
             item {
-                Text("البث من المواقع الرسمية", color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(OfficialDestinationCategory.SPORTS.title, color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
-            items(RemotePlaylistSources.officialDestinations, key = { it.id }) { destination ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = PanelBlack),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(destination.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            Text(destination.description, color = MutedText, fontSize = 10.sp)
-                        }
-                        TextButton(onClick = { onOpenOfficialUrl(destination.url) }) {
-                            Text("فتح رسمي", color = AccentRed, fontSize = 11.sp)
-                        }
-                    }
-                }
+            items(RemotePlaylistSources.officialDestinations.filter { it.category == OfficialDestinationCategory.SPORTS }, key = { it.id }) { destination ->
+                OfficialDestinationCard(destination, onOpenOfficialUrl)
+            }
+            item {
+                Text(OfficialDestinationCategory.MOVIES.title, color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            items(RemotePlaylistSources.officialDestinations.filter { it.category == OfficialDestinationCategory.MOVIES }, key = { it.id }) { destination ->
+                OfficialDestinationCard(destination, onOpenOfficialUrl)
+            }
+            item {
+                Text(OfficialDestinationCategory.GENERAL.title, color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            items(RemotePlaylistSources.officialDestinations.filter { it.category == OfficialDestinationCategory.GENERAL }, key = { it.id }) { destination ->
+                OfficialDestinationCard(destination, onOpenOfficialUrl)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfficialDestinationCard(
+    destination: OfficialLiveDestination,
+    onOpenOfficialUrl: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = PanelBlack),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(destination.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text(destination.description, color = MutedText, fontSize = 10.sp)
+            }
+            TextButton(onClick = { onOpenOfficialUrl(destination.url) }) {
+                Text("فتح رسمي", color = AccentRed, fontSize = 11.sp)
             }
         }
     }
