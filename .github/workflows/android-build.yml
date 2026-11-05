@@ -9,6 +9,7 @@ on:
       - "*.gradle.kts"
       - "gradle.properties"
       - ".github/workflows/android-build.yml"
+      - ".github/workflows/draft-release.yml"
   pull_request:
     branches: [main]
   workflow_dispatch:
