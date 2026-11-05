@@ -275,10 +275,24 @@ def run_audit(playlist_fetcher=fetch_playlist, stream_probe=probe_stream) -> dic
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Probe one HTTPS stream URL.")
-    parser.add_argument("url")
+    parser = argparse.ArgumentParser(description="Probe a stream URL or write the small source-sampling report.")
+    parser.add_argument("url", nargs="?")
+    parser.add_argument("--output", default=None)
     args = parser.parse_args()
-    print(json.dumps(probe_stream(args.url), ensure_ascii=False))
+    if args.url:
+        print(json.dumps(probe_stream(args.url), ensure_ascii=False))
+        return
+    report = run_audit()
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as handle:
+            json.dump(report, handle, ensure_ascii=False, indent=2)
+            handle.write("\\n")
+    print(json.dumps({key: value for key, value in report.items() if key != "sources"}, ensure_ascii=False))
+    for source in report["sources"]:
+        print(f'{source["source_id"]}: {source["samples_attempted"]} samples; ' +
+              ", ".join(f'{sample["channel"]}: {sample["status"]}' for sample in source["samples"]))
+    if report["samples_attempted"] == 0:
+        raise SystemExit("No channel URLs could be sampled")
 
 
 if __name__ == "__main__":
