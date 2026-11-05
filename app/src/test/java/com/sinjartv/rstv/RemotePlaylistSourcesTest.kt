@@ -28,6 +28,7 @@ class RemotePlaylistSourcesTest {
         assertTrue("iptv-org-arab" in ids)
         assertTrue("iptv-org-turkey" in ids)
         assertTrue("m3upt-portuguese" in ids)
+        assertTrue("romaxa-world-auto-checked" in ids)
         assertTrue("iptv-org-country-index" in ids)
         assertTrue("iptv-org-language-index" in ids)
         assertTrue("iptv-org-category-index" in ids)
@@ -46,6 +47,9 @@ class RemotePlaylistSourcesTest {
         indexes.forEach { id ->
             assertTrue(sources.getValue(id).provider == "iptv-org/iptv")
         }
+        val romaxa = sources.getValue("romaxa-world-auto-checked")
+        assertTrue(romaxa.playlistUrl == "https://romaxa55.github.io/world_ip_tv/output/index.m3u")
+        assertTrue(romaxa.provider == "Romaxa55/world_ip_tv")
         val portuguese = sources.getValue("m3upt-portuguese")
         assertTrue(portuguese.playlistUrl.endsWith("/M3UPT.m3u"))
         assertTrue(!portuguese.attribution.isNullOrBlank())
