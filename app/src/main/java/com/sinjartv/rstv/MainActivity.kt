@@ -71,6 +71,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -554,8 +556,7 @@ private fun RSTVHome() {
                                 modifier = Modifier.padding(vertical = 18.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                BrandMark()
-                                Text("RS TV", color = SoftWhite, fontWeight = FontWeight.Black)
+                                BrandMark(Modifier.size(width = 76.dp, height = 31.dp))
                             }
                         }
                     ) {
@@ -699,11 +700,25 @@ private fun RSTVHome() {
 }
 
 @Composable
-private fun BrandMark() {
+private fun BrandMark(
+    modifier: Modifier = Modifier.size(width = 112.dp, height = 46.dp)
+) {
     Image(
-        painter = painterResource(id = R.drawable.ic_rs_tv),
-        contentDescription = "شعار RS TV",
-        modifier = Modifier.size(46.dp)
+        painter = painterResource(id = R.drawable.sinjar_show_logo),
+        contentDescription = "شعار SINJAR SHOW TV",
+        contentScale = ContentScale.Fit,
+        modifier = modifier
+    )
+}
+
+
+@Composable
+private fun BrandWatermark(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(id = R.drawable.sinjar_show_logo),
+        contentDescription = "علامة SINJAR SHOW المائية",
+        contentScale = ContentScale.Fit,
+        modifier = modifier.size(width = 92.dp, height = 35.dp).alpha(0.62f)
     )
 }
 
@@ -869,18 +884,7 @@ private fun HomeContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Box(
-                            modifier = Modifier.size(62.dp)
-                                .background(Color(0xFF302714), RoundedCornerShape(18.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.royal_smart_tv),
-                                contentDescription = "التلفاز الذكي",
-                                tint = AccentRed,
-                                modifier = Modifier.size(38.dp)
-                            )
-                        }
+                        BrandMark(Modifier.size(width = 142.dp, height = 55.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("RS TV", color = AccentRed, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                             Text("عالم الترفيه بين يديك", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
@@ -1073,11 +1077,15 @@ private fun LiveContent(
                     contentColor = SoftWhite
                 )
             ) { Text("رجوع للقنوات") }
+            BrandWatermark(
+                modifier = Modifier.align(Alignment.TopEnd).padding(14.dp)
+            )
             Text(
                 selectedChannel.name,
                 color = SoftWhite,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.TopEnd).padding(14.dp)
+                fontSize = 12.sp,
+                modifier = Modifier.align(Alignment.BottomStart).padding(14.dp)
                     .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp)
             )
@@ -1147,6 +1155,9 @@ private fun LiveContent(
                                     view.player = player
                                     view.keepScreenOn = true
                                 }
+                            )
+                            BrandWatermark(
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                             )
                         }
                         Text(status, color = MutedText, fontSize = 11.sp)
