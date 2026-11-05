@@ -136,7 +136,8 @@ def run_audit(playlist_fetcher=fetch_playlist, stream_probe=probe_stream) -> dic
     return {
         "schema_version": 1,
         "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "purpose": "Bounded HTTP response probe of at most three channel URLs per public playlist",
+        "purpose": "Bounded HTTP response probe of up to six evenly distributed channel URLs per public playlist",
+        "sampling_strategy": "evenly distributed across eligible playlist entries after URL deduplication",
         "max_samples_per_source": MAX_SAMPLES_PER_SOURCE,
         "max_response_bytes_per_probe": MAX_RESPONSE_BYTES,
         "channel_playback_tested": False,
