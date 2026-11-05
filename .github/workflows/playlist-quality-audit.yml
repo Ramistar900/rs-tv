@@ -45,7 +45,6 @@ jobs:
         run: python tools/probe_channel_streams.py --output stream-probe-report.json
 
       - name: Publish audit summary
-        if: always()
         run: |
           python - <<'PY'
           import json
