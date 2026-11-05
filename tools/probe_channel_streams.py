@@ -110,12 +110,8 @@ def _hls_segment_url(manifest_url: str, manifest: str) -> tuple[str | None, bool
                 if not candidate.startswith("#"):
                     return urljoin(manifest_url, candidate), False
 
-    # Prefer an initialization map if supplied; otherwise probe the first segment.
-    for line in lines:
-        if line.startswith("#EXT-X-MAP:"):
-            match = re.search(r'URI="([^"]+)"', line)
-            if match:
-                return urljoin(manifest_url, match.group(1)), False
+    # Test the first media segment. For fMP4, fetching only EXT-X-MAP would
+    # verify initialization bytes but not an actual media segment.
     for line in lines:
         if not line.startswith("#"):
             return urljoin(manifest_url, line), False
@@ -137,10 +133,8 @@ def _probe_hls(url: str, first: dict) -> dict:
 
     # A master URL can resolve to a variant playlist. Read one additional manifest only.
     try:
-        segment_host = (urlsplit(segment_url).hostname or "").lower()
-        manifest_host = (urlsplit(manifest_url).hostname or "").lower()
-        if segment_url.lower().endswith((".m3u8", ".m3u")) or segment_host == manifest_host and \
-                segment_url.lower().split("?", 1)[0].endswith(".m3u8"):
+        segment_path = urlsplit(segment_url).path.lower()
+        if segment_path.endswith((".m3u8", ".m3u")):
             variant = fetch_resource(segment_url, MAX_RESPONSE_BYTES)
             if variant["sample"].lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"#EXTM3U"):
                 next_url, variant_encrypted = _hls_segment_url(variant["final_url"],
