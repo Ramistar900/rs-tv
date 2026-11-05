@@ -18,7 +18,7 @@ on:
       - ".github/workflows/playlist-quality-audit.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: rs-tv-playlist-quality-audit
@@ -50,7 +50,7 @@ jobs:
 
       - name: Rotate and test a global batch of unique stream URLs
         if: github.event_name != 'pull_request'
-        run: python tools/scan_channel_health.py --limit 600 --workers 24 --output channel-health-report.json
+        run: python tools/scan_channel_health.py --limit 600 --workers 24 --state catalog/generated/stream-health.json --output channel-health-report.json
 
       - name: Publish global channel health summary
         if: github.event_name != 'pull_request'
@@ -70,6 +70,8 @@ jobs:
               f"- Batch: **{report['batch_index'] + 1}/{report['batch_count']}**",
               f"- HLS first segments with bytes received: **{report['hls_first_segments_checked']:,}**",
               f"- Direct media responses with bytes received: **{report['direct_media_bytes_checked']:,}**",
+              f"- Current persistent catalogue states: **{report['catalogue_status_totals']}**",
+              f"- Transient retries in this batch: **{report['retry_slots_used']}**",
               "",
               "| Result | Count |",
               "|---|---:|",
@@ -124,6 +126,20 @@ jobs:
               handle.write("\n".join(lines) + "\n")
           PY
 
+
+      - name: Persist health state
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/generated/stream-health.json
+          if git diff --cached --quiet; then
+            echo "No stream health state changes to commit"
+          else
+            git commit -m "chore: refresh IPTV stream health state"
+            git push
+          fi
+
       - name: Upload quality reports
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
@@ -134,4 +150,5 @@ jobs:
             quality-report.json
             stream-probe-report.json
             channel-health-report.json
+            catalog/generated/stream-health.json
           retention-days: 14
