@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "project": "RS TV",
   "purpose": "Worldwide discovery registry for internet live channels and legal film/series metadata. Every external record is a candidate until source, availability, and rights are checked.",
   "sources": [
@@ -130,6 +130,103 @@
       "status": "experimental_secondary_candidate_source_on_user_request",
       "license": "Unlicense (as stated by repository)",
       "notes": "Small supplementary collection grouped by news, sports, weather and education. Maintainer rights claims are not independent proof; every channel still needs review."
+    },
+    {
+      "id": "fifa-plus",
+      "name": "FIFA+ official live football and archive",
+      "type": "official_free_or_rights-cleared_sports_platform",
+      "url": "https://www.plus.fifa.com/en",
+      "status": "official_service_link_only",
+      "notes": "FIFA+ publishes selected live matches, archive matches, and original programming. The live schedule and territory rights vary by competition and country; a link is not a guarantee that every match is free in every territory."
+    },
+    {
+      "id": "eurovision-sport",
+      "name": "Eurovision Sport",
+      "type": "official_free_sports_streaming_platform",
+      "url": "https://eurovisionsport.com/en",
+      "status": "official_service_link_only",
+      "notes": "EBU-backed free live and on-demand sports destination. Event availability, territories, and rights windows vary by event."
+    },
+    {
+      "id": "red-bull-tv",
+      "name": "Red Bull TV",
+      "type": "official_free_sports_and_documentary_platform",
+      "url": "https://www.redbull.com/int-en/tv",
+      "status": "official_service_link_only",
+      "notes": "Official free sports event streams, replays, documentaries, and sports films. Event rights and live coverage vary by region and schedule."
+    },
+    {
+      "id": "trt-spor",
+      "name": "TRT Spor official live page",
+      "type": "official_broadcaster_live_website",
+      "url": "https://www.trtspor.com.tr/canli-yayin-izle/trt-spor",
+      "status": "official_website_link_only",
+      "notes": "Official Turkish sports broadcaster page. Some events or videos can be region-restricted by rights; do not treat the page as a guaranteed direct stream."
+    },
+    {
+      "id": "fubo-sports-network",
+      "name": "Fubo Sports Network",
+      "type": "official_free_ad_supported_sports_network",
+      "url": "https://www.fubosportsnetwork.com/",
+      "status": "official_service_link_only",
+      "notes": "Free ad-supported sports programming distributed through selected partner platforms. Availability is limited by country and distribution platform; this is not a free source for all premium league rights."
+    },
+    {
+      "id": "tubi",
+      "name": "Tubi",
+      "type": "official_free_ad_supported_movies_and_live_tv",
+      "url": "https://tubitv.com/",
+      "status": "official_service_link_only",
+      "notes": "Official free, ad-supported movies and selected live channels. Tubi lists availability in the US, Canada, Mexico, LATAM, UK, and Australia; it does not list Türkiye as a supported market."
+    },
+    {
+      "id": "plex-live-tv",
+      "name": "Plex free movies and live TV",
+      "type": "official_free_ad_supported_movies_and_live_tv",
+      "url": "https://www.plex.tv/watch-free/",
+      "status": "official_service_link_only",
+      "notes": "Official free movies and live TV. Plex currently excludes Türkiye from the countries where its free Live TV service is available; include as a destination for supported territories only."
+    },
+    {
+      "id": "internet-archive-movies",
+      "name": "Internet Archive Moving Image Archive",
+      "type": "public_collection_item_level_rights_review",
+      "url": "https://archive.org/details/movies",
+      "status": "item_level_rights_review_required",
+      "notes": "Publicly accessible collection of films and moving images. Rights and terms must be checked per item and per version; public access alone does not prove public-domain or redistribution status."
+    },
+    {
+      "id": "doubo-sports",
+      "name": "Doubo Sports public M3U",
+      "type": "daily_checked_curated_sports_playlist",
+      "url": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/sports.m3u",
+      "status": "daily_checked_candidate_import",
+      "license": "CC BY 4.0 for link selection/index; credit Doubo Public Channel Directory",
+      "notes": "Doubo directory page currently lists 100 sports channels, refreshed daily. Publisher says it lists freely available feeds and excludes paid/objectionable streams. Counts fluctuate; technical checks and CC BY license of link selection do not prove the underlying programme rights."
+    },
+    {
+      "id": "iptv-org-sports",
+      "name": "IPTV-org Sports category playlist",
+      "type": "community_sports_channel_discovery_playlist",
+      "url": "https://iptv-org.github.io/iptv/categories/sports.m3u",
+      "status": "candidate_source_requires_channel_level_review",
+      "notes": "Dedicated sports-category M3U playlist; its channels overlap the global, regional and country playlists and are globally deduplicated by stream URL."
+    },
+    {
+      "id": "iptv-org-movies",
+      "name": "IPTV-org Movies category playlist",
+      "type": "community_movie_channel_discovery_playlist",
+      "url": "https://iptv-org.github.io/iptv/categories/movies.m3u",
+      "status": "candidate_source_requires_channel_level_review",
+      "notes": "Linear channels that schedule movie programming, not an on-demand movie library. Entries overlap the global catalogue and require per-channel technical and rights review."
+    },
+    {
+      "id": "iptv-org-series",
+      "name": "IPTV-org Series category playlist",
+      "type": "community_series_channel_discovery_playlist",
+      "url": "https://iptv-org.github.io/iptv/categories/series.m3u",
+      "status": "candidate_source_requires_channel_level_review",
+      "notes": "Linear channels that schedule series and TV programmes, not an on-demand series library. Entries overlap the global catalogue and require per-channel technical and rights review."
     }
   ],
   "channel_record_required_fields": [
@@ -213,6 +310,76 @@
       "name": "NASA+",
       "url": "https://plus.nasa.gov/",
       "playback": "Official free NASA streaming service; use its own player."
+    },
+    {
+      "id": "fifa-plus",
+      "name": "FIFA+ selected live matches",
+      "url": "https://www.plus.fifa.com/en",
+      "playback": "Official service player; country and competition rights vary.",
+      "category": "sports"
+    },
+    {
+      "id": "eurovision-sport",
+      "name": "Eurovision Sport",
+      "url": "https://eurovisionsport.com/en",
+      "playback": "Official free player for selected live events and replays.",
+      "category": "sports"
+    },
+    {
+      "id": "red-bull-tv",
+      "name": "Red Bull TV",
+      "url": "https://www.redbull.com/int-en/tv",
+      "playback": "Official player for selected live sports and documentaries.",
+      "category": "sports"
+    },
+    {
+      "id": "trt-spor",
+      "name": "TRT Spor",
+      "url": "https://www.trtspor.com.tr/canli-yayin-izle/trt-spor",
+      "playback": "Official broadcaster page; individual events may be geoblocked.",
+      "category": "sports"
+    },
+    {
+      "id": "fubo-sports-network",
+      "name": "Fubo Sports Network",
+      "url": "https://www.fubosportsnetwork.com/",
+      "playback": "Official free channel via supported distribution platforms; territory restrictions apply.",
+      "category": "sports"
+    },
+    {
+      "id": "rakuten-tv-free",
+      "name": "Rakuten TV Free / Live TV",
+      "url": "https://www.rakuten.tv/",
+      "playback": "Official ad-supported movie and live-channel service; catalogue depends on country and device.",
+      "category": "movies"
+    },
+    {
+      "id": "pluto-tv",
+      "name": "Pluto TV",
+      "url": "https://pluto.tv/welcome/on-demand",
+      "playback": "Official free live channels and on-demand catalogue; regional availability varies.",
+      "category": "movies"
+    },
+    {
+      "id": "tubi",
+      "name": "Tubi",
+      "url": "https://tubitv.com/",
+      "playback": "Official free service in supported markets; not listed for Türkiye.",
+      "category": "movies"
+    },
+    {
+      "id": "internet-archive-movies",
+      "name": "Internet Archive Moving Image Archive",
+      "url": "https://archive.org/details/movies",
+      "playback": "Review rights at the individual item/version level before presenting as public-domain.",
+      "category": "movies"
+    },
+    {
+      "id": "plex-live-tv",
+      "name": "Plex free movies and Live TV",
+      "url": "https://www.plex.tv/watch-free/",
+      "playback": "Official service; free Live TV is not available in Türkiye.",
+      "category": "movies"
     }
   ]
 }

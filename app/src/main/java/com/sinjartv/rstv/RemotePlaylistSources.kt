@@ -16,11 +16,18 @@ internal data class RemotePlaylistSource(
     val allowedHosts: Set<String> = setOf(URI(playlistUrl).host.lowercase())
 )
 
+internal enum class OfficialDestinationCategory(val title: String) {
+    SPORTS("قنوات ومنصات الرياضة"),
+    MOVIES("الأفلام والمسلسلات"),
+    GENERAL("قنوات البث الرسمية")
+}
+
 internal data class OfficialLiveDestination(
     val id: String,
     val name: String,
     val description: String,
-    val url: String
+    val url: String,
+    val category: OfficialDestinationCategory = OfficialDestinationCategory.GENERAL
 )
 
 internal object RemotePlaylistSources {
@@ -50,6 +57,14 @@ internal object RemotePlaylistSources {
             attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory."
         ),
         RemotePlaylistSource(
+            id = "doubo-sports",
+            name = "Doubo — الرياضة العالمية",
+            description = "قائمة رياضية متخصصة يعلن الدليل أنها تضم نحو 100 قناة مجانية متاحة للعامة؛ أزلناها من العدّ المزدوج عند دمجها مع المصادر العالمية، وتظل كل قناة بحاجة إلى فحص مستقل.",
+            playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/sports.m3u",
+            provider = "Doubo Public Channel Directory",
+            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها."
+        ),
+        RemotePlaylistSource(
             id = "iptv-org-world",
             name = "IPTV-org — العالم",
             description = "فهرس مجتمعي واسع لقنوات الإنترنت، مقسّم بحسب الدول واللغات والتصنيفات. الروابط مرشحة وليست كلها مضمونة أو مرخصة.",
@@ -68,6 +83,27 @@ internal object RemotePlaylistSources {
             name = "IPTV-org — تركيا",
             description = "قنوات مصنفة لتركيا في فهرس IPTV-org.",
             playlistUrl = "https://iptv-org.github.io/iptv/countries/tr.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-sports",
+            name = "IPTV-org — القنوات الرياضية",
+            description = "قائمة مستقلة للقنوات المصنفة رياضية حول العالم. هي قائمة اكتشاف مجتمعية؛ الروابط قد تتوقف أو تُقيّد جغرافياً ولا تُعد معتمدة للحقوق تلقائياً.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/sports.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-movies",
+            name = "IPTV-org — قنوات الأفلام",
+            description = "قنوات تلفزيونية خطية تعرض أفلاماً وفق جدول بث؛ ليست مكتبة أفلام حسب الطلب.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/movies.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-series",
+            name = "IPTV-org — قنوات المسلسلات",
+            description = "قنوات تلفزيونية خطية تعرض المسلسلات والبرامج وفق جدول بث؛ وليست خدمة مشاهدة حسب الطلب.",
+            playlistUrl = "https://iptv-org.github.io/iptv/categories/series.m3u",
             provider = "iptv-org/iptv"
         ),
         RemotePlaylistSource(
@@ -131,6 +167,76 @@ internal object RemotePlaylistSources {
     )
 
     val officialDestinations = listOf(
+        OfficialLiveDestination(
+            id = "fifa-plus",
+            name = "FIFA+ — كرة القدم العالمية",
+            description = "مباريات مباشرة مختارة من اتحادات وطنية وأرشيف ومحتوى أصلي مجاني؛ جدول المباريات وحقوق المشاهدة يختلفان حسب الدولة والبطولة.",
+            url = "https://www.plus.fifa.com/en",
+            category = OfficialDestinationCategory.SPORTS
+        ),
+        OfficialLiveDestination(
+            id = "eurovision-sport",
+            name = "Eurovision Sport — رياضات العالم",
+            description = "منصة مجانية للأحداث الرياضية المباشرة والإعادات والملخصات، مثل ألعاب القوى والسباحة والدراجات والرياضات القتالية؛ بعض الأحداث محدودة إقليمياً.",
+            url = "https://eurovisionsport.com/en",
+            category = OfficialDestinationCategory.SPORTS
+        ),
+        OfficialLiveDestination(
+            id = "red-bull-tv",
+            name = "Red Bull TV — رياضات وأفلام",
+            description = "بث مجاني لأحداث مختارة في رياضة المحركات والدراجات والتزلج وركوب الأمواج، إضافة إلى أفلام ووثائقيات رياضية؛ التغطية تتغير حسب الحدث والمنطقة.",
+            url = "https://www.redbull.com/int-en/tv",
+            category = OfficialDestinationCategory.SPORTS
+        ),
+        OfficialLiveDestination(
+            id = "trt-spor",
+            name = "TRT Spor — تركيا",
+            description = "صفحة البث الرسمية للقناة التركية؛ بعض المباريات والمقاطع قد تكون مقيدة بحقوق المنطقة أو لا تعمل خارج نطاق الترخيص.",
+            url = "https://www.trtspor.com.tr/canli-yayin-izle/trt-spor",
+            category = OfficialDestinationCategory.SPORTS
+        ),
+        OfficialLiveDestination(
+            id = "fubo-sports-network",
+            name = "Fubo Sports Network",
+            description = "شبكة رياضية مجانية مدعومة بالإعلانات عبر منصات توزيع مختارة، مع تغطية إقليمية تختلف حسب البلد والمنصة؛ ليست باقة جميع الدوريات المدفوعة.",
+            url = "https://www.fubosportsnetwork.com/",
+            category = OfficialDestinationCategory.SPORTS
+        ),
+        OfficialLiveDestination(
+            id = "rakuten-tv-free",
+            name = "Rakuten TV — Free وLive TV",
+            description = "أفلام ومسلسلات وقنوات مباشرة مجانية مدعومة بالإعلانات، وتشمل بعض القنوات الرياضية؛ الكتالوج وطريقة الدخول يختلفان حسب البلد والجهاز.",
+            url = "https://www.rakuten.tv/",
+            category = OfficialDestinationCategory.MOVIES
+        ),
+        OfficialLiveDestination(
+            id = "pluto-tv",
+            name = "Pluto TV — أفلام وقنوات مجانية",
+            description = "مئات القنوات وعناوين أفلام مجانية مدعومة بالإعلانات؛ عدد القنوات والمحتوى والتوفر الجغرافي يتغير حسب البلد.",
+            url = "https://pluto.tv/welcome/on-demand",
+            category = OfficialDestinationCategory.MOVIES
+        ),
+        OfficialLiveDestination(
+            id = "tubi",
+            name = "Tubi — أفلام وقنوات مجانية",
+            description = "مكتبة أفلام وقنوات مجانية قانونية في الدول المدعومة مثل الولايات المتحدة وكندا والمكسيك والمملكة المتحدة وأستراليا؛ غير مدرج ضمن التغطية الرسمية لتركيا.",
+            url = "https://tubitv.com/",
+            category = OfficialDestinationCategory.MOVIES
+        ),
+        OfficialLiveDestination(
+            id = "internet-archive-movies",
+            name = "Internet Archive — أفلام كلاسيكية",
+            description = "أرشيف أفلام ومواد مرئية؛ يجب التأكد من حالة الحقوق لكل عنوان ونسخة على حدة قبل اعتباره متاحاً للمشاهدة أو إعادة الاستخدام.",
+            url = "https://archive.org/details/movies",
+            category = OfficialDestinationCategory.MOVIES
+        ),
+        OfficialLiveDestination(
+            id = "plex-live-tv",
+            name = "Plex — أفلام وقنوات مباشرة",
+            description = "خدمة مجانية مدعومة بالإعلانات للأفلام والقنوات، لكن Plex يذكر أن Live TV غير متاح حالياً في تركيا؛ أدرجناه كخيار للدول المدعومة فقط.",
+            url = "https://www.plex.tv/watch-free/",
+            category = OfficialDestinationCategory.MOVIES
+        ),
         OfficialLiveDestination(
             id = "aljazeera-ar",
             name = "الجزيرة — البث الحي",

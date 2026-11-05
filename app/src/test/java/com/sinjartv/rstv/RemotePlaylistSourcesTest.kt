@@ -24,9 +24,13 @@ class RemotePlaylistSourcesTest {
         assertTrue("doubo-world" in ids)
         assertTrue("doubo-turkey" in ids)
         assertTrue("doubo-arabic" in ids)
+        assertTrue("doubo-sports" in ids)
         assertTrue("iptv-org-world" in ids)
         assertTrue("iptv-org-arab" in ids)
         assertTrue("iptv-org-turkey" in ids)
+        assertTrue("iptv-org-sports" in ids)
+        assertTrue("iptv-org-movies" in ids)
+        assertTrue("iptv-org-series" in ids)
         assertTrue("m3upt-portuguese" in ids)
         assertTrue("romaxa-world-auto-checked" in ids)
         assertTrue("iptv-org-country-index" in ids)
@@ -53,6 +57,20 @@ class RemotePlaylistSourcesTest {
         val portuguese = sources.getValue("m3upt-portuguese")
         assertTrue(portuguese.playlistUrl.endsWith("/M3UPT.m3u"))
         assertTrue(!portuguese.attribution.isNullOrBlank())
+    }
+
+
+    @Test
+    fun officialSportsAndFilmDestinationsAreCategorizedSeparately() {
+        val destinations = RemotePlaylistSources.officialDestinations.associateBy { it.id }
+        assertTrue(destinations.getValue("fifa-plus").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("eurovision-sport").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("red-bull-tv").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("trt-spor").category == OfficialDestinationCategory.SPORTS)
+        assertTrue(destinations.getValue("rakuten-tv-free").category == OfficialDestinationCategory.MOVIES)
+        assertTrue(destinations.getValue("pluto-tv").category == OfficialDestinationCategory.MOVIES)
+        assertTrue(destinations.getValue("internet-archive-movies").category == OfficialDestinationCategory.MOVIES)
+        assertTrue(destinations.values.any { it.category == OfficialDestinationCategory.GENERAL })
     }
 
     @Test

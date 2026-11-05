@@ -42,6 +42,36 @@ The app downloads only the selected playlist, checks HTTPS and a size limit, val
 
 These playlists include traditional linear television brands and channels that may also be carried by satellite, but the app receives them through their online streams. It does not tune a satellite dish or emulate a satellite receiver.
 
+## Official sports and film destinations
+
+RS TV includes a separate official-service directory grouped into sports and films. These entries open the rights holder or licensed platform; they are not converted into direct M3U links and are not scraped or re-hosted.
+
+### Sports
+
+The app's **مصادر IPTV** list now also includes two direct category playlists for sports discovery:
+- **Doubo Sports**: a separate daily-updated M3U. Doubo currently lists 100 sports channels in its directory; this is a publisher-reported count, not 100 independently verified working streams.
+- **IPTV-org Sports**: a worldwide category playlist. It overlaps the main IPTV-org index and country lists, so the RS TV source merger removes exact duplicate stream URLs.
+
+The app also exposes dedicated **IPTV-org Movies** and **IPTV-org Series** linear-channel lists. These are scheduled TV channels, not on-demand movie files. The health scan includes these category lists, but deduplicates their exact stream URLs across all worldwide feeds.
+
+- **FIFA+** — selected live football matches, archive matches and original programming. The live schedule and rights vary by competition and territory.
+- **Eurovision Sport** — free live events, replays and highlights across sports such as athletics, aquatics, cycling and combat sports. Individual event rights and availability can vary by country.
+- **Red Bull TV** — selected live events, replays, sports films and documentaries, including motorsport and action sports; event coverage varies by region.
+- **TRT Spor** — official Turkish broadcaster page. Particular match videos or feeds may be geo-restricted according to rights.
+- **Fubo Sports Network** — free ad-supported sports programming through selected distribution partners; it is not a universal free feed of premium leagues and its supported platforms/territories are limited.
+
+These links are useful starting points, not promises that every event is available free in Türkiye. Check the event schedule and territory notice on the provider itself. The unverified “Alwan Sports” name is not added as a source until an official operator website or rights-holder confirmation can be identified.
+
+### Films and series
+
+- **Rakuten TV Free / Live TV** — free ad-supported films, series and live channels in supported countries and on supported devices.
+- **Pluto TV** — free ad-supported live channels and on-demand films; the catalogue differs by country.
+- **Tubi** — free ad-supported films and selected live channels in markets listed by Tubi (including the US, Canada, Mexico, parts of LATAM, the UK and Australia); Türkiye is not listed as a supported market.
+- **Plex** — free films and live channels in supported countries. Plex currently lists Türkiye among countries where its free Live TV service is unavailable.
+- **Internet Archive Moving Image Archive** — a discovery collection for films and archival material. Rights must be checked for each item and each version before describing it as public-domain or reusing it.
+
+The app opens these providers through their official player/app or website. It does not expose premium channels as free, bypass DRM, or assume a publicly accessible archive item is automatically in the public domain.
+
 ## YouTube live broadcasts
 
 YouTube live discovery is designed around the official YouTube Data API v3 search endpoint with `type=video` and `eventType=live`. It requires a protected `YOUTUBE_API_KEY`. Results depend on search terms, supported languages/regions, quota, and availability; they are not a complete index of all YouTube live channels. Playback must use the official YouTube watch route or approved official player integration. RS TV must not extract or rehost YouTube media streams.
@@ -85,3 +115,12 @@ This audit does **not** request individual channel streams, measure playback upt
 ## Bounded channel endpoint sampling
 
 The daily quality workflow also samples up to six HTTPS channel endpoints from each configured playlist, selected evenly across the eligible entries rather than only from the beginning. It requests at most 64 KiB per endpoint with an eight-second timeout, rejects non-public/unresolvable hosts, rejects cross-host or non-HTTPS redirects, and does not fetch HLS segments or play media. Results distinguish HTTP response, HLS/DASH manifest, media response, timeout, network error, forbidden/geo-restricted, not found, and unexpected content. This is a lightweight endpoint check only: it does not prove that a viewer can play the channel, verify video quality, or establish redistribution rights. Reports remain diagnostic and do not modify or approve catalogue entries.
+
+
+## Rotating global stream-health scan
+
+The daily audit now collects the direct HTTPS entries from all configured playlists, removes duplicate canonical stream URLs across the complete source set, and checks a rotating batch of up to 600 unique URLs using bounded concurrency. The batch rotates by UTC day so that a catalogue of many thousands of links is not hammered in one workflow run. The report shows the total unique candidate URLs, batch number, source attribution, per-result status, and how many HLS first segments or direct media bytes were actually received. Raw stream URLs (including query tokens) are omitted from the report.
+
+For HLS, the checker fetches a bounded manifest and attempts to retrieve the first media segment. It skips encrypted HLS playlists rather than trying to obtain keys. For direct media, it requests only a bounded byte range. DASH manifests are structurally checked, and manifests advertising content protection are identified; this is not a complete DASH playback test. Temporary failures, geo-blocks and server errors remain diagnostic statuses and are not a basis for instantly deleting a channel. Every batch is a snapshot; the full catalogue is revisited over successive scheduled runs.
+
+This still is not playback on a real phone/TV box, a sustained uptime/bitrate test, or a legal review. A successful first segment does not grant streaming rights. Only separately rights-reviewed entries may ever be approved for the default catalogue.

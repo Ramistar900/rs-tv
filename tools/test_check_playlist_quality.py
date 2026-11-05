@@ -2,7 +2,7 @@ import unittest
 
 from unittest.mock import patch
 
-from check_playlist_quality import audit, canonical_url, inspect_playlist, is_page_only_platform
+from check_playlist_quality import SOURCES, audit, canonical_url, inspect_playlist, is_page_only_platform
 
 
 class PlaylistQualityTests(unittest.TestCase):
@@ -34,6 +34,11 @@ class PlaylistQualityTests(unittest.TestCase):
         self.assertEqual(report["sources_checked"], 2)
         self.assertEqual(report["unique_eligible_stream_urls_across_sources"], 2)
         self.assertEqual(report["duplicate_stream_urls_across_sources"], 1)
+
+
+    def test_audit_registry_includes_specialized_sports_and_film_sources(self):
+        ids = {source_id for source_id, _ in SOURCES}
+        self.assertTrue({"doubo-sports", "iptv-org-sports", "iptv-org-movies", "iptv-org-series"} <= ids)
 
     def test_platform_pages_are_not_direct_streams(self):
         self.assertTrue(is_page_only_platform("https://www.youtube.com/watch?v=abc"))
