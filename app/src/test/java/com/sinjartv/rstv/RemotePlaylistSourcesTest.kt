@@ -19,6 +19,19 @@ class RemotePlaylistSourcesTest {
     }
 
     @Test
+    fun douboListsAllowOnlyKnownJsDelivrRedirectHosts() {
+        val douboSources = RemotePlaylistSources.playlists.filter { it.id.startsWith("doubo-") }
+        assertTrue(douboSources.isNotEmpty())
+        douboSources.forEach { source ->
+            assertTrue("cdn.jsdelivr.net" in source.allowedHosts)
+            assertTrue("fastly.jsdelivr.net" in source.allowedHosts)
+            assertTrue("gcore.jsdelivr.net" in source.allowedHosts)
+            assertTrue("testingcf.jsdelivr.net" in source.allowedHosts)
+            assertFalse("untrusted.example" in source.allowedHosts)
+        }
+    }
+
+    @Test
     fun catalogueIncludesWorldwideArabicAndTurkishLists() {
         val ids = RemotePlaylistSources.playlists.map { it.id }.toSet()
         assertTrue("doubo-world" in ids)

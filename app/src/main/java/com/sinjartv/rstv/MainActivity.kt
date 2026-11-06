@@ -1,6 +1,8 @@
 package com.sinjartv.rstv
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -79,6 +81,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -86,6 +90,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
@@ -156,6 +161,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RSTVHome() {
     val context = LocalContext.current
+    val activity = remember(context) {
+        var current: Context? = context
+        while (current != null && current !is Activity) {
+            current = (current as? ContextWrapper)?.baseContext
+        }
+        current as? Activity
+    }
     val scope = rememberCoroutineScope()
     val channels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
@@ -177,6 +189,18 @@ private fun RSTVHome() {
     var isFullscreenPlayer by remember { mutableStateOf(false) }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
     val exoPlayer = player
+
+    DisposableEffect(isFullscreenPlayer, activity) {
+        val window = activity?.window
+        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
+        if (isFullscreenPlayer) {
+            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
 
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
@@ -768,26 +792,12 @@ private fun RSTVHome() {
 
 @Composable
 private fun PlayerWatermark(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(7.dp))
-            .padding(horizontal = 7.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_rs_tv),
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            alpha = 0.52f
-        )
-        Text(
-            "RS TV",
-            color = SoftWhite.copy(alpha = 0.62f),
-            fontWeight = FontWeight.Black,
-            fontSize = 10.sp
-        )
-    }
+    Image(
+        painter = painterResource(id = R.drawable.sinjar_show_logo),
+        contentDescription = "SINJAR SHOW",
+        modifier = modifier.size(width = 88.dp, height = 34.dp),
+        alpha = 0.48f
+    )
 }
 
 @Composable
@@ -892,6 +902,7 @@ private fun ScreenBody(
             sourceLibraryCount = sourceLibraryCount,
             remotePlaylistStatus = remotePlaylistStatus,
             onAddWorldSources = onAddWorldSources,
+            onShowSourceLibrary = onShowSourceLibrary,
             modifier = modifier
         )
         RSTVTab.YOUTUBE -> YouTubeLiveContent(modifier = modifier)
@@ -1155,33 +1166,20 @@ private fun LiveContent(
                 factory = { viewContext ->
                     PlayerView(viewContext).apply {
                         this.player = player
-                        useController = true
+                        useController = false
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                         setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                         keepScreenOn = true
                     }
                 },
                 update = { view ->
                     view.player = player
+                    view.useController = false
+                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     view.keepScreenOn = true
                 }
             )
-            TextButton(
-                onClick = onExitFullscreen,
-                modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
-                colors = ButtonDefaults.textButtonColors(
-                    containerColor = Color.Black.copy(alpha = 0.65f),
-                    contentColor = SoftWhite
-                )
-            ) { Text("تصغير المشغل") }
             PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(18.dp))
-            Text(
-                selectedChannel.name,
-                color = SoftWhite,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.TopEnd).padding(14.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            )
         }
     } else {
         Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1207,61 +1205,56 @@ private fun LiveContent(
                 Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
             }
             if (selectedChannel != null) {
-                Card(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = PanelBlack),
-                    shape = RoundedCornerShape(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            selectedChannel.name,
+                            color = SoftWhite,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1
+                        )
+                        Text("LIVE", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        TextButton(onClick = onEnterFullscreen) {
+                            Text("ملء الشاشة", color = Silver, fontSize = 11.sp)
+                        }
+                    }
+                    BoxWithConstraints(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                selectedChannel.name,
-                                color = SoftWhite,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text("LIVE", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                            TextButton(onClick = onEnterFullscreen) {
-                                Text("تكبير", color = Silver, fontSize = 11.sp)
-                            }
-                        }
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxWidth(),
-                            contentAlignment = Alignment.Center
+                        val playerWidth = minOf(maxWidth, 760.dp)
+                        val playerHeight = (playerWidth * 9f / 16f).coerceAtMost(300.dp)
+                        val fittedWidth = playerHeight * 16f / 9f
+                        Box(
+                            modifier = Modifier
+                                .width(fittedWidth)
+                                .height(playerHeight)
+                                .background(Color.Black, RoundedCornerShape(16.dp))
                         ) {
-                            val playerHeight = (maxHeight * 0.6f)
-                                .coerceAtMost(280.dp)
-                                .coerceAtMost(maxWidth * 9f / 16f)
-                            val playerWidth = playerHeight * 16f / 9f
-                            Box(
-                                modifier = Modifier
-                                    .width(playerWidth)
-                                    .height(playerHeight)
-                                    .background(Color.Black)
-                            ) {
-                                AndroidView(
-                                    modifier = Modifier.fillMaxSize(),
-                                    factory = { viewContext ->
-                                        PlayerView(viewContext).apply {
-                                            this.player = player
-                                            useController = true
-                                            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                                            keepScreenOn = true
-                                        }
-                                    },
-                                    update = { view ->
-                                        view.player = player
-                                        view.keepScreenOn = true
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { viewContext ->
+                                    PlayerView(viewContext).apply {
+                                        this.player = player
+                                        useController = false
+                                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                        keepScreenOn = true
                                     }
-                                )
-                                PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(10.dp))
-                            }
+                                },
+                                update = { view ->
+                                    view.player = player
+                                    view.useController = false
+                                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                    view.keepScreenOn = true
+                                }
+                            )
+                            PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(10.dp))
                         }
-                        Text(status, color = MutedText, fontSize = 11.sp)
-                        StreamPlaybackDiagnostic(selectedChannel.streamUrl, selectedChannel.httpHeaders)
                     }
                 }
             }
@@ -1460,6 +1453,7 @@ private fun WorldCatalogContent(
     sourceLibraryCount: Int,
     remotePlaylistStatus: String,
     onAddWorldSources: () -> Unit,
+    onShowSourceLibrary: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
@@ -1507,37 +1501,72 @@ private fun WorldCatalogContent(
 
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("القنوات العالمية", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-        Text("تصفح قنوات الإنترنت حسب الدولة واللغة والتصنيف", color = MutedText, fontSize = 11.sp)
+        Text(
+            "استورد قوائم القنوات العالمية إلى المشغّل الداخلي، ثم تصفّح القنوات وشغّلها من داخل التطبيق.",
+            color = MutedText,
+            fontSize = 11.sp
+        )
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = PanelRaised),
-            shape = RoundedCornerShape(14.dp)
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("مكتبة بث عالمية داخل التطبيق", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Column(
+                Modifier.fillMaxWidth().padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("مكتبة البث العالمية", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(
-                    "تحميل القوائم العالمية والعربية والتركية إلى مكتبة IPTV المجمّعة، ثم تشغيل القنوات من المشغّل الداخلي. تتم إزالة روابط البث المكررة، وتبقى قائمتك المحلية محفوظة.",
+                    "يجلب التطبيق قوائم عالمية وعربية وتركية من مصادر IPTV، ويحفظها في مكتبة منفصلة دون استبدال قائمتك المحلية.",
                     color = MutedText,
-                    fontSize = 10.sp
+                    fontSize = 11.sp
                 )
                 Button(
                     onClick = onAddWorldSources,
                     enabled = !remotePlaylistStatus.startsWith("جارٍ تحديث مكتبة القنوات العالمية"),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(11.dp)
                 ) {
-                    Text("تحميل القنوات العالمية وتشغيلها")
+                    Text(
+                        if (remotePlaylistStatus.startsWith("جارٍ تحديث مكتبة القنوات العالمية")) {
+                            "جارٍ تنزيل القوائم..."
+                        } else {
+                            "تحديث واستيراد القنوات العالمية"
+                        },
+                        color = ScreenBlack,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-                Text("المكتبة الحالية: $sourceLibraryCount مصادر", color = Silver, fontSize = 10.sp)
-                Text(sourceLibraryStatus, color = MutedText, fontSize = 10.sp)
+                Button(
+                    onClick = onShowSourceLibrary,
+                    enabled = sourceLibraryCount > 0,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PanelBlack,
+                        contentColor = SoftWhite,
+                        disabledContainerColor = PanelBlack.copy(alpha = 0.45f),
+                        disabledContentColor = MutedText
+                    ),
+                    shape = RoundedCornerShape(11.dp)
+                ) {
+                    Text("فتح مكتبة القنوات المستوردة (${sourceLibraryCount} مصدر)")
+                }
+                Text(sourceLibraryStatus, color = Silver, fontSize = 10.sp)
                 Text(remotePlaylistStatus, color = SoftWhite, fontSize = 10.sp)
                 Text(
-                    "إسناد الفهارس: Doubo Public Channel Directory (CC BY 4.0) وIPTV-org. ترخيص الفهرس لا يمنح حقوق محتوى القنوات؛ قد تختلف الإتاحة حسب الدولة.",
-                    color = AccentRed,
+                    "تُزال القنوات المكررة. توفر الرابط لا يضمن استمرار البث أو حقوق إعادة نشر المحتوى.",
+                    color = MutedText,
                     fontSize = 9.sp
                 )
             }
         }
+        Text("دليل الدول والقنوات الرسمية", color = Silver, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "هذا الدليل يعرض بيانات القناة وموقعها الرسمي؛ التشغيل داخل التطبيق يكون من قوائم IPTV المستوردة أعلاه.",
+            color = MutedText,
+            fontSize = 10.sp
+        )
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -1568,26 +1597,18 @@ private fun WorldCatalogContent(
             onSelected = { selectedLanguage = it },
             modifier = Modifier.fillMaxWidth()
         )
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = PanelRaised),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${visibleCandidates.size} / ${candidates.size} قناة مرشّحة", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text(catalogStatus, color = MutedText, fontSize = 10.sp)
-                Text(
-                    "هذه بيانات اكتشاف أولية. لا يوجد تشغيل مباشر قبل مراجعة الحقوق والتحقق من المصدر.",
-                    color = AccentRed,
-                    fontSize = 10.sp
-                )
-            }
-        }
+        Text(
+            "${visibleCandidates.size} / ${candidates.size} محطة في الدليل",
+            color = SoftWhite,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+        )
+        Text(catalogStatus, color = MutedText, fontSize = 10.sp)
         if (visibleCandidates.isEmpty()) {
             EmptyState(
-                title = if (candidates.isEmpty()) "الكتالوج العالمي غير متاح" else "لا توجد نتائج",
+                title = if (candidates.isEmpty()) "الدليل العالمي غير متاح" else "لا توجد نتائج",
                 description = if (candidates.isEmpty()) {
-                    "تأكد من تضمين ملف القنوات العالمي في نسخة التطبيق."
+                    "يمكنك مع ذلك استيراد القوائم العالمية من بطاقة مكتبة البث أعلاه."
                 } else {
                     "غيّر الدولة أو اللغة أو التصنيف أو عبارة البحث."
                 }
@@ -1608,7 +1629,6 @@ private fun WorldCatalogContent(
         }
     }
 }
-
 @Composable
 private fun WorldFilterDropdown(
     title: String,

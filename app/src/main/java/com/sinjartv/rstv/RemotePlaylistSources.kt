@@ -47,7 +47,8 @@ internal object RemotePlaylistSources {
             description = "فهرس يومي لقنوات يعلن ناشره أنها متاحة مجاناً للعامة. يفحص الروابط إلى أول مقطع فيديو ويستخدم نطاقات المحطات الرسمية أو CDN/منصات مجانية معتمدة ضمن سياسته.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.m3u",
             provider = "Doubo Public Channel Directory",
-            attribution = "يجب إسناد Doubo Public Channel Directory وفق CC BY 4.0. ترخيص الفهرس لا يمنح حقوق محتوى القنوات."
+            attribution = "يجب إسناد Doubo Public Channel Directory وفق CC BY 4.0. ترخيص الفهرس لا يمنح حقوق محتوى القنوات.",
+            allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
         ),
         RemotePlaylistSource(
             id = "doubo-turkey",
@@ -55,7 +56,8 @@ internal object RemotePlaylistSources {
             description = "قائمة القنوات المصنفة لتركيا ضمن الدليل اليومي نفسه.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/tr.m3u",
             provider = "Doubo Public Channel Directory",
-            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory."
+            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory.",
+            allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
         ),
         RemotePlaylistSource(
             id = "doubo-arabic",
@@ -63,7 +65,8 @@ internal object RemotePlaylistSources {
             description = "قائمة حسب اللغة العربية (رمز ISO 639-3: ara) من الدليل نفسه.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/languages/ara.m3u",
             provider = "Doubo Public Channel Directory",
-            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory."
+            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory.",
+            allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
         ),
         RemotePlaylistSource(
             id = "doubo-sports",
@@ -71,7 +74,8 @@ internal object RemotePlaylistSources {
             description = "قائمة رياضية متخصصة يعلن الدليل أنها تضم نحو 100 قناة مجانية متاحة للعامة؛ أزلناها من العدّ المزدوج عند دمجها مع المصادر العالمية، وتظل كل قناة بحاجة إلى فحص مستقل.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/sports.m3u",
             provider = "Doubo Public Channel Directory",
-            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها."
+            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها.",
+            allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
         ),
         RemotePlaylistSource(
             id = "iptv-org-world",
