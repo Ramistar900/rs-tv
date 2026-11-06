@@ -75,6 +75,7 @@ internal object RemotePlaylistSources {
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/sports.m3u",
             provider = "Doubo Public Channel Directory",
             attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها."
+            allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
         ),
         RemotePlaylistSource(
             id = "iptv-org-world",
