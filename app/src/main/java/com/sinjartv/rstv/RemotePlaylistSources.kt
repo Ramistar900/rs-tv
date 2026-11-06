@@ -74,7 +74,7 @@ internal object RemotePlaylistSources {
             description = "قائمة رياضية متخصصة يعلن الدليل أنها تضم نحو 100 قناة مجانية متاحة للعامة؛ أزلناها من العدّ المزدوج عند دمجها مع المصادر العالمية، وتظل كل قناة بحاجة إلى فحص مستقل.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/categories/sports.m3u",
             provider = "Doubo Public Channel Directory",
-            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها."
+            attribution = "إسناد CC BY 4.0: Doubo Public Channel Directory. ترخيص اختيار الروابط لا يمنح حقوق بث البرامج نفسها.",
             allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
         ),
         RemotePlaylistSource(
