@@ -110,6 +110,24 @@ jobs:
           echo "===== SHA-256 ====="
           sha256sum "$APK"
 
+      # Keep the Almalaki-style direct test downloads in Actions.
+      - name: Upload SINJAR TV Debug APK for testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: SINJAR-TV-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload SINJAR TV Signed Release APK for testing
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SINJAR-TV-Release-APK
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Create draft GitHub Release and upload APKs
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
