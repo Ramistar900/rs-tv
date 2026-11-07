@@ -1157,6 +1157,8 @@ private fun LiveContent(
     onShowUserPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showChannelTable by remember { mutableStateOf(false) }
+    var channelTableQuery by remember { mutableStateOf("") }
     BackHandler(enabled = isFullscreenPlayer && selectedChannel != null) {
         onExitFullscreen()
     }
