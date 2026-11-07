@@ -113,6 +113,7 @@ jobs:
 
       # Keep the Almalaki-style direct test downloads in Actions.
       - name: Upload SINJAR TV Debug APK for testing
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: SINJAR-TV-APK
@@ -122,6 +123,7 @@ jobs:
 
       - name: Upload SINJAR TV Signed Release APK for testing
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: SINJAR-TV-Release-APK
