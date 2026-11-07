@@ -1,11 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
-        android:label="RS TV"
-        android:icon="@drawable/ic_rs_tv"
+        android:label="SINJAR TV SHOW"
+        android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/rs_tv_banner"
         android:usesCleartextTraffic="false"
         android:supportsRtl="true"
