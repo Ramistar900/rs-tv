@@ -8,6 +8,7 @@ internal data class RSTVChannel(
     val tvgId: String?,
     val group: String?,
     val logoUrl: String?,
+    val country: String? = null,
     val streamUrl: String,
     val httpHeaders: Map<String, String> = emptyMap(),
     val sourceIds: Set<String> = emptySet(),
@@ -52,6 +53,7 @@ internal object M3uPlaylistParser {
             val tvgId: String?,
             val group: String?,
             val logoUrl: String?,
+            val country: String?,
             val httpHeaders: MutableMap<String, String> = linkedMapOf()
         )
 
@@ -83,7 +85,8 @@ internal object M3uPlaylistParser {
                     name = name,
                     tvgId = attributes["tvg-id"]?.takeIf(String::isNotBlank),
                     group = attributes["group-title"]?.takeIf(String::isNotBlank),
-                    logoUrl = attributes["tvg-logo"]?.takeIf(String::isNotBlank)
+                    logoUrl = attributes["tvg-logo"]?.takeIf(String::isNotBlank),
+                    country = attributes["tvg-country"]?.takeIf(String::isNotBlank) ?: attributes["country"]?.takeIf(String::isNotBlank)
                 )
                 continue
             }
@@ -131,6 +134,7 @@ internal object M3uPlaylistParser {
                     tvgId = channel.tvgId,
                     group = channel.group,
                     logoUrl = channel.logoUrl,
+                    country = channel.country,
                     streamUrl = line,
                     httpHeaders = headers
                 )
