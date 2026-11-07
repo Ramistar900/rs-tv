@@ -1,13 +1,11 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="320dp"
-    android:height="180dp"
-    android:viewportWidth="320"
-    android:viewportHeight="180">
-    <path android:fillColor="#08090C" android:pathData="M0,0h320v180h-320z"/>
-    <path android:fillColor="#17191F" android:pathData="M16,20h288v140h-288z"/>
-    <path android:fillColor="#D71920" android:pathData="M42,47h86a12,12 0,0 1,12 12v62a12,12 0,0 1,-12 12h-86a12,12 0,0 1,-12 -12v-62a12,12 0,0 1,12 -12z"/>
-    <path android:fillColor="#08090C" android:pathData="M54,62h62a6,6 0,0 1,6 6v34a6,6 0,0 1,-6 6h-62a6,6 0,0 1,-6 -6v-34a6,6 0,0 1,6 -6z"/>
-    <path android:fillColor="#F4F4F4" android:pathData="M74,69l27,16 -27,16z"/>
-    <path android:fillColor="#D71920" android:pathData="M169,72h112v7h-112zM169,91h82v5h-82zM169,107h98v5h-98z"/>
-    <path android:fillColor="#B7BEC9" android:pathData="M169,124h62v4h-62z"/>
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="320dp" android:height="180dp" />
+            <solid android:color="#08090C" />
+        </shape>
+    </item>
+    <item android:drawable="@drawable/ic_rs_tv" android:width="112dp" android:height="112dp" android:gravity="left|center_vertical" android:left="22dp" />
+    <item android:drawable="@drawable/rs_tv_banner_wordmark" />
+</layer-list>
