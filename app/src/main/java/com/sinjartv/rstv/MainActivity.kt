@@ -48,6 +48,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -1202,7 +1204,9 @@ private fun LiveContent(
                         }
                     }
                 }
-                Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
+                TextButton(onClick = { channelTableQuery = ""; showChannelTable = true }) {
+                    Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
+                }
             }
             if (selectedChannel != null) {
                 Column(
@@ -1307,6 +1311,50 @@ private fun LiveContent(
                                 onToggleFavorite = { onToggleFavorite(channel) }
                             )
                         }
+                    }
+                }
+            }
+            if (showChannelTable) {
+                Dialog(
+                    onDismissRequest = { showChannelTable = false },
+                    properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+                ) {
+                    Row(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.38f))) {
+                        Column(
+                            modifier = Modifier.fillMaxHeight().fillMaxWidth(0.82f)
+                                .background(Color(0xD9B58A32), RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
+                                .border(1.dp, Color(0xFFE8C875).copy(alpha = 0.75f), RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = channelTableQuery,
+                                onValueChange = { channelTableQuery = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                placeholder = { Text("بحث") },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            val numberedChannels = channels.mapIndexed { index, channel -> (index + 1) to channel }
+                            val filteredChannels = numberedChannels.filter { (_, channel) ->
+                                channelTableQuery.isBlank() || channel.name.contains(channelTableQuery, ignoreCase = true) ||
+                                    channel.country.orEmpty().contains(channelTableQuery, ignoreCase = true)
+                            }
+                            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                items(filteredChannels, key = { it.second.streamUrl }) { (number, channel) ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().clickable { showChannelTable = false; onPlay(channel) }
+                                            .padding(horizontal = 8.dp, vertical = 11.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(number.toString(), color = Color(0xFFFFF1C8), fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp))
+                                        Text(channel.name, color = Color(0xFFFFF9E8), modifier = Modifier.weight(1f), maxLines = 1)
+                                        Text(channel.country?.takeIf(String::isNotBlank) ?: "غير محددة", color = Color(0xFFFFE7AD), maxLines = 1)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.weight(1f).fillMaxHeight().clickable { showChannelTable = false })
                     }
                 }
             }
