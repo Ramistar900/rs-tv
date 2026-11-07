@@ -1,3 +1,4 @@
+# Trigger a fresh verification build after the channel drawer import fix.
 name: RS TV Android Build
 
 on:
