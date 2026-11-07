@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   debug-apk:
@@ -59,10 +59,19 @@ jobs:
           gradle-version: "8.9"
       - name: Run unit tests and build debug APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+      - name: Create draft GitHub Release and upload APK
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
         with:
-          name: rs-tv-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
+          tag_name: sinjar-tv-build-${{ github.run_number }}
+          name: SINJAR TV Build ${{ github.run_number }}
+          body: |
+            Automated SINJAR TV build.
+
+            Built from commit: ${{ github.sha }}
+
+            This release is a draft. Review it and publish manually when ready.
+          draft: true
+          prerelease: true
+          files: app/build/outputs/apk/debug/*.apk
+          fail_on_unmatched_files: true
