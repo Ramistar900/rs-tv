@@ -165,6 +165,31 @@ class RemotePlaylistSourcesTest {
     }
 
     @Test
+    fun privateSectionPackagesUseSeparateMovieAndSeriesDiscoverySources() {
+        assertTrue(
+            RemotePlaylistSources.privateContentPackageIds ==
+                listOf("iptv-org-movies", "iptv-org-series")
+        )
+        assertFalse(RemotePlaylistSources.privateContentPackageIds.any {
+            it in RemotePlaylistSources.worldLibraryBundleIds
+        })
+        val packages = RemotePlaylistSources.privateContentPackages.associateBy { it.id }
+        assertTrue(packages.keys == RemotePlaylistSources.privateContentPackageIds.toSet())
+        assertTrue(packages.getValue("iptv-org-movies").playlistUrl.endsWith("/categories/movies.m3u"))
+        assertTrue(packages.getValue("iptv-org-series").playlistUrl.endsWith("/categories/series.m3u"))
+        assertTrue(packages.values.all { it.provider == "iptv-org/iptv" })
+    }
+
+    @Test
+    fun privateSectionHasOfficialMatureProviderLinkNotAnM3uStream() {
+        val destination = RemotePlaylistSources.officialDestinations.first { it.id == "taboovision" }
+        assertTrue(destination.category == OfficialDestinationCategory.PRIVATE)
+        assertTrue(destination.url == "https://taboo.vision/")
+        assertTrue(destination.description.contains("Android TV"))
+        assertTrue(destination.description.contains("لا يوجد رابط M3U"))
+    }
+
+    @Test
     fun officialDestinationsUseHttps() {
         assertTrue(RemotePlaylistSources.officialDestinations.isNotEmpty())
         RemotePlaylistSources.officialDestinations.forEach { destination ->
