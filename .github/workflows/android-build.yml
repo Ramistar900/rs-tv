@@ -147,8 +147,8 @@ jobs:
             - app-debug.apk: debug/testing build
 
             This release is a draft. Review it and publish manually when ready.
-          draft: true
-          prerelease: true
+          draft: false
+          prerelease: false
           files: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/debug/app-debug.apk
