@@ -11,6 +11,32 @@ internal data class RemoteSourceSnapshot(
 )
 
 internal object RemotePlaylistMerger {
+    private val countryBySourceId = mapOf(
+        "doubo-turkey" to "تركيا",
+        "iptv-org-us" to "الولايات المتحدة الأمريكية",
+        "iptv-org-ca" to "كندا",
+        "iptv-org-cn" to "الصين",
+        "iptv-org-jp" to "اليابان",
+        "iptv-org-kr" to "كوريا الجنوبية",
+        "iptv-org-ru" to "روسيا",
+        "iptv-org-br" to "البرازيل",
+        "iptv-org-ar" to "الأرجنتين",
+        "iptv-org-cl" to "تشيلي",
+        "iptv-org-co" to "كولومبيا",
+        "iptv-org-mx" to "المكسيك",
+        "iptv-org-pe" to "بيرو",
+        "iptv-org-uk" to "المملكة المتحدة",
+        "iptv-org-de" to "ألمانيا",
+        "iptv-org-fr" to "فرنسا",
+        "iptv-org-it" to "إيطاليا",
+        "iptv-org-es" to "إسبانيا",
+        "iptv-org-pt" to "البرتغال",
+        "iptv-org-pl" to "بولندا",
+        "iptv-org-nl" to "هولندا",
+        "iptv-org-se" to "السويد",
+        "iptv-org-no" to "النرويج"
+    )
+
     fun merge(snapshots: List<RemoteSourceSnapshot>): List<RSTVChannel> {
         val merged = linkedMapOf<String, RSTVChannel>()
         snapshots.forEach { snapshot ->
@@ -20,6 +46,7 @@ internal object RemotePlaylistMerger {
             parsed.channels.forEach { channel ->
                 val key = canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
                 val incoming = channel.copy(
+                    country = channel.country?.takeIf(String::isNotBlank) ?: countryBySourceId[snapshot.id],
                     sourceIds = setOf(snapshot.id),
                     sourceNames = setOf(snapshot.name),
                     sourceProviders = setOf(snapshot.provider)
@@ -33,6 +60,7 @@ internal object RemotePlaylistMerger {
                         tvgId = existing.tvgId ?: incoming.tvgId,
                         group = existing.group ?: incoming.group,
                         logoUrl = existing.logoUrl ?: incoming.logoUrl,
+                        country = existing.country?.takeIf(String::isNotBlank) ?: incoming.country,
                         sourceIds = existing.sourceIds + incoming.sourceIds,
                         sourceNames = existing.sourceNames + incoming.sourceNames,
                         sourceProviders = existing.sourceProviders + incoming.sourceProviders
