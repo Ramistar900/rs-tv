@@ -212,6 +212,17 @@
     "playback": "Blocked until a source has passed separate rights review.",
     "approved_free_m3u_sources": [],
     "source_policy": "Do not add public, anonymous, pirated, subscription-only, DRM-protected or unclear-rights sources. A free URL is not proof of permission to stream or redistribute.",
-    "access": "PIN-gated local section; salted PBKDF2 verifier, temporary lockout after repeated failures, optional hidden navigation entry."
+    "access": "PIN-gated local section; salted PBKDF2 verifier, temporary lockout after repeated failures, optional hidden navigation entry.",
+    "private_discovery_package_ids": [
+      "iptv-org-movies",
+      "iptv-org-series"
+    ],
+    "private_package_storage": "Downloaded separately from the ordinary IPTV source library. These are broad movies/series discovery lists, not adult packages; only explicitly age-rated or explicit-labeled entries may be shown in the PIN-protected private section. Unclassified entries remain isolated.",
+    "official_mature_service": {
+      "id": "taboovision",
+      "url": "https://taboo.vision/",
+      "integration": "External official information link only; no M3U extraction or in-app playback.",
+      "device_note": "Provider states TCL Smart TV preloading is available and Android TV support is coming soon; availability can vary."
+    }
   }
 }
