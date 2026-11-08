@@ -19,6 +19,7 @@ internal data class RemotePlaylistSource(
 internal enum class OfficialDestinationCategory(val title: String) {
     SPORTS("قنوات ومنصات الرياضة"),
     MOVIES("الأفلام والمسلسلات"),
+    PRIVATE("خدمات خاصة رسمية"),
     GENERAL("قنوات البث الرسمية")
 }
 
@@ -39,6 +40,10 @@ internal object RemotePlaylistSources {
         "iptv-org-arab",
         "iptv-org-turkey"
     )
+
+    // These broad discovery lists are imported into a separate private library;
+    // only entries with explicit adult-rating metadata are displayed in that section.
+    val privateContentPackageIds = listOf("iptv-org-movies", "iptv-org-series")
 
     val playlists = listOf(
         RemotePlaylistSource(
@@ -543,6 +548,9 @@ internal object RemotePlaylistSources {
         )
     )
 
+    val privateContentPackages: List<RemotePlaylistSource>
+        get() = privateContentPackageIds.mapNotNull { id -> playlists.firstOrNull { it.id == id } }
+
     val officialDestinations = listOf(
         OfficialLiveDestination(
             id = "fifa-plus",
@@ -613,6 +621,13 @@ internal object RemotePlaylistSources {
             description = "خدمة مجانية مدعومة بالإعلانات للأفلام والقنوات، لكن Plex يذكر أن Live TV غير متاح حالياً في تركيا؛ أدرجناه كخيار للدول المدعومة فقط.",
             url = "https://www.plex.tv/watch-free/",
             category = OfficialDestinationCategory.MOVIES
+        ),
+        OfficialLiveDestination(
+            id = "taboovision",
+            name = "TabooVision — قناة للمشاهدين البالغين",
+            description = "خدمة خارجية تقول إنها مجانية ومدعومة بالإعلانات وتستخدم التحقق من العمر ومحتوى مرخّص. يذكر موقعها أن الخدمة مدمجة حالياً في أجهزة TCL المختارة وأن دعم Android TV ما زال قادماً. تفتح الصفحة الرسمية فقط؛ لا يوجد رابط M3U أو تشغيل داخل RS TV.",
+            url = "https://taboo.vision/",
+            category = OfficialDestinationCategory.PRIVATE
         ),
         OfficialLiveDestination(
             id = "aljazeera-ar",
