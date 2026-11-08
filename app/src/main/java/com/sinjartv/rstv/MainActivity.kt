@@ -77,12 +77,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1902,6 +1898,7 @@ private fun ChannelCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onPlay)
             .onFocusChanged { focused = it.isFocused }
             .graphicsLayer {
                 scaleX = focusScale
@@ -1912,18 +1909,7 @@ private fun ChannelCard(
                 color = if (focused) AccentRed else Color.Transparent,
                 shape = RoundedCornerShape(14.dp)
             )
-            .onKeyEvent { event ->
-                if (
-                    event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.DirectionCenter || event.key == Key.Enter)
-                ) {
-                    onPlay()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusable(),
+,
         colors = CardDefaults.cardColors(containerColor = if (active || focused) PanelRaised else PanelBlack),
         shape = RoundedCornerShape(14.dp)
     ) {
