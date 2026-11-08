@@ -178,11 +178,11 @@ jobs:
         with:
           tag_name: sinjar-tv-build-${{ github.run_number }}
           name: SINJAR TV Build ${{ github.run_number }}
-          target_commitish: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          target_commitish: ${{ github.sha }}
           body: |
             Automated SINJAR TV build.
 
-            Built from commit: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+            Built from commit: ${{ github.sha }}
 
             Attached:
             - app-release.apk: signed release build
