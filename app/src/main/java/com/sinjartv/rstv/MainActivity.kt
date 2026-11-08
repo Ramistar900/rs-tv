@@ -1025,7 +1025,7 @@ private fun ScreenBody(
 ) {
     when (tab) {
         RSTVTab.HOME -> HomeContent(
-            channelCount = regularChannels.size,
+            channelCount = channels.size,
             worldChannelCount = worldChannels.size,
             recentChannels = recentChannels,
             onPlay = onPlay,
