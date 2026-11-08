@@ -14,10 +14,10 @@ internal enum class AdultContentType {
 
 internal object AdultContentPolicy {
     private val explicitPattern = Regex(
-        """(?i)(?:^|[^a-z0-9])(?:xxx|porn|pornographic|erotic|adult\\s*(?:tv|channel|entertainment)|sex\\s*(?:tv|channel))(?:$|[^a-z0-9])|للكبار فقط|محتوى صريح|إباحي|اباحي|إباحية|اباحية|قنوات جنسية"""
+        """(?i)(?:^|[^a-z0-9])(?:xxx|porn|pornographic|erotic|adult\s*(?:tv|channel|entertainment)|sex\s*(?:tv|channel))(?:$|[^a-z0-9])|للكبار فقط|محتوى صريح|إباحي|اباحي|إباحية|اباحية|قنوات جنسية"""
     )
     private val ageRatingPattern = Regex(
-        """(?i)^(?:18\\+?|r18\\+?|tv-?ma|nc-?17|ao|mature|18\\s*years?\\s*old|للكبار|للبالغين|مناسب للبالغين)$"""
+        """(?i)^(?:18\+?|r18\+?|tv-?ma|nc-?17|ao|mature|18\s*years?\s*old|للكبار|للبالغين|مناسب للبالغين)$"""
     )
 
     fun classify(channel: RSTVChannel): AdultContentType? {
@@ -56,7 +56,7 @@ internal object AdultAccessStore {
     }
 
     fun setPin(context: Context, pin: String) {
-        require(pin.matches(Regex("\\d{4,8}"))) { "رمز PIN يجب أن يتكون من 4 إلى 8 أرقام" }
+        require(pin.matches(Regex("\d{4,8}"))) { "رمز PIN يجب أن يتكون من 4 إلى 8 أرقام" }
         val salt = ByteArray(16).also(SecureRandom()::nextBytes)
         val hash = derive(pin, salt)
         prefs(context).edit()
