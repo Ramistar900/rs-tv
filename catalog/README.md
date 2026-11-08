@@ -127,15 +127,19 @@ For HLS, the checker fetches a bounded manifest and attempts to retrieve the fir
 
 This still is not playback on a real phone/TV box, a sustained uptime/bitrate test, or a legal review. A successful first segment does not grant streaming rights. Only separately rights-reviewed entries may ever be approved for the default catalogue.
 
-## Adult content isolation (+18)
+## Private content section (خاص)
 
-RS TV has a separate **+18 للكبار فقط** area with two independent buckets:
+RS TV has a separate **خاص** area protected by a user-created 4–8 digit PIN, with two independently classified content groups:
 
-- **Age-rated films/series and channels**: classified only when an explicit M3U rating such as `TV-MA`, `NC-17`, or `18+` is supplied.
-- **Explicit adult channels**: classified from explicit category labels, not from ordinary `Movies` or `Series` group names.
+- **Age-rated films/series and channels**: surfaced only when M3U metadata supplies an explicit rating such as `TV-MA`, `NC-17`, or `18+`.
+- **Explicit adult-channel candidates**: classified from clearly explicit category/name labels, not from generic `Movies` or `Series` groups.
 
-The section is protected by a user-created 4–8 digit PIN. The PIN itself is not stored: the app stores a random salt and a PBKDF2-derived verifier, compares verifiers in constant time, and temporarily blocks further attempts after five incorrect entries. The section can be hidden from navigation and is re-locked when the user leaves it. Adult-classified entries are excluded from ordinary live browsing, search, favorites, and recent-channel lists.
+The movie and series discovery packages (`iptv-org-movies` and `iptv-org-series`) are downloaded into a dedicated private package directory, separate from the ordinary source library. Those playlists are broad discovery lists, **not 18+ packages**. Only entries with an explicit maturity label are displayed in the private section; all other entries remain isolated and are not added to live browsing, search, favourites, or history. A generic movie/series label is never treated as an adult rating.
 
-**No free, legally authorized adult M3U source has been approved for RS TV at this time.** IPTV-org's public catalogue does not provide adult playlists, and public availability of an M3U URL is not evidence of the broadcaster's permission to redistribute or stream its content. Detected adult entries from an imported playlist are therefore shown only as unapproved candidates; playback is blocked. No anonymous, pirated, DRM-bypassing, or subscription-only source is added. A future source must have an official operator identity and clear evidence permitting free playback in the app's intended territories.
+The PIN itself is not stored: the app stores a random salt and a PBKDF2-derived verifier, compares verifiers in constant time, temporarily blocks further attempts after five incorrect entries, and re-locks the section when the user leaves it. The section can be hidden from navigation. Private-package downloads can be cleared separately from the ordinary IPTV source library.
 
-The PIN is a local parental-access gate, not age verification or a substitute for device-level parental controls.
+**No free, legally authorized adult M3U source has been approved for RS TV at this time.** A public M3U URL is not evidence that the broadcaster permits redistribution or playback. Classified entries remain unapproved candidates and playback remains blocked until separate technical and rights review. No anonymous, pirated, DRM-bypassing, or subscription-only source is added.
+
+The section also lists TabooVision as an external provider-information link only. Its official website describes an age-verified, ad-supported mature FAST channel and currently says Android TV support is coming soon; RS TV does not extract or play its stream. See [TabooVision's official information](https://taboo.vision/).
+
+The PIN is a local access gate, not legal age verification or a substitute for device-level parental controls.
