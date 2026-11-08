@@ -799,7 +799,7 @@ private fun RSTVHome() {
 @Composable
 private fun PlayerWatermark(modifier: Modifier = Modifier) {
     Image(
-        painter = painterResource(id = R.drawable.sinjar_show_logo),
+        painter = painterResource(id = R.drawable.sinjar_show_brand),
         contentDescription = "SINJAR SHOW",
         modifier = modifier.size(width = 88.dp, height = 34.dp),
         alpha = 0.48f
@@ -809,7 +809,7 @@ private fun PlayerWatermark(modifier: Modifier = Modifier) {
 @Composable
 private fun BrandMark() {
     Image(
-        painter = painterResource(id = R.drawable.sinjar_show_logo),
+        painter = painterResource(id = R.drawable.sinjar_show_brand),
         contentDescription = "SINJAR SHOW",
         modifier = Modifier.size(width = 88.dp, height = 34.dp)
     )
@@ -991,7 +991,7 @@ private fun HomeContent(
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
-                                painter = painterResource(R.drawable.sinjar_show_logo),
+                                painter = painterResource(R.drawable.sinjar_show_brand),
                                 contentDescription = "SINJAR SHOW",
                                 modifier = Modifier.size(width = 58.dp, height = 28.dp)
                             )
