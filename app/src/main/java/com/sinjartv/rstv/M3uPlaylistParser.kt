@@ -60,7 +60,7 @@ internal object M3uPlaylistParser {
         )
 
         val channels = mutableListOf<RSTVChannel>()
-        val seenEntries = mutableSetOf<String>()
+        val seenEntries = mutableMapOf<String, Int>()
         var pending: PendingChannel? = null
         var skippedUnsafeLinks = 0
         var invalidEntries = 0
@@ -133,18 +133,25 @@ internal object M3uPlaylistParser {
 
             val headers = channel.httpHeaders.toMap()
             val entryKey = line + headers.toSortedMap().entries.joinToString("|") { "${it.key}=${it.value}" }
-            if (seenEntries.add(entryKey)) {
-                channels += RSTVChannel(
-                    name = channel.name,
-                    tvgId = channel.tvgId,
-                    group = channel.group,
-                    logoUrl = channel.logoUrl,
-                    country = channel.country,
-                    contentRating = channel.contentRating,
-                    streamUrl = line,
-                    httpHeaders = headers
-                )
+            val parsedChannel = RSTVChannel(
+                name = channel.name,
+                tvgId = channel.tvgId,
+                group = channel.group,
+                logoUrl = channel.logoUrl,
+                country = channel.country,
+                contentRating = channel.contentRating,
+                streamUrl = line,
+                httpHeaders = headers
+            )
+            val existingIndex = seenEntries[entryKey]
+            if (existingIndex == null) {
+                seenEntries[entryKey] = channels.size
+                channels += parsedChannel
             } else {
+                // When duplicate metadata conflicts, retain the more restrictive adult label.
+                if (AdultContentPolicy.isAdult(parsedChannel)) {
+                    channels[existingIndex] = parsedChannel
+                }
                 invalidEntries++
             }
         }
