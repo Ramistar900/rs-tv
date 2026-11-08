@@ -37,10 +37,12 @@ class AdultContentPolicyTest {
     fun doesNotTreatOrdinaryMovieOrSeriesGroupsAsAdult() {
         val movies = channel(name = "Cinema", group = "Movies")
         val series = channel(name = "Drama", group = "Series")
+        val adultSwim = channel(name = "Adult Swim", group = "Entertainment")
         val tv14 = channel(name = "Family", rating = "TV-14")
 
         assertFalse(AdultContentPolicy.isAdult(movies))
         assertFalse(AdultContentPolicy.isAdult(series))
+        assertFalse(AdultContentPolicy.isAdult(adultSwim))
         assertFalse(AdultContentPolicy.isAdult(tv14))
     }
 
