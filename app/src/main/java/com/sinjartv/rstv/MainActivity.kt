@@ -711,6 +711,10 @@ private fun RSTVHome() {
                 ScreenBody(
                     tab = selectedTab,
                     worldChannels = worldChannels,
+                    adultChannels = adultChannels,
+                    isAdultSectionHidden = adultSectionHidden,
+                    onHideAdultSection = ::hideOrShowAdultSection,
+                    onManageAdult = ::requestAdultAccess,
                     worldCatalogStatus = worldCatalogStatus,
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
@@ -745,7 +749,7 @@ private fun RSTVHome() {
                         searchQuery = ""
                         status = "تمت العودة إلى قائمة المستخدم المحلية"
                     },
-                    onNavigate = { selectedTab = it },
+                    onNavigate = ::navigateToTab,
                     onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                     onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
                     onClear = { pendingClear = it },
@@ -766,10 +770,10 @@ private fun RSTVHome() {
                             }
                         }
                     ) {
-                        primaryNavigationTabs.forEach { tab ->
+                        (if (adultSectionHidden) primaryNavigationTabs else primaryNavigationTabs + RSTVTab.ADULT).forEach { tab ->
                             NavigationRailItem(
                                 selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
+                                onClick = { navigateToTab(tab) },
                                 icon = { Icon(tab.icon, contentDescription = tab.title) },
                                 label = { Text(tab.title, fontSize = 10.sp) },
                                 alwaysShowLabel = true
@@ -781,11 +785,15 @@ private fun RSTVHome() {
                     ) {
                         TopHeader(
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
-                            channelCount = channels.size
+                            channelCount = regularChannels.size
                         )
                         ScreenBody(
                             tab = selectedTab,
                             worldChannels = worldChannels,
+                            adultChannels = adultChannels,
+                            isAdultSectionHidden = adultSectionHidden,
+                            onHideAdultSection = ::hideOrShowAdultSection,
+                            onManageAdult = ::requestAdultAccess,
                             worldCatalogStatus = worldCatalogStatus,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
@@ -820,7 +828,7 @@ private fun RSTVHome() {
                                 searchQuery = ""
                                 status = "تمت العودة إلى قائمة المستخدم المحلية"
                             },
-                            onNavigate = { selectedTab = it },
+                            onNavigate = ::navigateToTab,
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                             onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
                             onClear = { pendingClear = it },
@@ -874,7 +882,7 @@ private fun RSTVHome() {
                                 searchQuery = ""
                                 status = "تمت العودة إلى قائمة المستخدم المحلية"
                             },
-                            onNavigate = { selectedTab = it },
+                            onNavigate = ::navigateToTab,
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                             onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
                             onClear = { pendingClear = it },
@@ -885,10 +893,10 @@ private fun RSTVHome() {
                         containerColor = PanelBlack,
                         contentColor = SoftWhite
                     ) {
-                        primaryNavigationTabs.forEach { tab ->
+                        (if (adultSectionHidden) primaryNavigationTabs else primaryNavigationTabs + RSTVTab.ADULT).forEach { tab ->
                             NavigationBarItem(
                                 selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
+                                onClick = { navigateToTab(tab) },
                                 icon = { Icon(tab.icon, contentDescription = tab.title) },
                                 label = { Text(tab.title, fontSize = 9.sp) },
                                 alwaysShowLabel = true
@@ -966,6 +974,10 @@ private fun TopHeader(
 private fun ScreenBody(
     tab: RSTVTab,
     worldChannels: List<WorldChannelCandidate>,
+    adultChannels: List<RSTVChannel>,
+    isAdultSectionHidden: Boolean,
+    onHideAdultSection: () -> Unit,
+    onManageAdult: () -> Unit,
     worldCatalogStatus: String,
     remotePlaylistStatus: String,
     sourceLibraryStatus: String,
@@ -1028,6 +1040,12 @@ private fun ScreenBody(
         )
         RSTVTab.YOUTUBE -> YouTubeLiveContent(modifier = modifier)
         RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
+        RSTVTab.ADULT -> AdultContentContent(
+            channels = adultChannels,
+            isSectionHidden = isAdultSectionHidden,
+            onToggleHidden = onHideAdultSection,
+            modifier = modifier
+        )
         RSTVTab.LIVE -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
@@ -1066,6 +1084,7 @@ private fun ScreenBody(
             onImportPlaylist = onImportPlaylist,
             onImportGuide = onImportGuide,
             onClear = onClear,
+            onManageAdult = onManageAdult,
             modifier = modifier
         )
     }
@@ -2387,6 +2406,7 @@ private fun SettingsContent(
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
     onClear: (ClearAction) -> Unit,
+    onManageAdult: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -2396,6 +2416,9 @@ private fun SettingsContent(
         item {
             Text("الإعدادات", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text("إدارة مكتبتك المحلية وتجربة التشغيل", color = MutedText, fontSize = 12.sp)
+        }
+        item {
+            SettingsAction("إدارة قسم +18", "حماية القسم برمز PIN وإظهار القسم أو إخفاؤه", onManageAdult)
         }
         item {
             SettingsAction("استيراد / استبدال قائمة M3U", "يتم حفظ القائمة داخل مساحة التطبيق الخاصة", onImportPlaylist)
