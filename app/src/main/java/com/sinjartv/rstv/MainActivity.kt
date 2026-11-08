@@ -809,9 +809,9 @@ private fun PlayerWatermark(modifier: Modifier = Modifier) {
 @Composable
 private fun BrandMark() {
     Image(
-        painter = painterResource(id = R.drawable.ic_rs_tv),
-        contentDescription = "شعار RS TV",
-        modifier = Modifier.size(46.dp)
+        painter = painterResource(id = R.drawable.sinjar_show_logo),
+        contentDescription = "SINJAR SHOW",
+        modifier = Modifier.size(width = 88.dp, height = 34.dp)
     )
 }
 
@@ -990,11 +990,10 @@ private fun HomeContent(
                                 .background(Color(0xFF302714), RoundedCornerShape(18.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.royal_smart_tv),
-                                contentDescription = "التلفاز الذكي",
-                                tint = AccentRed,
-                                modifier = Modifier.size(38.dp)
+                            Image(
+                                painter = painterResource(R.drawable.sinjar_show_logo),
+                                contentDescription = "SINJAR SHOW",
+                                modifier = Modifier.size(width = 58.dp, height = 28.dp)
                             )
                         }
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
