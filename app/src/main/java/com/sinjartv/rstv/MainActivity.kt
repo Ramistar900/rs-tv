@@ -249,6 +249,15 @@ private fun RSTVHome() {
         }
     }
 
+    fun isRestrictedAdultChannel(channel: RSTVChannel): Boolean {
+        val targetKey = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
+        return AdultContentPolicy.isAdult(channel) ||
+            (channels + sourceLibraryChannels).any { candidate ->
+                AdultContentPolicy.isAdult(candidate) &&
+                    RemotePlaylistMerger.canonicalStreamKey(candidate.streamUrl, candidate.httpHeaders) == targetKey
+            }
+    }
+
     DisposableEffect(isFullscreenPlayer, activity) {
         val window = activity?.window
         val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
@@ -522,12 +531,12 @@ private fun RSTVHome() {
 
 
     fun playChannel(channel: RSTVChannel) {
-        if (AdultContentPolicy.isAdult(channel)) {
+        if (isRestrictedAdultChannel(channel)) {
             status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
             return
         }
         val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels)
-            .filterNot(AdultContentPolicy::isAdult)
+            .filterNot(::isRestrictedAdultChannel)
         val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
         val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
@@ -547,7 +556,7 @@ private fun RSTVHome() {
     }
 
     fun toggleFavourite(channel: RSTVChannel) {
-        if (AdultContentPolicy.isAdult(channel)) return
+        if (isRestrictedAdultChannel(channel)) return
         LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
         favouriteRevision++
     }
@@ -555,18 +564,23 @@ private fun RSTVHome() {
     val favoriteUrls = remember(favouriteRevision) {
         LocalLibraryStore.favoriteStreams(context)
     }
-    val allKnownChannels = (channels + sourceLibraryChannels)
-        .groupBy { it.streamUrl }
+    val combinedChannels = channels + sourceLibraryChannels
+    val allKnownChannels = combinedChannels
+        .groupBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
         .values
         .map { candidates ->
             candidates.firstOrNull(AdultContentPolicy::isAdult) ?: candidates.first()
         }
-    val adultStreamUrls = allKnownChannels.filter(AdultContentPolicy::isAdult)
-        .map { it.streamUrl }
+    val adultStreamKeys = allKnownChannels.filter(AdultContentPolicy::isAdult)
+        .map { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
         .toSet()
     val adultChannels = allKnownChannels.filter(AdultContentPolicy::isAdult)
-    val regularChannels = channels.filterNot { it.streamUrl in adultStreamUrls }
-    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot { it.streamUrl in adultStreamUrls }
+    val regularChannels = channels.filterNot {
+        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
+    }
+    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot {
+        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
+    }
     val favoriteChannels = allKnownChannels.filterNot(AdultContentPolicy::isAdult)
         .filter { it.streamUrl in favoriteUrls }
     val recentChannels = LocalLibraryStore.history(context)
