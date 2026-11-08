@@ -27,6 +27,20 @@ class M3uPlaylistParserTest {
     }
 
     @Test
+    fun parsesExplicitContentRatingMetadata() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1 tvg-rating="TV-MA",Mature Drama
+            https://cdn.example/mature.m3u8
+        """.trimIndent()
+
+        val channel = M3uPlaylistParser.parse(playlist).channels.single()
+
+        assertEquals("TV-MA", channel.contentRating)
+        assertEquals(AdultContentType.AGE_RATED, AdultContentPolicy.classify(channel))
+    }
+
+    @Test
     fun rejectsNonHttpsStreamUrls() {
         val playlist = """
             #EXTM3U
