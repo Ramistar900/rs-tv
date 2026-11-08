@@ -142,7 +142,7 @@ private enum class RSTVTab(
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
-    ADULT("+18 للكبار", Icons.Outlined.Lock),
+    ADULT("خاص", Icons.Outlined.Lock),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
 }
 
@@ -156,7 +156,8 @@ private enum class ClearAction(val title: String, val message: String) {
     PLAYLIST("حذف القائمة المحفوظة", "سيتم حذف قائمة القنوات المحلية من هذا الجهاز."),
     HISTORY("مسح سجل المشاهدة", "سيتم مسح سجل القنوات التي شاهدتها."),
     FAVORITES("مسح المفضلة", "سيتم إزالة جميع القنوات من قائمة المفضلة."),
-    SOURCE_LIBRARY("مسح مكتبة مصادر IPTV", "سيتم حذف نسخ قوائم المصادر المجمّعة فقط، دون حذف قائمة المستخدم أو المفضلة.")
+    SOURCE_LIBRARY("مسح مكتبة مصادر IPTV", "سيتم حذف نسخ قوائم المصادر المجمّعة فقط، دون حذف قائمة المستخدم أو المفضلة."),
+    PRIVATE_PACKAGES("مسح باقات القسم الخاص", "سيتم حذف الباقات التي نزلتها داخل القسم الخاص فقط.")
 }
 
 class MainActivity : ComponentActivity() {
@@ -197,6 +198,9 @@ private fun RSTVHome() {
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
+    val privatePackageChannels = remember { mutableStateListOf<RSTVChannel>() }
+    var privatePackageStatus by remember { mutableStateOf("لم يتم تنزيل باقات خاصة بعد.") }
+    var privatePackageCount by remember { mutableIntStateOf(0) }
     var showingSourceLibrary by remember { mutableStateOf(false) }
     var worldChannels by remember { mutableStateOf<List<WorldChannelCandidate>>(emptyList()) }
     var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
@@ -252,7 +256,7 @@ private fun RSTVHome() {
     fun isRestrictedAdultChannel(channel: RSTVChannel): Boolean {
         val targetKey = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
         return AdultContentPolicy.isAdult(channel) ||
-            (channels + sourceLibraryChannels).any { candidate ->
+            (channels + sourceLibraryChannels + privatePackageChannels).any { candidate ->
                 AdultContentPolicy.isAdult(candidate) &&
                     RemotePlaylistMerger.canonicalStreamKey(candidate.streamUrl, candidate.httpHeaders) == targetKey
             }
@@ -326,6 +330,21 @@ private fun RSTVHome() {
             sourceLibraryStatus = "تمت استعادة ${savedSources.size} قوائم مصدر و${mergedSources.size} قناة بعد إزالة التكرار"
         }.onFailure {
             sourceLibraryStatus = "تعذر استعادة مكتبة المصادر: ${it.message ?: "خطأ غير معروف"}"
+        }
+        runCatching {
+            val savedPackages = withContext(Dispatchers.IO) {
+                LocalLibraryStore.loadPrivatePackages(context)
+            }
+            val mergedPackages = withContext(Dispatchers.Default) {
+                RemotePlaylistMerger.merge(savedPackages)
+            }
+            privatePackageChannels.clear()
+            privatePackageChannels.addAll(mergedPackages.filter(AdultContentPolicy::isAdult))
+            privatePackageCount = savedPackages.size
+            privatePackageStatus =
+                "تمت استعادة $privatePackageCount باقات خاصة و${privatePackageChannels.size} قناة تحمل تصنيف 18+ صريح."
+        }.onFailure {
+            privatePackageStatus = "تعذرت استعادة الباقات الخاصة: ${it.message ?: "خطأ غير معروف"}"
         }
         val savedGuide = withContext(Dispatchers.IO) {
             LocalLibraryStore.loadGuide(context)
@@ -445,6 +464,51 @@ private fun RSTVHome() {
                 remotePlaylistStatus = "تمت إضافة ${parsed.channels.size} قناة من ${source.name}. قائمتك الحالية لم تتغير."
             }.onFailure { error ->
                 remotePlaylistStatus = "تعذرت إضافة ${source.name}: ${error.message ?: "خطأ غير معروف"}"
+            }
+        }
+    }
+
+    fun addPrivateContentPackage(source: RemotePlaylistSource) {
+        if (source.id !in RemotePlaylistSources.privateContentPackageIds) {
+            privatePackageStatus = "هذه الباقة غير معتمدة للقسم الخاص."
+            return
+        }
+        privatePackageStatus = "جارٍ تنزيل ${source.name} إلى المكتبة الخاصة..."
+        scope.launch {
+            runCatching {
+                val content = withContext(Dispatchers.IO) {
+                    RemotePlaylistDownloader.download(source)
+                }
+                val parsed = withContext(Dispatchers.Default) {
+                    M3uPlaylistParser.parse(content)
+                }
+                require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
+                require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في هذه الباقة" }
+
+                val snapshot = RemoteSourceSnapshot(
+                    id = source.id,
+                    name = source.name,
+                    provider = source.provider,
+                    attribution = source.attribution,
+                    content = content
+                )
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.savePrivatePackage(context, snapshot)
+                }
+                val savedPackages = withContext(Dispatchers.IO) {
+                    LocalLibraryStore.loadPrivatePackages(context)
+                }
+                val mergedPackages = withContext(Dispatchers.Default) {
+                    RemotePlaylistMerger.merge(savedPackages)
+                }
+                val ratedPackages = mergedPackages.filter(AdultContentPolicy::isAdult)
+                privatePackageChannels.clear()
+                privatePackageChannels.addAll(ratedPackages)
+                privatePackageCount = savedPackages.size
+                privatePackageStatus =
+                    "تم تنزيل ${source.name}. عدد الباقات المحفوظة: $privatePackageCount. القنوات ذات تصنيف 18+ الصريح: ${ratedPackages.size}. بقية القنوات بقيت في المكتبة الخاصة ولم تُعرض."
+            }.onFailure { error ->
+                privatePackageStatus = "تعذر تنزيل ${source.name}: ${error.message ?: "خطأ غير معروف"}"
             }
         }
     }
@@ -574,7 +638,13 @@ private fun RSTVHome() {
     val adultStreamKeys = allKnownChannels.filter(AdultContentPolicy::isAdult)
         .map { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
         .toSet()
-    val adultChannels = allKnownChannels.filter(AdultContentPolicy::isAdult)
+    val adultChannels = (allKnownChannels + privatePackageChannels)
+        .groupBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
+        .values
+        .map { candidates ->
+            candidates.firstOrNull(AdultContentPolicy::isAdult) ?: candidates.first()
+        }
+        .filter(AdultContentPolicy::isAdult)
     val regularChannels = channels.filterNot {
         RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
     }
@@ -628,6 +698,13 @@ private fun RSTVHome() {
                             sourceLibraryStatus = "تم مسح مكتبة المصادر"
                             status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
                         }
+                        ClearAction.PRIVATE_PACKAGES -> {
+                            LocalLibraryStore.clearPrivatePackages(context)
+                            privatePackageChannels.clear()
+                            privatePackageCount = 0
+                            privatePackageStatus = "تم حذف جميع باقات القسم الخاص."
+                            status = "تم مسح باقات القسم الخاص"
+                        }
                     }
                     pendingClear = null
                 }) { Text("تأكيد", color = AccentRed) }
@@ -646,8 +723,8 @@ private fun RSTVHome() {
             onDismissRequest = { adultPinMode = null },
             title = {
                 Text(
-                    if (mode == AdultPinMode.SETUP) "إنشاء رمز حماية +18"
-                    else "إدخال رمز حماية +18"
+                    if (mode == AdultPinMode.SETUP) "إنشاء رمز حماية للقسم الخاص"
+                    else "إدخال رمز حماية للقسم الخاص"
                 )
             },
             text = {
@@ -656,7 +733,7 @@ private fun RSTVHome() {
                         if (mode == AdultPinMode.SETUP)
                             "أنشئ رمزاً من 4 إلى 8 أرقام. لن يُحفظ الرمز نفسه، بل بصمة مشتقة ومملّحة."
                         else
-                            "أدخل رمز PIN لفتح قسم المحتوى المصنّف للكبار.",
+                            "أدخل رمز PIN لفتح القسم الخاص.",
                         color = MutedText,
                         fontSize = 12.sp
                     )
@@ -824,6 +901,10 @@ private fun RSTVHome() {
                             tab = selectedTab,
                             worldChannels = worldChannels,
                             adultChannels = adultChannels,
+                            privatePackages = RemotePlaylistSources.privateContentPackages,
+                            privatePackageStatus = privatePackageStatus,
+                            privatePackageCount = privatePackageCount,
+                            onAddPrivatePackage = ::addPrivateContentPackage,
                             isAdultSectionHidden = adultSectionHidden,
                             onHideAdultSection = ::hideOrShowAdultSection,
                             onManageAdult = ::requestAdultAccess,
@@ -882,6 +963,10 @@ private fun RSTVHome() {
                             tab = selectedTab,
                             worldChannels = worldChannels,
                             adultChannels = adultChannels,
+                            privatePackages = RemotePlaylistSources.privateContentPackages,
+                            privatePackageStatus = privatePackageStatus,
+                            privatePackageCount = privatePackageCount,
+                            onAddPrivatePackage = ::addPrivateContentPackage,
                             isAdultSectionHidden = adultSectionHidden,
                             onHideAdultSection = ::hideOrShowAdultSection,
                             onManageAdult = ::requestAdultAccess,
@@ -1012,6 +1097,10 @@ private fun ScreenBody(
     tab: RSTVTab,
     worldChannels: List<WorldChannelCandidate>,
     adultChannels: List<RSTVChannel>,
+    privatePackages: List<RemotePlaylistSource>,
+    privatePackageStatus: String,
+    privatePackageCount: Int,
+    onAddPrivatePackage: (RemotePlaylistSource) -> Unit,
     isAdultSectionHidden: Boolean,
     onHideAdultSection: () -> Unit,
     onManageAdult: () -> Unit,
@@ -1079,6 +1168,11 @@ private fun ScreenBody(
         RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
         RSTVTab.ADULT -> AdultContentContent(
             channels = adultChannels,
+            privatePackages = privatePackages,
+            privatePackageStatus = privatePackageStatus,
+            privatePackageCount = privatePackageCount,
+            onAddPrivatePackage = onAddPrivatePackage,
+            onOpenOfficialUrl = onOpenOfficialUrl,
             isSectionHidden = isAdultSectionHidden,
             onToggleHidden = onHideAdultSection,
             modifier = modifier
@@ -2440,6 +2534,11 @@ private fun ProgrammeCard(programme: GuideProgramme) {
 @Composable
 private fun AdultContentContent(
     channels: List<RSTVChannel>,
+    privatePackages: List<RemotePlaylistSource>,
+    privatePackageStatus: String,
+    privatePackageCount: Int,
+    onAddPrivatePackage: (RemotePlaylistSource) -> Unit,
+    onOpenOfficialUrl: (String) -> Unit,
     isSectionHidden: Boolean,
     onToggleHidden: () -> Unit,
     modifier: Modifier = Modifier
@@ -2452,12 +2551,49 @@ private fun AdultContentContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text("+18 للكبار فقط", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+            Text("خاص", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
             Text(
-                "قسم منفصل لا يظهر في البحث أو المفضلة أو قوائم البث العادية. يلزم رمز PIN للدخول.",
+                "مساحة مستقلة ومحميّة برمز PIN؛ لا تظهر محتوياتها في البحث أو المفضلة أو قوائم البث العادية.",
                 color = MutedText,
                 fontSize = 12.sp
             )
+        }
+        item {
+            Text("باقات الأفلام والمسلسلات", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(
+                "نزّل الباقات إلى مساحة خاصة منفصلة. هذه قوائم أفلام ومسلسلات عامة وليست كلها 18+؛ لا يظهر هنا إلا ما يحمل تصنيفاً عمرياً صريحاً مثل TV-MA أو NC-17 أو 18+.",
+                color = MutedText,
+                fontSize = 11.sp
+            )
+            Text("الباقات المحفوظة: $privatePackageCount", color = Silver, fontSize = 11.sp)
+            Text(privatePackageStatus, color = MutedText, fontSize = 10.sp)
+        }
+        items(privatePackages, key = { it.id }) { source ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(source.name, color = SoftWhite, fontWeight = FontWeight.Bold)
+                    Text(source.description, color = MutedText, fontSize = 11.sp)
+                    Text(
+                        "قائمة اكتشاف مجتمعية • لا تعني وحدها أن حقوق كل قناة معتمدة",
+                        color = Silver,
+                        fontSize = 10.sp
+                    )
+                    Button(
+                        onClick = { onAddPrivatePackage(source) },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("تنزيل داخل خاص", color = ScreenBlack)
+                    }
+                }
+            }
         }
         item {
             Card(
@@ -2468,7 +2604,7 @@ private fun AdultContentContent(
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text("تنبيه الترخيص", color = Silver, fontWeight = FontWeight.Bold)
                     Text(
-                        "لا توجد حالياً حزمة IPTV مجانية ثبت أنها تملك إذناً واضحاً لبث محتوى +18. القنوات المكتشفة في قوائم M3U تبقى محجوبة ولا تعمل حتى مراجعة حقوق مصدرها. لن نستخدم روابط مسروقة أو قوائم مجهولة.",
+                        "لا توجد حالياً حزمة M3U مجانية ثبت ترخيصها لمحتوى +18 الصريح. الباقات أعلاه للاكتشاف فقط؛ القنوات ذات التصنيف العمري الصريح تبقى محجوبة حتى مراجعة مصدرها وحقوقها. لن نستخدم قوائم مجهولة أو روابط مقرصنة.",
                         color = MutedText,
                         fontSize = 12.sp
                     )
@@ -2502,17 +2638,30 @@ private fun AdultContentContent(
             }
         }
         item {
+            Text("خدمة خارجية للمحتوى الناضج", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(
+                "هذه خدمة مستقلة وليست باقة M3U. يذكر مزودها أن Android TV ما زال قيد الإضافة؛ فتح الرابط لا يعني أن البث متاح على جهازك.",
+                color = MutedText,
+                fontSize = 11.sp
+            )
+        }
+        items(RemotePlaylistSources.officialDestinations.filter {
+            it.category == OfficialDestinationCategory.PRIVATE
+        }, key = { it.id }) { destination ->
+            OfficialDestinationCard(destination, onOpenOfficialUrl)
+        }
+        item {
             Button(
                 onClick = onToggleHidden,
                 colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(if (isSectionHidden) "إظهار +18 في القائمة" else "إخفاء +18 من القائمة")
+                Text(if (isSectionHidden) "إظهار «خاص» في القائمة" else "إخفاء «خاص» من القائمة")
             }
         }
         item {
             Text(
-                "إخفاء القسم يمنع ظهوره في شريط التنقل. يمكن إدارته مجدداً من بطاقة «إدارة قسم +18» في الرئيسية، بعد إدخال PIN.",
+                "إخفاء القسم يمنع ظهوره في شريط التنقل. يمكن إدارته مجدداً من بطاقة «إدارة القسم الخاص» في الرئيسية، بعد إدخال PIN.",
                 color = MutedText,
                 fontSize = 11.sp
             )
@@ -2557,7 +2706,7 @@ private fun SettingsContent(
             Text("إدارة مكتبتك المحلية وتجربة التشغيل", color = MutedText, fontSize = 12.sp)
         }
         item {
-            SettingsAction("إدارة قسم +18", "حماية القسم برمز PIN وإظهار القسم أو إخفاؤه", onManageAdult)
+            SettingsAction("إدارة القسم الخاص", "حماية القسم برمز PIN وإظهار القسم أو إخفاؤه", onManageAdult)
         }
         item {
             SettingsAction("استيراد / استبدال قائمة M3U", "يتم حفظ القائمة داخل مساحة التطبيق الخاصة", onImportPlaylist)
@@ -2576,6 +2725,9 @@ private fun SettingsContent(
         }
         item {
             SettingsAction("مسح مكتبة مصادر IPTV", "حذف النسخ المجمّعة فقط مع إبقاء قائمة المستخدم والمفضلة", { onClear(ClearAction.SOURCE_LIBRARY) })
+        }
+        item {
+            SettingsAction("مسح باقات القسم الخاص", "حذف الباقات المخزنة في مساحة خاص فقط", { onClear(ClearAction.PRIVATE_PACKAGES) })
         }
         item {
             Card(
