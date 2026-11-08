@@ -613,6 +613,93 @@ private fun RSTVHome() {
         )
     }
 
+    adultPinMode?.let { mode ->
+        AlertDialog(
+            onDismissRequest = { adultPinMode = null },
+            title = {
+                Text(
+                    if (mode == AdultPinMode.SETUP) "إنشاء رمز حماية +18"
+                    else "إدخال رمز حماية +18"
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        if (mode == AdultPinMode.SETUP)
+                            "أنشئ رمزاً من 4 إلى 8 أرقام. لن يُحفظ الرمز نفسه، بل بصمة مشتقة ومملّحة."
+                        else
+                            "أدخل رمز PIN لفتح قسم المحتوى المصنّف للكبار.",
+                        color = MutedText,
+                        fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = adultPinEntry,
+                        onValueChange = { value ->
+                            adultPinEntry = value.filter(Char::isDigit).take(8)
+                            adultPinError = ""
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("رمز PIN") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (mode == AdultPinMode.SETUP) {
+                        OutlinedTextField(
+                            value = adultPinConfirmation,
+                            onValueChange = { value ->
+                                adultPinConfirmation = value.filter(Char::isDigit).take(8)
+                                adultPinError = ""
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("تأكيد الرمز") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                        )
+                    }
+                    if (adultPinError.isNotBlank()) {
+                        Text(adultPinError, color = Color(0xFFFF8A80), fontSize = 11.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (mode == AdultPinMode.SETUP) {
+                        when {
+                            adultPinEntry.length !in 4..8 ->
+                                adultPinError = "اختر رمزاً من 4 إلى 8 أرقام."
+                            adultPinEntry != adultPinConfirmation ->
+                                adultPinError = "الرمزان غير متطابقين."
+                            else -> {
+                                AdultAccessStore.setPin(context, adultPinEntry)
+                                adultAccessGranted = true
+                                selectedTab = RSTVTab.ADULT
+                                adultPinMode = null
+                                adultPinEntry = ""
+                                adultPinConfirmation = ""
+                            }
+                        }
+                    } else if (AdultAccessStore.verifyPin(context, adultPinEntry)) {
+                        adultAccessGranted = true
+                        selectedTab = RSTVTab.ADULT
+                        adultPinMode = null
+                        adultPinEntry = ""
+                    } else {
+                        adultPinEntry = ""
+                        adultPinError = "الرمز غير صحيح أو أن المحاولات موقوفة مؤقتاً."
+                    }
+                }) {
+                    Text(if (mode == AdultPinMode.SETUP) "حفظ وفتح القسم" else "فتح القسم", color = AccentRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { adultPinMode = null }) { Text("إلغاء") }
+            },
+            containerColor = PanelRaised,
+            titleContentColor = SoftWhite,
+            textContentColor = MutedText
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = ScreenBlack,
