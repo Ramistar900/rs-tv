@@ -820,28 +820,40 @@ private fun TopHeader(
     onImportPlaylist: () -> Unit,
     channelCount: Int
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
     ) {
-        BrandMark()
-        Column(modifier = Modifier.weight(1f)) {
-            Text("RS TV", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
-            Text("SINJAR TV SHOW", color = MutedText, fontSize = 9.sp, letterSpacing = 2.sp)
-        }
-        Text(
-            text = "$channelCount قناة",
-            color = Silver,
-            fontSize = 11.sp
-        )
-        Button(
-            onClick = onImportPlaylist,
-            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-            shape = RoundedCornerShape(12.dp)
+        val logoWidth = (maxWidth * 0.18f).coerceIn(68.dp, 116.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = logoWidth + 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("استيراد")
+            Column(modifier = Modifier.weight(1f)) {
+                Text("RS TV", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                Text("SINJAR TV SHOW", color = MutedText, fontSize = 9.sp, letterSpacing = 2.sp)
+            }
+            Text(
+                text = "$channelCount قناة",
+                color = Silver,
+                fontSize = 11.sp
+            )
+            Button(
+                onClick = onImportPlaylist,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("استيراد")
+            }
         }
+        Image(
+            painter = painterResource(id = R.drawable.sinjar_show_logo),
+            contentDescription = "SINJAR TV SHOW",
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .width(logoWidth)
+                .aspectRatio(176f / 68f)
+        )
     }
 }
 
