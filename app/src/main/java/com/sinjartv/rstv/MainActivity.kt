@@ -547,6 +547,7 @@ private fun RSTVHome() {
     }
 
     fun toggleFavourite(channel: RSTVChannel) {
+        if (AdultContentPolicy.isAdult(channel)) return
         LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
         favouriteRevision++
     }
@@ -554,10 +555,18 @@ private fun RSTVHome() {
     val favoriteUrls = remember(favouriteRevision) {
         LocalLibraryStore.favoriteStreams(context)
     }
-    val allKnownChannels = (channels + sourceLibraryChannels).distinctBy { it.streamUrl }
+    val allKnownChannels = (channels + sourceLibraryChannels)
+        .groupBy { it.streamUrl }
+        .values
+        .map { candidates ->
+            candidates.firstOrNull(AdultContentPolicy::isAdult) ?: candidates.first()
+        }
+    val adultStreamUrls = allKnownChannels.filter(AdultContentPolicy::isAdult)
+        .map { it.streamUrl }
+        .toSet()
     val adultChannels = allKnownChannels.filter(AdultContentPolicy::isAdult)
-    val regularChannels = channels.filterNot(AdultContentPolicy::isAdult)
-    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot(AdultContentPolicy::isAdult)
+    val regularChannels = channels.filterNot { it.streamUrl in adultStreamUrls }
+    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot { it.streamUrl in adultStreamUrls }
     val favoriteChannels = allKnownChannels.filterNot(AdultContentPolicy::isAdult)
         .filter { it.streamUrl in favoriteUrls }
     val recentChannels = LocalLibraryStore.history(context)
