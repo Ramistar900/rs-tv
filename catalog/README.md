@@ -126,3 +126,16 @@ The daily audit now collects the direct HTTPS entries from all configured playli
 For HLS, the checker fetches a bounded manifest and attempts to retrieve the first media segment. It skips encrypted HLS playlists rather than trying to obtain keys. For direct media, it requests only a bounded byte range. DASH manifests are structurally checked, and manifests advertising content protection are identified; this is not a complete DASH playback test. Temporary failures, geo-blocks and server errors remain diagnostic statuses and are not a basis for instantly deleting a channel. Every batch is a snapshot; the full catalogue is revisited over successive scheduled runs.
 
 This still is not playback on a real phone/TV box, a sustained uptime/bitrate test, or a legal review. A successful first segment does not grant streaming rights. Only separately rights-reviewed entries may ever be approved for the default catalogue.
+
+## Adult content isolation (+18)
+
+RS TV has a separate **+18 للكبار فقط** area with two independent buckets:
+
+- **Age-rated films/series and channels**: classified only when an explicit M3U rating such as `TV-MA`, `NC-17`, or `18+` is supplied.
+- **Explicit adult channels**: classified from explicit category labels, not from ordinary `Movies` or `Series` group names.
+
+The section is protected by a user-created 4–8 digit PIN. The PIN itself is not stored: the app stores a random salt and a PBKDF2-derived verifier, compares verifiers in constant time, and temporarily blocks further attempts after five incorrect entries. The section can be hidden from navigation and is re-locked when the user leaves it. Adult-classified entries are excluded from ordinary live browsing, search, favorites, and recent-channel lists.
+
+**No free, legally authorized adult M3U source has been approved for RS TV at this time.** IPTV-org's public catalogue does not provide adult playlists, and public availability of an M3U URL is not evidence of the broadcaster's permission to redistribute or stream its content. Detected adult entries from an imported playlist are therefore shown only as unapproved candidates; playback is blocked. No anonymous, pirated, DRM-bypassing, or subscription-only source is added. A future source must have an official operator identity and clear evidence permitting free playback in the app's intended territories.
+
+The PIN is a local parental-access gate, not age verification or a substitute for device-level parental controls.
