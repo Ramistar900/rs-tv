@@ -37,7 +37,35 @@ internal object RemotePlaylistSources {
         "doubo-turkey",
         "iptv-org-world",
         "iptv-org-arab",
-        "iptv-org-turkey"
+        "iptv-org-turkey",
+        "iptv-org-europe",
+        "iptv-org-western-europe",
+        "iptv-org-east-asia",
+        "iptv-org-north-america",
+        "iptv-org-south-america",
+        "iptv-org-latin-america",
+        "iptv-org-us",
+        "iptv-org-ca",
+        "iptv-org-cn",
+        "iptv-org-jp",
+        "iptv-org-kr",
+        "iptv-org-ru",
+        "iptv-org-br",
+        "iptv-org-ar",
+        "iptv-org-cl",
+        "iptv-org-co",
+        "iptv-org-mx",
+        "iptv-org-pe",
+        "iptv-org-uk",
+        "iptv-org-de",
+        "iptv-org-fr",
+        "iptv-org-it",
+        "iptv-org-es",
+        "iptv-org-pt",
+        "iptv-org-pl",
+        "iptv-org-nl",
+        "iptv-org-se",
+        "iptv-org-no"
     )
 
     val playlists = listOf(
@@ -343,6 +371,202 @@ internal object RemotePlaylistSources {
             name = "IPTV-org — فهرس القنوات حسب المنطقة",
             description = "القائمة العالمية نفسها مرتبة حسب المناطق الجغرافية؛ هذا تنظيم إضافي وليس مصدراً مستقلاً لزيادة العدد الفريد.",
             playlistUrl = "https://iptv-org.github.io/iptv/index.region.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-europe",
+            name = "IPTV-org — أوروبا",
+            description = "قنوات الدول الأوروبية ضمن فهرس IPTV-org. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/regions/eur.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-western-europe",
+            name = "IPTV-org — أوروبا الغربية",
+            description = "قنوات أوروبا الغربية. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/regions/wer.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-east-asia",
+            name = "IPTV-org — شرق آسيا",
+            description = "قنوات شرق آسيا، مع تغطية الصين واليابان وكوريا بحسب بيانات الفهرس. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/regions/eas.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-north-america",
+            name = "IPTV-org — أمريكا الشمالية",
+            description = "قنوات أمريكا الشمالية، بما فيها الولايات المتحدة وكندا بحسب بيانات الفهرس. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/regions/noram.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-south-america",
+            name = "IPTV-org — أمريكا الجنوبية",
+            description = "قنوات دول أمريكا الجنوبية. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/regions/southam.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-latin-america",
+            name = "IPTV-org — أمريكا اللاتينية",
+            description = "قنوات أمريكا اللاتينية والكاريبي ضمن الفهرس. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/regions/latam.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-us",
+            name = "IPTV-org — الولايات المتحدة الأمريكية",
+            description = "قنوات مصنفة للولايات المتحدة. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/us.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-ca",
+            name = "IPTV-org — كندا",
+            description = "قنوات مصنفة لكندا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/ca.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-cn",
+            name = "IPTV-org — الصين",
+            description = "قنوات مصنفة للصين. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/cn.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-jp",
+            name = "IPTV-org — اليابان",
+            description = "قنوات مصنفة لليابان. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/jp.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-kr",
+            name = "IPTV-org — كوريا الجنوبية",
+            description = "قنوات مصنفة لكوريا الجنوبية. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/kr.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-ru",
+            name = "IPTV-org — روسيا",
+            description = "قنوات مصنفة لروسيا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/ru.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-br",
+            name = "IPTV-org — البرازيل",
+            description = "قنوات مصنفة للبرازيل. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/br.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-ar",
+            name = "IPTV-org — الأرجنتين",
+            description = "قنوات مصنفة للأرجنتين. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/ar.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-cl",
+            name = "IPTV-org — تشيلي",
+            description = "قنوات مصنفة لتشيلي. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/cl.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-co",
+            name = "IPTV-org — كولومبيا",
+            description = "قنوات مصنفة لكولومبيا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/co.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-mx",
+            name = "IPTV-org — المكسيك",
+            description = "قنوات مصنفة للمكسيك. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/mx.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-pe",
+            name = "IPTV-org — بيرو",
+            description = "قنوات مصنفة لبيرو. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/pe.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-uk",
+            name = "IPTV-org — المملكة المتحدة",
+            description = "قنوات مصنفة للمملكة المتحدة. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/uk.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-de",
+            name = "IPTV-org — ألمانيا",
+            description = "قنوات مصنفة لألمانيا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/de.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-fr",
+            name = "IPTV-org — فرنسا",
+            description = "قنوات مصنفة لفرنسا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/fr.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-it",
+            name = "IPTV-org — إيطاليا",
+            description = "قنوات مصنفة لإيطاليا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/it.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-es",
+            name = "IPTV-org — إسبانيا",
+            description = "قنوات مصنفة لإسبانيا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/es.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-pt",
+            name = "IPTV-org — البرتغال",
+            description = "قنوات مصنفة للبرتغال. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/pt.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-pl",
+            name = "IPTV-org — بولندا",
+            description = "قنوات مصنفة لبولندا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/pl.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-nl",
+            name = "IPTV-org — هولندا",
+            description = "قنوات مصنفة لهولندا. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/nl.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-se",
+            name = "IPTV-org — السويد",
+            description = "قنوات مصنفة للسويد. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/se.m3u",
+            provider = "iptv-org/iptv"
+        ),
+        RemotePlaylistSource(
+            id = "iptv-org-no",
+            name = "IPTV-org — النرويج",
+            description = "قنوات مصنفة للنرويج. القنوات تُنزّل كحزمة فقط وتظهر لاحقاً في صفحة البث المباشر؛ توفر الرابط لا يثبت الحقوق أو استمرار التشغيل.",
+            playlistUrl = "https://iptv-org.github.io/iptv/countries/no.m3u",
             provider = "iptv-org/iptv"
         )
     )
