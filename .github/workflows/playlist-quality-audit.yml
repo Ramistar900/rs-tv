@@ -22,7 +22,7 @@ on:
       - ".github/workflows/playlist-quality-audit.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: rs-tv-playlist-quality-audit
@@ -30,7 +30,10 @@ concurrency:
 
 jobs:
   audit:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 45
     steps:
       - name: Check out source
@@ -131,29 +134,14 @@ jobs:
           PY
 
 
-      - name: Persist health state
+      - name: Upload stream health state for the persistence job
         if: github.event_name != 'pull_request'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add catalog/generated/stream-health.json
-          if git diff --cached --quiet; then
-            echo "No stream health state changes to commit"
-          else
-            git commit -m "chore: refresh IPTV stream health state"
-            # Other scheduled catalogue workflows may update main in parallel.
-            # Rebase this state-only commit onto the latest main before pushing.
-            for attempt in 1 2 3; do
-              git fetch origin main
-              git rebase origin/main
-              if git push origin HEAD:main; then
-                exit 0
-              fi
-              echo "Push attempt $attempt failed; retrying against the latest main"
-            done
-            echo "Unable to persist health state after three rebase attempts"
-            exit 1
-          fi
+        uses: actions/upload-artifact@v4
+        with:
+          name: rs-tv-stream-health-state
+          path: catalog/generated/stream-health.json
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Upload quality reports
         if: github.event_name != 'pull_request'
@@ -167,3 +155,54 @@ jobs:
             channel-health-report.json
             catalog/generated/stream-health.json
           retention-days: 14
+
+  persist-health-state:
+    if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    needs: audit
+    name: Persist generated health state with write permission
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out trusted main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download generated stream health state
+        uses: actions/download-artifact@v4
+        with:
+          name: rs-tv-stream-health-state
+          path: state-artifact
+
+      - name: Commit updated health state
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATE_FILE="$(find state-artifact -type f -name 'stream-health.json' -print -quit)"
+          if [ -z "$STATE_FILE" ]; then
+            echo "::error::Generated stream-health.json artifact was not found"
+            exit 1
+          fi
+          mkdir -p catalog/generated
+          cp "$STATE_FILE" catalog/generated/stream-health.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/generated/stream-health.json
+          if git diff --cached --quiet; then
+            echo "No stream health state changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: refresh IPTV stream health state"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push attempt $attempt failed; retrying against the latest main"
+          done
+          echo "::error::Unable to persist health state after three attempts"
+          exit 1
