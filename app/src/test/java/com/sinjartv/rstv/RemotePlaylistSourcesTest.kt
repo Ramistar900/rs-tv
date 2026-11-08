@@ -121,7 +121,13 @@ class RemotePlaylistSourcesTest {
         )
 
         assertTrue(featured.all { it in ids })
-        assertTrue(featured.all { it in RemotePlaylistSources.worldLibraryBundleIds })
+        val quickBundle = RemotePlaylistSources.worldLibraryBundleIds.toSet()
+        assertTrue(quickBundle.all { it in ids })
+        assertTrue("doubo-world" in quickBundle)
+        assertTrue("iptv-org-world" in quickBundle)
+        assertTrue("iptv-org-arab" in quickBundle)
+        assertTrue("iptv-org-turkey" in quickBundle)
+        assertTrue(quickBundle.size < featured.size)
     }
 
     @Test
