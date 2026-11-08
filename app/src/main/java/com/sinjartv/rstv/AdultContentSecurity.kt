@@ -57,7 +57,8 @@ internal object AdultAccessStore {
 
     fun setPin(context: Context, pin: String) {
         require(pin.matches(Regex("\\d{4,8}"))) { "رمز PIN يجب أن يتكون من 4 إلى 8 أرقام" }
-        val salt = ByteArray(16).also(SecureRandom()::nextBytes)
+        val secureRandom = SecureRandom()
+        val salt = ByteArray(16).also { secureRandom.nextBytes(it) }
         val hash = derive(pin, salt)
         prefs(context).edit()
             .putString(SALT_KEY, Base64.encodeToString(salt, Base64.NO_WRAP))
@@ -74,7 +75,7 @@ internal object AdultAccessStore {
 
         val salt = decode(preferences.getString(SALT_KEY, null)) ?: return false
         val expected = decode(preferences.getString(HASH_KEY, null)) ?: return false
-        if (pin.length !in 4..8 || !pin.all(Char::isDigit)) return false
+        if (pin.length !in 4..8 || !pin.all { it.isDigit() }) return false
 
         val matches = MessageDigest.isEqual(expected, derive(pin, salt))
         if (matches) {
