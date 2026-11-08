@@ -107,6 +107,22 @@ class M3uPlaylistParserTest {
     }
 
     @Test
+    fun duplicateStreamRetainsMostRestrictiveAdultClassification() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1 group-title="News",Regular entry
+            https://cdn.example/shared.m3u8
+            #EXTINF:-1 group-title="XXX",Restricted duplicate
+            https://cdn.example/shared.m3u8
+        """.trimIndent()
+
+        val channel = M3uPlaylistParser.parse(playlist).channels.single()
+
+        assertEquals("Restricted duplicate", channel.name)
+        assertEquals(AdultContentType.EXPLICIT, AdultContentPolicy.classify(channel))
+    }
+
+    @Test
     fun rejectsFilesWithoutM3uHeader() {
         val result = M3uPlaylistParser.parse("https://cdn.example/live.m3u8")
 
