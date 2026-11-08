@@ -37,6 +37,11 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            // Keep the experimental build installable beside the production app.
+            applicationIdSuffix = ".test"
+            versionNameSuffix = "-test"
+        }
         getByName("release") {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
