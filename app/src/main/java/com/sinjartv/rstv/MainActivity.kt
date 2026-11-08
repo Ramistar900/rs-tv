@@ -649,7 +649,7 @@ private fun RSTVHome() {
                     OutlinedTextField(
                         value = adultPinEntry,
                         onValueChange = { value ->
-                            adultPinEntry = value.filter(Char::isDigit).take(8)
+                            adultPinEntry = value.filter { it.isDigit() }.take(8)
                             adultPinError = ""
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -661,7 +661,7 @@ private fun RSTVHome() {
                         OutlinedTextField(
                             value = adultPinConfirmation,
                             onValueChange = { value ->
-                                adultPinConfirmation = value.filter(Char::isDigit).take(8)
+                                adultPinConfirmation = value.filter { it.isDigit() }.take(8)
                                 adultPinError = ""
                             },
                             modifier = Modifier.fillMaxWidth(),
