@@ -1297,7 +1297,7 @@ private fun LiveContent(
                         }
                     }
                 }
-                TextButton(onClick = { channelTableQuery = ""; showChannelTable = true }) {
+                TextButton(onClick = { showChannelTable = true }) {
                     Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
                 }
             }
