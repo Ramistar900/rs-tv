@@ -240,8 +240,13 @@ private fun RSTVHome() {
         val hidden = !adultSectionHidden
         AdultAccessStore.setSectionHidden(context, hidden)
         adultSectionHidden = hidden
-        adultAccessGranted = false
-        if (hidden) selectedTab = RSTVTab.HOME
+        if (hidden) {
+            adultAccessGranted = false
+            selectedTab = RSTVTab.HOME
+        } else {
+            adultAccessGranted = true
+            selectedTab = RSTVTab.ADULT
+        }
     }
 
     DisposableEffect(isFullscreenPlayer, activity) {
@@ -698,6 +703,11 @@ private fun RSTVHome() {
             titleContentColor = SoftWhite,
             textContentColor = MutedText
         )
+    }
+
+    BackHandler(enabled = selectedTab == RSTVTab.ADULT) {
+        adultAccessGranted = false
+        selectedTab = RSTVTab.HOME
     }
 
     Surface(
