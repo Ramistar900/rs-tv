@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.outlined.Public
@@ -97,6 +99,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -139,12 +142,15 @@ private enum class RSTVTab(
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
+    ADULT("+18 للكبار", Icons.Outlined.Lock),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
 }
 
 private val primaryNavigationTabs = listOf(
     RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES, RSTVTab.WORLD
 )
+
+private enum class AdultPinMode { SETUP, VERIFY }
 
 private enum class ClearAction(val title: String, val message: String) {
     PLAYLIST("حذف القائمة المحفوظة", "سيتم حذف قائمة القنوات المحلية من هذا الجهاز."),
@@ -205,8 +211,38 @@ private fun RSTVHome() {
     var favouriteRevision by remember { mutableIntStateOf(0) }
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
     var isFullscreenPlayer by remember { mutableStateOf(false) }
+    var adultAccessGranted by remember { mutableStateOf(false) }
+    var adultSectionHidden by remember { mutableStateOf(AdultAccessStore.isSectionHidden(context)) }
+    var adultPinMode by remember { mutableStateOf<AdultPinMode?>(null) }
+    var adultPinEntry by remember { mutableStateOf("") }
+    var adultPinConfirmation by remember { mutableStateOf("") }
+    var adultPinError by remember { mutableStateOf("") }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
     val exoPlayer = player
+
+    fun requestAdultAccess() {
+        adultPinEntry = ""
+        adultPinConfirmation = ""
+        adultPinError = ""
+        adultPinMode = if (AdultAccessStore.hasPin(context)) AdultPinMode.VERIFY else AdultPinMode.SETUP
+    }
+
+    fun navigateToTab(tab: RSTVTab) {
+        if (tab == RSTVTab.ADULT) {
+            if (adultAccessGranted) selectedTab = RSTVTab.ADULT else requestAdultAccess()
+            return
+        }
+        adultAccessGranted = false
+        selectedTab = tab
+    }
+
+    fun hideOrShowAdultSection() {
+        val hidden = !adultSectionHidden
+        AdultAccessStore.setSectionHidden(context, hidden)
+        adultSectionHidden = hidden
+        adultAccessGranted = false
+        if (hidden) selectedTab = RSTVTab.HOME
+    }
 
     DisposableEffect(isFullscreenPlayer, activity) {
         val window = activity?.window
@@ -481,7 +517,12 @@ private fun RSTVHome() {
 
 
     fun playChannel(channel: RSTVChannel) {
-        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels).toList()
+        if (AdultContentPolicy.isAdult(channel)) {
+            status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
+            return
+        }
+        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels)
+            .filterNot(AdultContentPolicy::isAdult)
         val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
         val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
@@ -509,15 +550,19 @@ private fun RSTVHome() {
         LocalLibraryStore.favoriteStreams(context)
     }
     val allKnownChannels = (channels + sourceLibraryChannels).distinctBy { it.streamUrl }
-    val favoriteChannels = allKnownChannels.filter { it.streamUrl in favoriteUrls }
+    val adultChannels = allKnownChannels.filter(AdultContentPolicy::isAdult)
+    val regularChannels = channels.filterNot(AdultContentPolicy::isAdult)
+    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot(AdultContentPolicy::isAdult)
+    val favoriteChannels = allKnownChannels.filterNot(AdultContentPolicy::isAdult)
+        .filter { it.streamUrl in favoriteUrls }
     val recentChannels = LocalLibraryStore.history(context)
-        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url } }
-    val visibleChannels = channels.filter { channel ->
+        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url && !AdultContentPolicy.isAdult(it) } }
+    val visibleChannels = regularChannels.filter { channel ->
         searchQuery.isBlank() ||
             channel.name.contains(searchQuery, ignoreCase = true) ||
             channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
     }
-    val visibleSourceLibraryChannels = sourceLibraryChannels.filter { channel ->
+    val visibleSourceLibraryChannels = regularSourceLibraryChannels.filter { channel ->
         searchQuery.isBlank() ||
             channel.name.contains(searchQuery, ignoreCase = true) ||
             channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
