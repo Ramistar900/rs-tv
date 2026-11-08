@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material.icons.outlined.Public
@@ -97,6 +99,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -139,12 +142,15 @@ private enum class RSTVTab(
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
+    ADULT("+18 للكبار", Icons.Outlined.Lock),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
 }
 
 private val primaryNavigationTabs = listOf(
     RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES, RSTVTab.WORLD
 )
+
+private enum class AdultPinMode { SETUP, VERIFY }
 
 private enum class ClearAction(val title: String, val message: String) {
     PLAYLIST("حذف القائمة المحفوظة", "سيتم حذف قائمة القنوات المحلية من هذا الجهاز."),
@@ -205,8 +211,52 @@ private fun RSTVHome() {
     var favouriteRevision by remember { mutableIntStateOf(0) }
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
     var isFullscreenPlayer by remember { mutableStateOf(false) }
+    var adultAccessGranted by remember { mutableStateOf(false) }
+    var adultSectionHidden by remember { mutableStateOf(AdultAccessStore.isSectionHidden(context)) }
+    var adultPinMode by remember { mutableStateOf<AdultPinMode?>(null) }
+    var adultPinEntry by remember { mutableStateOf("") }
+    var adultPinConfirmation by remember { mutableStateOf("") }
+    var adultPinError by remember { mutableStateOf("") }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
     val exoPlayer = player
+
+    fun requestAdultAccess() {
+        adultPinEntry = ""
+        adultPinConfirmation = ""
+        adultPinError = ""
+        adultPinMode = if (AdultAccessStore.hasPin(context)) AdultPinMode.VERIFY else AdultPinMode.SETUP
+    }
+
+    fun navigateToTab(tab: RSTVTab) {
+        if (tab == RSTVTab.ADULT) {
+            if (adultAccessGranted) selectedTab = RSTVTab.ADULT else requestAdultAccess()
+            return
+        }
+        adultAccessGranted = false
+        selectedTab = tab
+    }
+
+    fun hideOrShowAdultSection() {
+        val hidden = !adultSectionHidden
+        AdultAccessStore.setSectionHidden(context, hidden)
+        adultSectionHidden = hidden
+        if (hidden) {
+            adultAccessGranted = false
+            selectedTab = RSTVTab.HOME
+        } else {
+            adultAccessGranted = true
+            selectedTab = RSTVTab.ADULT
+        }
+    }
+
+    fun isRestrictedAdultChannel(channel: RSTVChannel): Boolean {
+        val targetKey = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
+        return AdultContentPolicy.isAdult(channel) ||
+            (channels + sourceLibraryChannels).any { candidate ->
+                AdultContentPolicy.isAdult(candidate) &&
+                    RemotePlaylistMerger.canonicalStreamKey(candidate.streamUrl, candidate.httpHeaders) == targetKey
+            }
+    }
 
     DisposableEffect(isFullscreenPlayer, activity) {
         val window = activity?.window
@@ -481,7 +531,12 @@ private fun RSTVHome() {
 
 
     fun playChannel(channel: RSTVChannel) {
-        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels).toList()
+        if (isRestrictedAdultChannel(channel)) {
+            status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
+            return
+        }
+        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels)
+            .filterNot(::isRestrictedAdultChannel)
         val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
         val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
@@ -501,6 +556,7 @@ private fun RSTVHome() {
     }
 
     fun toggleFavourite(channel: RSTVChannel) {
+        if (isRestrictedAdultChannel(channel)) return
         LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
         favouriteRevision++
     }
@@ -508,16 +564,33 @@ private fun RSTVHome() {
     val favoriteUrls = remember(favouriteRevision) {
         LocalLibraryStore.favoriteStreams(context)
     }
-    val allKnownChannels = (channels + sourceLibraryChannels).distinctBy { it.streamUrl }
-    val favoriteChannels = allKnownChannels.filter { it.streamUrl in favoriteUrls }
+    val combinedChannels = channels + sourceLibraryChannels
+    val allKnownChannels = combinedChannels
+        .groupBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
+        .values
+        .map { candidates ->
+            candidates.firstOrNull(AdultContentPolicy::isAdult) ?: candidates.first()
+        }
+    val adultStreamKeys = allKnownChannels.filter(AdultContentPolicy::isAdult)
+        .map { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
+        .toSet()
+    val adultChannels = allKnownChannels.filter(AdultContentPolicy::isAdult)
+    val regularChannels = channels.filterNot {
+        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
+    }
+    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot {
+        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
+    }
+    val favoriteChannels = allKnownChannels.filterNot(AdultContentPolicy::isAdult)
+        .filter { it.streamUrl in favoriteUrls }
     val recentChannels = LocalLibraryStore.history(context)
-        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url } }
-    val visibleChannels = channels.filter { channel ->
+        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url && !AdultContentPolicy.isAdult(it) } }
+    val visibleChannels = regularChannels.filter { channel ->
         searchQuery.isBlank() ||
             channel.name.contains(searchQuery, ignoreCase = true) ||
             channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
     }
-    val visibleSourceLibraryChannels = sourceLibraryChannels.filter { channel ->
+    val visibleSourceLibraryChannels = regularSourceLibraryChannels.filter { channel ->
         searchQuery.isBlank() ||
             channel.name.contains(searchQuery, ignoreCase = true) ||
             channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
@@ -568,6 +641,98 @@ private fun RSTVHome() {
         )
     }
 
+    adultPinMode?.let { mode ->
+        AlertDialog(
+            onDismissRequest = { adultPinMode = null },
+            title = {
+                Text(
+                    if (mode == AdultPinMode.SETUP) "إنشاء رمز حماية +18"
+                    else "إدخال رمز حماية +18"
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        if (mode == AdultPinMode.SETUP)
+                            "أنشئ رمزاً من 4 إلى 8 أرقام. لن يُحفظ الرمز نفسه، بل بصمة مشتقة ومملّحة."
+                        else
+                            "أدخل رمز PIN لفتح قسم المحتوى المصنّف للكبار.",
+                        color = MutedText,
+                        fontSize = 12.sp
+                    )
+                    OutlinedTextField(
+                        value = adultPinEntry,
+                        onValueChange = { value ->
+                            adultPinEntry = value.filter { it.isDigit() }.take(8)
+                            adultPinError = ""
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("رمز PIN") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (mode == AdultPinMode.SETUP) {
+                        OutlinedTextField(
+                            value = adultPinConfirmation,
+                            onValueChange = { value ->
+                                adultPinConfirmation = value.filter { it.isDigit() }.take(8)
+                                adultPinError = ""
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("تأكيد الرمز") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                        )
+                    }
+                    if (adultPinError.isNotBlank()) {
+                        Text(adultPinError, color = Color(0xFFFF8A80), fontSize = 11.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (mode == AdultPinMode.SETUP) {
+                        when {
+                            adultPinEntry.length !in 4..8 ->
+                                adultPinError = "اختر رمزاً من 4 إلى 8 أرقام."
+                            adultPinEntry != adultPinConfirmation ->
+                                adultPinError = "الرمزان غير متطابقين."
+                            else -> {
+                                AdultAccessStore.setPin(context, adultPinEntry)
+                                adultAccessGranted = true
+                                selectedTab = RSTVTab.ADULT
+                                adultPinMode = null
+                                adultPinEntry = ""
+                                adultPinConfirmation = ""
+                            }
+                        }
+                    } else if (AdultAccessStore.verifyPin(context, adultPinEntry)) {
+                        adultAccessGranted = true
+                        selectedTab = RSTVTab.ADULT
+                        adultPinMode = null
+                        adultPinEntry = ""
+                    } else {
+                        adultPinEntry = ""
+                        adultPinError = "الرمز غير صحيح أو أن المحاولات موقوفة مؤقتاً."
+                    }
+                }) {
+                    Text(if (mode == AdultPinMode.SETUP) "حفظ وفتح القسم" else "فتح القسم", color = AccentRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { adultPinMode = null }) { Text("إلغاء") }
+            },
+            containerColor = PanelRaised,
+            titleContentColor = SoftWhite,
+            textContentColor = MutedText
+        )
+    }
+
+    BackHandler(enabled = selectedTab == RSTVTab.ADULT) {
+        adultAccessGranted = false
+        selectedTab = RSTVTab.HOME
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = ScreenBlack,
@@ -579,6 +744,10 @@ private fun RSTVHome() {
                 ScreenBody(
                     tab = selectedTab,
                     worldChannels = worldChannels,
+                    adultChannels = adultChannels,
+                    isAdultSectionHidden = adultSectionHidden,
+                    onHideAdultSection = ::hideOrShowAdultSection,
+                    onManageAdult = ::requestAdultAccess,
                     worldCatalogStatus = worldCatalogStatus,
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
@@ -613,7 +782,7 @@ private fun RSTVHome() {
                         searchQuery = ""
                         status = "تمت العودة إلى قائمة المستخدم المحلية"
                     },
-                    onNavigate = { selectedTab = it },
+                    onNavigate = ::navigateToTab,
                     onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                     onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
                     onClear = { pendingClear = it },
@@ -634,10 +803,10 @@ private fun RSTVHome() {
                             }
                         }
                     ) {
-                        primaryNavigationTabs.forEach { tab ->
+                        (if (adultSectionHidden) primaryNavigationTabs else primaryNavigationTabs + RSTVTab.ADULT).forEach { tab ->
                             NavigationRailItem(
                                 selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
+                                onClick = { navigateToTab(tab) },
                                 icon = { Icon(tab.icon, contentDescription = tab.title) },
                                 label = { Text(tab.title, fontSize = 10.sp) },
                                 alwaysShowLabel = true
@@ -649,11 +818,15 @@ private fun RSTVHome() {
                     ) {
                         TopHeader(
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
-                            channelCount = channels.size
+                            channelCount = regularChannels.size
                         )
                         ScreenBody(
                             tab = selectedTab,
                             worldChannels = worldChannels,
+                            adultChannels = adultChannels,
+                            isAdultSectionHidden = adultSectionHidden,
+                            onHideAdultSection = ::hideOrShowAdultSection,
+                            onManageAdult = ::requestAdultAccess,
                             worldCatalogStatus = worldCatalogStatus,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
@@ -688,7 +861,7 @@ private fun RSTVHome() {
                                 searchQuery = ""
                                 status = "تمت العودة إلى قائمة المستخدم المحلية"
                             },
-                            onNavigate = { selectedTab = it },
+                            onNavigate = ::navigateToTab,
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                             onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
                             onClear = { pendingClear = it },
@@ -703,11 +876,15 @@ private fun RSTVHome() {
                     ) {
                         TopHeader(
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
-                            channelCount = channels.size
+                            channelCount = regularChannels.size
                         )
                         ScreenBody(
                             tab = selectedTab,
                             worldChannels = worldChannels,
+                            adultChannels = adultChannels,
+                            isAdultSectionHidden = adultSectionHidden,
+                            onHideAdultSection = ::hideOrShowAdultSection,
+                            onManageAdult = ::requestAdultAccess,
                             worldCatalogStatus = worldCatalogStatus,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
@@ -742,7 +919,7 @@ private fun RSTVHome() {
                                 searchQuery = ""
                                 status = "تمت العودة إلى قائمة المستخدم المحلية"
                             },
-                            onNavigate = { selectedTab = it },
+                            onNavigate = ::navigateToTab,
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
                             onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
                             onClear = { pendingClear = it },
@@ -753,10 +930,10 @@ private fun RSTVHome() {
                         containerColor = PanelBlack,
                         contentColor = SoftWhite
                     ) {
-                        primaryNavigationTabs.forEach { tab ->
+                        (if (adultSectionHidden) primaryNavigationTabs else primaryNavigationTabs + RSTVTab.ADULT).forEach { tab ->
                             NavigationBarItem(
                                 selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
+                                onClick = { navigateToTab(tab) },
                                 icon = { Icon(tab.icon, contentDescription = tab.title) },
                                 label = { Text(tab.title, fontSize = 9.sp) },
                                 alwaysShowLabel = true
@@ -834,6 +1011,10 @@ private fun TopHeader(
 private fun ScreenBody(
     tab: RSTVTab,
     worldChannels: List<WorldChannelCandidate>,
+    adultChannels: List<RSTVChannel>,
+    isAdultSectionHidden: Boolean,
+    onHideAdultSection: () -> Unit,
+    onManageAdult: () -> Unit,
     worldCatalogStatus: String,
     remotePlaylistStatus: String,
     sourceLibraryStatus: String,
@@ -896,6 +1077,12 @@ private fun ScreenBody(
         )
         RSTVTab.YOUTUBE -> YouTubeLiveContent(modifier = modifier)
         RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
+        RSTVTab.ADULT -> AdultContentContent(
+            channels = adultChannels,
+            isSectionHidden = isAdultSectionHidden,
+            onToggleHidden = onHideAdultSection,
+            modifier = modifier
+        )
         RSTVTab.LIVE -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
@@ -934,6 +1121,7 @@ private fun ScreenBody(
             onImportPlaylist = onImportPlaylist,
             onImportGuide = onImportGuide,
             onClear = onClear,
+            onManageAdult = onManageAdult,
             modifier = modifier
         )
     }
@@ -2250,11 +2438,114 @@ private fun ProgrammeCard(programme: GuideProgramme) {
 }
 
 @Composable
+private fun AdultContentContent(
+    channels: List<RSTVChannel>,
+    isSectionHidden: Boolean,
+    onToggleHidden: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ageRatedChannels = channels.filter { AdultContentPolicy.classify(it) == AdultContentType.AGE_RATED }
+    val explicitChannels = channels.filter { AdultContentPolicy.classify(it) == AdultContentType.EXPLICIT }
+
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("+18 للكبار فقط", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+            Text(
+                "قسم منفصل لا يظهر في البحث أو المفضلة أو قوائم البث العادية. يلزم رمز PIN للدخول.",
+                color = MutedText,
+                fontSize = 12.sp
+            )
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = PanelRaised),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("تنبيه الترخيص", color = Silver, fontWeight = FontWeight.Bold)
+                    Text(
+                        "لا توجد حالياً حزمة IPTV مجانية ثبت أنها تملك إذناً واضحاً لبث محتوى +18. القنوات المكتشفة في قوائم M3U تبقى محجوبة ولا تعمل حتى مراجعة حقوق مصدرها. لن نستخدم روابط مسروقة أو قوائم مجهولة.",
+                        color = MutedText,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+        item {
+            Text("أفلام ومسلسلات بتصنيف عمري 18+", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text("يُعتمد التصنيف فقط عند وجود بيانات عمرية صريحة مثل TV-MA أو NC-17 أو 18+.", color = MutedText, fontSize = 11.sp)
+        }
+        if (ageRatedChannels.isEmpty()) {
+            item {
+                EmptyState("لا توجد قنوات معتمدة بعد", "لم يتم العثور على قناة ذات تصنيف عمري 18+ من مصدر تمت مراجعته.")
+            }
+        } else {
+            items(ageRatedChannels, key = { it.streamUrl }) { channel ->
+                AdultCandidateCard(channel, "تصنيف عمري 18+")
+            }
+        }
+        item {
+            Text("قنوات ذات محتوى صريح للبالغين", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text("هذه الفئة منفصلة تماماً عن الأفلام والمسلسلات المصنّفة عمرياً.", color = MutedText, fontSize = 11.sp)
+        }
+        if (explicitChannels.isEmpty()) {
+            item {
+                EmptyState("لا توجد مصادر قانونية معتمدة", "لن نضيف قناة صريحة إلا من مشغّل رسمي يثبت السماح بالبث المجاني.")
+            }
+        } else {
+            items(explicitChannels, key = { it.streamUrl }) { channel ->
+                AdultCandidateCard(channel, "محتوى صريح — محجوب للمراجعة")
+            }
+        }
+        item {
+            Button(
+                onClick = onToggleHidden,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (isSectionHidden) "إظهار +18 في القائمة" else "إخفاء +18 من القائمة")
+            }
+        }
+        item {
+            Text(
+                "إخفاء القسم يمنع ظهوره في شريط التنقل. يمكن إدارته مجدداً من بطاقة «إدارة قسم +18» في الرئيسية، بعد إدخال PIN.",
+                color = MutedText,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdultCandidateCard(channel: RSTVChannel, label: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = PanelBlack),
+        shape = RoundedCornerShape(13.dp)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(channel.name, color = SoftWhite, fontWeight = FontWeight.Bold)
+            Text(label, color = Silver, fontSize = 11.sp)
+            Text(
+                "المصدر: " + (channel.group ?: "قائمة مستوردة") + " • حالة البث: محجوب حتى مراجعة الحقوق",
+                color = MutedText,
+                fontSize = 10.sp
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingsContent(
     status: String,
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
     onClear: (ClearAction) -> Unit,
+    onManageAdult: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -2264,6 +2555,9 @@ private fun SettingsContent(
         item {
             Text("الإعدادات", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text("إدارة مكتبتك المحلية وتجربة التشغيل", color = MutedText, fontSize = 12.sp)
+        }
+        item {
+            SettingsAction("إدارة قسم +18", "حماية القسم برمز PIN وإظهار القسم أو إخفاؤه", onManageAdult)
         }
         item {
             SettingsAction("استيراد / استبدال قائمة M3U", "يتم حفظ القائمة داخل مساحة التطبيق الخاصة", onImportPlaylist)

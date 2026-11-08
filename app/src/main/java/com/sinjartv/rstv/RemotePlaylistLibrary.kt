@@ -55,12 +55,18 @@ internal object RemotePlaylistMerger {
                 if (existing == null) {
                     merged[key] = incoming
                 } else {
+                    val restrictiveMetadata = when {
+                        AdultContentPolicy.isAdult(existing) -> existing
+                        AdultContentPolicy.isAdult(incoming) -> incoming
+                        else -> null
+                    }
                     merged[key] = existing.copy(
-                        name = betterValue(existing.name, incoming.name),
+                        name = restrictiveMetadata?.name ?: betterValue(existing.name, incoming.name),
                         tvgId = existing.tvgId ?: incoming.tvgId,
-                        group = existing.group ?: incoming.group,
+                        group = restrictiveMetadata?.group ?: existing.group ?: incoming.group,
                         logoUrl = existing.logoUrl ?: incoming.logoUrl,
                         country = existing.country?.takeIf(String::isNotBlank) ?: incoming.country,
+                        contentRating = restrictiveMetadata?.contentRating ?: existing.contentRating ?: incoming.contentRating,
                         sourceIds = existing.sourceIds + incoming.sourceIds,
                         sourceNames = existing.sourceNames + incoming.sourceNames,
                         sourceProviders = existing.sourceProviders + incoming.sourceProviders

@@ -27,6 +27,20 @@ class M3uPlaylistParserTest {
     }
 
     @Test
+    fun parsesExplicitContentRatingMetadata() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1 tvg-rating="TV-MA",Mature Drama
+            https://cdn.example/mature.m3u8
+        """.trimIndent()
+
+        val channel = M3uPlaylistParser.parse(playlist).channels.single()
+
+        assertEquals("TV-MA", channel.contentRating)
+        assertEquals(AdultContentType.AGE_RATED, AdultContentPolicy.classify(channel))
+    }
+
+    @Test
     fun rejectsNonHttpsStreamUrls() {
         val playlist = """
             #EXTM3U
@@ -90,6 +104,22 @@ class M3uPlaylistParserTest {
 
         assertEquals(1, result.channels.size)
         assertEquals(1, result.invalidEntries)
+    }
+
+    @Test
+    fun duplicateStreamRetainsMostRestrictiveAdultClassification() {
+        val playlist = """
+            #EXTM3U
+            #EXTINF:-1 group-title="News",Regular entry
+            https://cdn.example/shared.m3u8
+            #EXTINF:-1 group-title="XXX",Restricted duplicate
+            https://cdn.example/shared.m3u8
+        """.trimIndent()
+
+        val channel = M3uPlaylistParser.parse(playlist).channels.single()
+
+        assertEquals("Restricted duplicate", channel.name)
+        assertEquals(AdultContentType.EXPLICIT, AdultContentPolicy.classify(channel))
     }
 
     @Test

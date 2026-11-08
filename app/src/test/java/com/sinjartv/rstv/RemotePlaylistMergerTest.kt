@@ -44,6 +44,38 @@ class RemotePlaylistMergerTest {
     }
 
     @Test
+    fun adultClassificationWinsWhenSourcesDisagreeAboutSameStream() {
+        val regular = RemoteSourceSnapshot(
+            id = "regular",
+            name = "Regular source",
+            provider = "Provider",
+            attribution = null,
+            content = """
+                #EXTM3U
+                #EXTINF:-1 group-title="Movies",Movie Channel
+                https://cdn.example/shared.m3u8
+            """.trimIndent()
+        )
+        val adult = RemoteSourceSnapshot(
+            id = "adult",
+            name = "Adult source",
+            provider = "Provider",
+            attribution = null,
+            content = """
+                #EXTM3U
+                #EXTINF:-1 group-title="XXX",Restricted Channel
+                https://cdn.example/shared.m3u8
+            """.trimIndent()
+        )
+
+        val merged = RemotePlaylistMerger.merge(listOf(regular, adult))
+
+        assertEquals(1, merged.size)
+        assertEquals(AdultContentType.EXPLICIT, AdultContentPolicy.classify(merged.single()))
+        assertEquals("Restricted Channel", merged.single().name)
+    }
+
+    @Test
     fun infersCountryFromCountryPackageWhenPlaylistEntryHasNoCountryTag() {
         val snapshot = RemoteSourceSnapshot(
             id = "iptv-org-jp",

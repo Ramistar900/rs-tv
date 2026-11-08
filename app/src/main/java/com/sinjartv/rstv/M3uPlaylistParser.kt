@@ -9,6 +9,7 @@ internal data class RSTVChannel(
     val group: String?,
     val logoUrl: String?,
     val country: String? = null,
+    val contentRating: String? = null,
     val streamUrl: String,
     val httpHeaders: Map<String, String> = emptyMap(),
     val sourceIds: Set<String> = emptySet(),
@@ -54,11 +55,12 @@ internal object M3uPlaylistParser {
             val group: String?,
             val logoUrl: String?,
             val country: String?,
+            val contentRating: String?,
             val httpHeaders: MutableMap<String, String> = linkedMapOf()
         )
 
         val channels = mutableListOf<RSTVChannel>()
-        val seenEntries = mutableSetOf<String>()
+        val seenEntries = mutableMapOf<String, Int>()
         var pending: PendingChannel? = null
         var skippedUnsafeLinks = 0
         var invalidEntries = 0
@@ -86,7 +88,10 @@ internal object M3uPlaylistParser {
                     tvgId = attributes["tvg-id"]?.takeIf(String::isNotBlank),
                     group = attributes["group-title"]?.takeIf(String::isNotBlank),
                     logoUrl = attributes["tvg-logo"]?.takeIf(String::isNotBlank),
-                    country = attributes["tvg-country"]?.takeIf(String::isNotBlank) ?: attributes["country"]?.takeIf(String::isNotBlank)
+                    country = attributes["tvg-country"]?.takeIf(String::isNotBlank) ?: attributes["country"]?.takeIf(String::isNotBlank),
+                    contentRating = attributes["tvg-rating"]?.takeIf(String::isNotBlank)
+                        ?: attributes["content-rating"]?.takeIf(String::isNotBlank)
+                        ?: attributes["rating"]?.takeIf(String::isNotBlank)
                 )
                 continue
             }
@@ -128,17 +133,25 @@ internal object M3uPlaylistParser {
 
             val headers = channel.httpHeaders.toMap()
             val entryKey = line + headers.toSortedMap().entries.joinToString("|") { "${it.key}=${it.value}" }
-            if (seenEntries.add(entryKey)) {
-                channels += RSTVChannel(
-                    name = channel.name,
-                    tvgId = channel.tvgId,
-                    group = channel.group,
-                    logoUrl = channel.logoUrl,
-                    country = channel.country,
-                    streamUrl = line,
-                    httpHeaders = headers
-                )
+            val parsedChannel = RSTVChannel(
+                name = channel.name,
+                tvgId = channel.tvgId,
+                group = channel.group,
+                logoUrl = channel.logoUrl,
+                country = channel.country,
+                contentRating = channel.contentRating,
+                streamUrl = line,
+                httpHeaders = headers
+            )
+            val existingIndex = seenEntries[entryKey]
+            if (existingIndex == null) {
+                seenEntries[entryKey] = channels.size
+                channels += parsedChannel
             } else {
+                // When duplicate metadata conflicts, retain the more restrictive adult label.
+                if (AdultContentPolicy.isAdult(parsedChannel)) {
+                    channels[existingIndex] = parsedChannel
+                }
                 invalidEntries++
             }
         }

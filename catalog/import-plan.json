@@ -196,5 +196,22 @@
     ],
     "safety": "Sources are discovery/playback entry points, not proof of blanket redistribution rights. The app never downloads video content itself, never follows cross-host or non-HTTPS redirects, rejects insecure/credential-bearing stream URLs and preserves provider attribution. Paid/DRM/conditional-access streams must not be bypassed."
   },
-  "official_broadcaster_web_destinations": "Al Jazeera Arabic and English, CGTN, Euronews, and NASA+ are presented as external official playback pages; they are not extracted into private media URLs."
+  "official_broadcaster_web_destinations": "Al Jazeera Arabic and English, CGTN, Euronews, and NASA+ are presented as external official playback pages; they are not extracted into private media URLs.",
+  "adult_content_policy": {
+    "categories": [
+      "age_rated",
+      "explicit"
+    ],
+    "m3u_rating_fields": [
+      "tvg-rating",
+      "content-rating",
+      "rating"
+    ],
+    "classification": "Only explicit age labels (TV-MA, NC-17, R18, 18+) and clear adult category labels are classified. Generic Movies/Series labels are not adult classifications.",
+    "ordinary_catalogue": "Adult-classified stream URLs are excluded from normal live, search, favourites and recent-channel surfaces, including when duplicate source metadata conflicts.",
+    "playback": "Blocked until a source has passed separate rights review.",
+    "approved_free_m3u_sources": [],
+    "source_policy": "Do not add public, anonymous, pirated, subscription-only, DRM-protected or unclear-rights sources. A free URL is not proof of permission to stream or redistribute.",
+    "access": "PIN-gated local section; salted PBKDF2 verifier, temporary lockout after repeated failures, optional hidden navigation entry."
+  }
 }
