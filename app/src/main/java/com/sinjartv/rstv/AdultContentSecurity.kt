@@ -56,7 +56,7 @@ internal object AdultAccessStore {
     }
 
     fun setPin(context: Context, pin: String) {
-        require(pin.matches(Regex("\d{4,8}"))) { "رمز PIN يجب أن يتكون من 4 إلى 8 أرقام" }
+        require(pin.matches(Regex("\\d{4,8}"))) { "رمز PIN يجب أن يتكون من 4 إلى 8 أرقام" }
         val salt = ByteArray(16).also(SecureRandom()::nextBytes)
         val hash = derive(pin, salt)
         prefs(context).edit()
