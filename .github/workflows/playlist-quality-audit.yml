@@ -168,6 +168,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Download generated stream health state
         uses: actions/download-artifact@v4
