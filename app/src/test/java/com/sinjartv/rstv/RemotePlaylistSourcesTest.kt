@@ -87,6 +87,44 @@ class RemotePlaylistSourcesTest {
     }
 
     @Test
+    fun featuredRegionalAndCountryPackagesCoverRequestedMarkets() {
+        val ids = RemotePlaylistSources.playlists.map { it.id }.toSet()
+        val featured = setOf(
+            "iptv-org-europe",
+            "iptv-org-western-europe",
+            "iptv-org-east-asia",
+            "iptv-org-north-america",
+            "iptv-org-south-america",
+            "iptv-org-latin-america",
+            "iptv-org-us",
+            "iptv-org-ca",
+            "iptv-org-cn",
+            "iptv-org-jp",
+            "iptv-org-kr",
+            "iptv-org-ru",
+            "iptv-org-br",
+            "iptv-org-ar",
+            "iptv-org-cl",
+            "iptv-org-co",
+            "iptv-org-mx",
+            "iptv-org-pe",
+            "iptv-org-uk",
+            "iptv-org-de",
+            "iptv-org-fr",
+            "iptv-org-it",
+            "iptv-org-es",
+            "iptv-org-pt",
+            "iptv-org-pl",
+            "iptv-org-nl",
+            "iptv-org-se",
+            "iptv-org-no"
+        )
+
+        assertTrue(featured.all { it in ids })
+        assertTrue(featured.all { it in RemotePlaylistSources.worldLibraryBundleIds })
+    }
+
+    @Test
     fun groupedIndexesAreExplicitlySameProviderAndPortugueseListHasAttribution() {
         val sources = RemotePlaylistSources.playlists.associateBy { it.id }
         val indexes = listOf(
