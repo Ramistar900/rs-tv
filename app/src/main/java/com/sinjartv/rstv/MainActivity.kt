@@ -1141,6 +1141,61 @@ private fun FeatureCard(
         }
     }
 }
+private val channelCategoryOrder = listOf(
+    "القنوات العربية",
+    "القنوات التركية",
+    "القنوات الإخبارية",
+    "القنوات الرياضية",
+    "الأفلام والمسلسلات",
+    "قنوات الأطفال",
+    "القنوات الدينية",
+    "القنوات العالمية"
+)
+
+private fun normalizedChannelText(value: String): String =
+    value.lowercase(Locale.ROOT)
+        .replace(Regex("[\\u064B-\\u065F\\u0670]"), "")
+        .replace('أ', 'ا')
+        .replace('إ', 'ا')
+        .replace('آ', 'ا')
+        .trim()
+
+private fun channelCategory(channel: RSTVChannel): String {
+    val group = normalizedChannelText(channel.group.orEmpty())
+    val name = normalizedChannelText(channel.name)
+    val country = normalizedChannelText(channel.country.orEmpty())
+    val metadata = "$group $name"
+    fun hasAny(vararg terms: String) = terms.any { normalizedChannelText(it) in metadata }
+
+    return when {
+        hasAny("sports", "sport", "رياضة", "رياضي") -> "القنوات الرياضية"
+        hasAny("news", "اخبار", "اخباري", "نشرات") -> "القنوات الإخبارية"
+        hasAny("movie", "movies", "cinema", "film", "series", "drama", "افلام", "مسلسلات", "سينما", "دراما") ->
+            "الأفلام والمسلسلات"
+        hasAny("kids", "children", "cartoon", "animation", "اطفال", "كرتون", "رسوم متحركة") ->
+            "قنوات الأطفال"
+        hasAny("religion", "religious", "islam", "quran", "christian", "ديني", "اسلام", "قران", "مسيحي", "كنيسة") ->
+            "القنوات الدينية"
+        country in setOf("tr", "tur", "turkey", "turkiye", "تركيا") || "تركيا" in country ->
+            "القنوات التركية"
+        country in setOf("dz", "bh", "km", "dj", "eg", "iq", "jo", "kw", "lb", "ly", "mr", "ma", "om", "ps", "qa", "sa", "so", "sd", "sy", "tn", "ae", "ye") ||
+            listOf("السعود", "سوريا", "مصر", "العراق", "الاردن", "فلسطين", "المغرب", "الجزائر", "تونس", "لبنان", "الامارات", "الكويت", "قطر", "عمان", "اليمن", "البحرين", "ليبيا", "السودان").any { it in country } ||
+            hasAny("arabic", "العربية", "عربي") ->
+            "القنوات العربية"
+        else -> "القنوات العالمية"
+    }
+}
+
+private fun orderedChannelGroups(channels: List<RSTVChannel>): List<Pair<String, List<RSTVChannel>>> {
+    val grouped = channels.groupBy(::channelCategory)
+    return channelCategoryOrder.mapNotNull { category ->
+        grouped[category]
+            ?.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { category to it }
+    }
+}
+
 @Composable
 private fun LiveContent(
     channels: List<RSTVChannel>,
@@ -1290,9 +1345,7 @@ private fun LiveContent(
                     EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
                 }
             } else {
-                val groupedChannels = channels
-                    .groupBy { it.group?.takeIf(String::isNotBlank) ?: "غير مصنّفة" }
-                    .toSortedMap(String.CASE_INSENSITIVE_ORDER)
+                val groupedChannels = orderedChannelGroups(channels)
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1307,7 +1360,7 @@ private fun LiveContent(
                                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                             )
                         }
-                        items(groupChannels.sortedBy { it.name.lowercase(Locale.ROOT) }, key = { it.streamUrl }) { channel ->
+                        items(groupChannels, key = { it.streamUrl }) { channel ->
                             ChannelCard(
                                 channel = channel,
                                 active = selectedChannel?.streamUrl == channel.streamUrl,
@@ -1341,7 +1394,9 @@ private fun LiveContent(
                                 placeholder = { Text("بحث") },
                                 shape = RoundedCornerShape(12.dp)
                             )
-                            val numberedChannels = channels.mapIndexed { index, channel -> (index + 1) to channel }
+                            val numberedChannels = orderedChannelGroups(channels)
+                                .flatMap { it.second }
+                                .mapIndexed { index, channel -> (index + 1) to channel }
                             val filteredChannels = numberedChannels.filter { (_, channel) ->
                                 channelTableQuery.isBlank() || channel.name.contains(channelTableQuery, ignoreCase = true) ||
                                     channel.country.orEmpty().contains(channelTableQuery, ignoreCase = true)
