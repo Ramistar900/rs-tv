@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CloudDownload
@@ -75,6 +77,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1885,9 +1889,28 @@ private fun ChannelCard(
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
+    var focused by remember(channel.streamUrl) { mutableStateOf(false) }
+    val focusScale by animateFloatAsState(
+        targetValue = if (focused) 1.035f else 1f,
+        animationSpec = tween(durationMillis = 150),
+        label = "channelCardFocusScale"
+    )
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = if (active) PanelRaised else PanelBlack),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onPlay)
+            .onFocusChanged { focused = it.isFocused }
+            .graphicsLayer {
+                scaleX = focusScale
+                scaleY = focusScale
+            }
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) AccentRed else Color.Transparent,
+                shape = RoundedCornerShape(14.dp)
+            )
+,
+        colors = CardDefaults.cardColors(containerColor = if (active || focused) PanelRaised else PanelBlack),
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
