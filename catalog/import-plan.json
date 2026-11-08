@@ -143,7 +143,7 @@
   "online_playlist_sources": {
     "mode": "user_initiated_remote_m3u_download",
     "app_file": "app/src/main/java/com/sinjartv/rstv/RemotePlaylistSources.kt",
-    "behavior": "The user selects one source; the app downloads it over HTTPS, parses HTTPS channel stream URLs, saves the playlist locally and replaces the currently active local playlist. The source list is fetched again on next selection; no client background polling is required.",
+    "behavior": "The user selects one source in the IPTV Sources screen; the app downloads it over HTTPS, parses HTTPS channel stream URLs, and saves or refreshes that package in a separate imported-channel library. Source selection never starts playback and never replaces the user playlist. Imported packages are played only from the Live Broadcast screen. The source list is fetched again on next selection; no client background polling is required.",
     "limits": {
       "max_download_bytes": 12582912,
       "connect_timeout_ms": 15000,

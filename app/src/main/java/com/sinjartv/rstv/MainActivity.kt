@@ -77,7 +77,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -104,6 +111,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -351,39 +359,6 @@ private fun RSTVHome() {
         }
     }
 
-    fun loadRemotePlaylist(source: RemotePlaylistSource) {
-        remotePlaylistStatus = "جارٍ جلب ${source.name}..."
-        scope.launch {
-            runCatching {
-                val content = withContext(Dispatchers.IO) {
-                    RemotePlaylistDownloader.download(source)
-                }
-                val parsed = withContext(Dispatchers.Default) {
-                    M3uPlaylistParser.parse(content)
-                }
-                require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
-                require(parsed.channels.isNotEmpty()) {
-                    "لم نجد روابط HTTPS صالحة في هذه القائمة"
-                }
-                withContext(Dispatchers.IO) {
-                    LocalLibraryStore.savePlaylist(context, content)
-                }
-                exoPlayer.stop()
-                exoPlayer.clearMediaItems()
-                selectedChannel = null
-                channels.clear()
-                channels.addAll(parsed.channels)
-                skippedUnsafeLinks = parsed.skippedUnsafeLinks
-                val resultMessage = "تم تحميل ${parsed.channels.size} قناة من ${source.name}. تم استبدال القائمة المحلية السابقة."
-                status = resultMessage
-                remotePlaylistStatus = resultMessage
-                selectedTab = RSTVTab.LIVE
-            }.onFailure { error ->
-                remotePlaylistStatus = "تعذر تحميل ${source.name}: ${error.message ?: "خطأ غير معروف"}"
-            }
-        }
-    }
-
     fun addRemotePlaylistToLibrary(source: RemotePlaylistSource) {
         remotePlaylistStatus = "جارٍ إضافة ${source.name} إلى مكتبة المصادر..."
         scope.launch {
@@ -477,10 +452,7 @@ private fun RSTVHome() {
             sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر و${mergedSources.size} قناة فريدة"
 
             if (imported.isNotEmpty()) {
-                isFullscreenPlayer = false
-                showingSourceLibrary = true
-                selectedTab = RSTVTab.LIVE
-                status = "تم تحديث مكتبة القنوات العالمية دون استبدال قائمتك المحلية"
+                status = "تم تنزيل حزم القنوات العالمية وحفظها في المكتبة. افتح البث المباشر لعرضها وتشغيلها."
             }
 
             remotePlaylistStatus = buildString {
@@ -611,7 +583,6 @@ private fun RSTVHome() {
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
                     sourceLibraryCount = sourceLibraryCount,
-                    onLoadRemotePlaylist = ::loadRemotePlaylist,
                     onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                     onShowSourceLibrary = ::showSourceLibrary,
                     onAddWorldSources = ::addWorldPlaylistsToLibrary,
@@ -687,7 +658,6 @@ private fun RSTVHome() {
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            onLoadRemotePlaylist = ::loadRemotePlaylist,
                             onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
                             onAddWorldSources = ::addWorldPlaylistsToLibrary,
@@ -742,7 +712,6 @@ private fun RSTVHome() {
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            onLoadRemotePlaylist = ::loadRemotePlaylist,
                             onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
                             onAddWorldSources = ::addWorldPlaylistsToLibrary,
@@ -869,7 +838,6 @@ private fun ScreenBody(
     remotePlaylistStatus: String,
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
-    onLoadRemotePlaylist: (RemotePlaylistSource) -> Unit,
     onAddSourceToLibrary: (RemotePlaylistSource) -> Unit,
     onShowSourceLibrary: () -> Unit,
     onAddWorldSources: () -> Unit,
@@ -911,7 +879,6 @@ private fun ScreenBody(
             status = remotePlaylistStatus,
             sourceLibraryStatus = sourceLibraryStatus,
             sourceLibraryCount = sourceLibraryCount,
-            onLoadPlaylist = onLoadRemotePlaylist,
             onAddToLibrary = onAddSourceToLibrary,
             onShowLibrary = onShowSourceLibrary,
             onOpenOfficialUrl = onOpenOfficialUrl,
@@ -1232,9 +1199,35 @@ private fun LiveContent(
     modifier: Modifier = Modifier
 ) {
     var showChannelTable by remember { mutableStateOf(false) }
-    var channelTableQuery by remember { mutableStateOf("") }
-    BackHandler(enabled = isFullscreenPlayer && selectedChannel != null) {
-        onExitFullscreen()
+    val fullscreenFocusRequester = remember { FocusRequester() }
+    val numberedChannels = remember(channels) {
+        orderedChannelGroups(channels)
+            .flatMap { it.second }
+            .distinctBy { it.streamUrl }
+            .mapIndexed { index, channel -> (index + 1) to channel }
+    }
+    val selectedChannelNumber = numberedChannels
+        .firstOrNull { it.second.streamUrl == selectedChannel?.streamUrl }
+        ?.first
+    var showChannelInfo by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isFullscreenPlayer, selectedChannel?.streamUrl) {
+        if (isFullscreenPlayer && selectedChannel != null) {
+            showChannelInfo = true
+            runCatching { fullscreenFocusRequester.requestFocus() }
+            delay(4_500L)
+            showChannelInfo = false
+        } else {
+            showChannelInfo = false
+        }
+    }
+
+    BackHandler(enabled = showChannelTable || (isFullscreenPlayer && selectedChannel != null)) {
+        if (showChannelTable) {
+            showChannelTable = false
+        } else {
+            onExitFullscreen()
+        }
     }
 
     if (isFullscreenPlayer && selectedChannel != null) {
@@ -1257,7 +1250,31 @@ private fun LiveContent(
                     view.keepScreenOn = true
                 }
             )
+            if (showChannelInfo && !showChannelTable) {
+                ReceiverChannelInfoOverlay(
+                    number = selectedChannelNumber,
+                    channel = selectedChannel,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 34.dp)
+                )
+            }
             PlayerWatermark(Modifier.align(Alignment.BottomEnd).padding(18.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusRequester(fullscreenFocusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (
+                            event.type == KeyEventType.KeyDown &&
+                            (event.key == Key.DirectionCenter || event.key == Key.Enter)
+                        ) {
+                            showChannelTable = true
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .clickable { showChannelTable = true }
+            )
         }
     } else {
         Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1280,7 +1297,7 @@ private fun LiveContent(
                         }
                     }
                 }
-                TextButton(onClick = { channelTableQuery = ""; showChannelTable = true }) {
+                TextButton(onClick = { showChannelTable = true }) {
                     Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
                 }
             }
@@ -1388,51 +1405,239 @@ private fun LiveContent(
                     }
                 }
             }
-            if (showChannelTable) {
-                Dialog(
-                    onDismissRequest = { showChannelTable = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+
+        }
+    }
+    if (showChannelTable) {
+        FullscreenChannelSelectorDialog(
+            channels = channels,
+            activeChannel = selectedChannel,
+            onDismiss = { showChannelTable = false },
+            onPlay = { channel ->
+                showChannelTable = false
+                onPlay(channel)
+            }
+        )
+    }
+
+}
+
+
+private val channelCountryLabels = mapOf(
+    "US" to "الولايات المتحدة الأمريكية", "USA" to "الولايات المتحدة الأمريكية",
+    "CA" to "كندا", "CN" to "الصين", "JP" to "اليابان",
+    "KR" to "كوريا الجنوبية", "RU" to "روسيا", "BR" to "البرازيل",
+    "AR" to "الأرجنتين", "CL" to "تشيلي", "CO" to "كولومبيا",
+    "MX" to "المكسيك", "PE" to "بيرو", "UK" to "المملكة المتحدة",
+    "GB" to "المملكة المتحدة", "DE" to "ألمانيا", "FR" to "فرنسا",
+    "IT" to "إيطاليا", "ES" to "إسبانيا", "PT" to "البرتغال",
+    "PL" to "بولندا", "NL" to "هولندا", "SE" to "السويد", "NO" to "النرويج",
+    "TR" to "تركيا"
+)
+
+private fun channelCountryLabel(channel: RSTVChannel): String {
+    val raw = channel.country?.trim().orEmpty()
+    if (raw.isNotBlank()) {
+        val normalized = raw.uppercase(Locale.ROOT)
+        return channelCountryLabels[normalized] ?: raw
+    }
+    return "غير محددة"
+}
+
+@Composable
+private fun ReceiverChannelInfoOverlay(
+    number: Int?,
+    channel: RSTVChannel,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(0.74f).border(
+            1.dp,
+            AccentRed.copy(alpha = 0.58f),
+            RoundedCornerShape(14.dp)
+        ),
+        colors = CardDefaults.cardColors(containerColor = Color(0xE9161B23)),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(15.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(number?.toString() ?: "—", color = AccentRed, fontSize = 24.sp, fontWeight = FontWeight.Black)
+                Text("رقم القناة", color = MutedText, fontSize = 9.sp)
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(channel.name, color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(
+                    "${channelCountryLabel(channel)}  •  ${channel.group?.takeIf(String::isNotBlank) ?: "بث مباشر"}",
+                    color = Silver,
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+                if (channel.sourceNames.isNotEmpty()) {
+                    Text(
+                        "المصدر: ${channel.sourceNames.joinToString("، ")}",
+                        color = MutedText,
+                        fontSize = 9.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+            Text("LIVE", color = AccentRed, fontWeight = FontWeight.Black, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun FullscreenChannelSelectorDialog(
+    channels: List<RSTVChannel>,
+    activeChannel: RSTVChannel?,
+    onDismiss: () -> Unit,
+    onPlay: (RSTVChannel) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    var previewChannel by remember(activeChannel?.streamUrl) { mutableStateOf(activeChannel) }
+    val numberedChannels = remember(channels) {
+        orderedChannelGroups(channels)
+            .flatMap { it.second }
+            .distinctBy { it.streamUrl }
+            .mapIndexed { index, channel -> (index + 1) to channel }
+    }
+    val filteredChannels = numberedChannels.filter { (_, channel) ->
+        query.isBlank() ||
+            channel.name.contains(query, ignoreCase = true) ||
+            channelCountryLabel(channel).contains(query, ignoreCase = true) ||
+            channel.group.orEmpty().contains(query, ignoreCase = true)
+    }
+    val previewEntry = numberedChannels.firstOrNull {
+        it.second.streamUrl == previewChannel?.streamUrl
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f))
+                    .clickable(onClick = onDismiss)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight(0.94f)
+                        .fillMaxWidth(0.78f)
+                        .background(Color(0xE9161B23), RoundedCornerShape(20.dp))
+                        .border(1.dp, AccentRed.copy(alpha = 0.55f), RoundedCornerShape(20.dp))
+                        .padding(14.dp)
+                        .clickable { },
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
                 ) {
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                    Row(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.38f))) {
-                        Column(
-                            modifier = Modifier.fillMaxHeight().fillMaxWidth(0.82f)
-                                .background(Color(0xD9B58A32), RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
-                                .border(1.dp, Color(0xFFE8C875).copy(alpha = 0.75f), RoundedCornerShape(topEnd = 20.dp, bottomEnd = 20.dp))
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = channelTableQuery,
-                                onValueChange = { channelTableQuery = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                placeholder = { Text("بحث") },
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            val numberedChannels = orderedChannelGroups(channels)
-                                .flatMap { it.second }
-                                .mapIndexed { index, channel -> (index + 1) to channel }
-                            val filteredChannels = numberedChannels.filter { (_, channel) ->
-                                channelTableQuery.isBlank() || channel.name.contains(channelTableQuery, ignoreCase = true) ||
-                                    channel.country.orEmpty().contains(channelTableQuery, ignoreCase = true)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("قائمة القنوات", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                            Text("${numberedChannels.size} قناة مرقّمة", color = MutedText, fontSize = 10.sp)
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text("إغلاق", color = Silver)
+                        }
+                    }
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        placeholder = { Text("ابحث عن قناة أو دولة أو تصنيف") },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        items(filteredChannels, key = { it.second.streamUrl }) { (number, channel) ->
+                            val isPreview = channel.streamUrl == previewChannel?.streamUrl
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { if (it.isFocused) previewChannel = channel }
+                                    .clickable { previewChannel = channel }
+                                    .background(
+                                        if (isPreview) Color(0x663B3424) else Color.Transparent,
+                                        RoundedCornerShape(9.dp)
+                                    )
+                                    .border(
+                                        if (isPreview) 1.dp else 0.dp,
+                                        if (isPreview) AccentRed.copy(alpha = 0.8f) else Color.Transparent,
+                                        RoundedCornerShape(9.dp)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            ) {
+                                Text(
+                                    number.toString(),
+                                    color = AccentRed,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.width(38.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(channel.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                    Text(
+                                        channel.group?.takeIf(String::isNotBlank) ?: "قناة",
+                                        color = MutedText,
+                                        fontSize = 9.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                                Text(channelCountryLabel(channel), color = Silver, fontSize = 10.sp, maxLines = 1)
                             }
-                            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                items(filteredChannels, key = { it.second.streamUrl }) { (number, channel) ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().clickable { showChannelTable = false; onPlay(channel) }
-                                            .padding(horizontal = 8.dp, vertical = 11.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(number.toString(), color = Color(0xFFFFF1C8), fontWeight = FontWeight.Bold, modifier = Modifier.width(42.dp))
-                                        Text(channel.name, color = Color(0xFFFFF9E8), modifier = Modifier.weight(1f), maxLines = 1)
-                                        Text(channel.country?.takeIf(String::isNotBlank) ?: "غير محددة", color = Color(0xFFFFE7AD), maxLines = 1)
-                                    }
+                        }
+                    }
+                    if (previewChannel != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().border(
+                                1.dp,
+                                AccentRed.copy(alpha = 0.6f),
+                                RoundedCornerShape(14.dp)
+                            ),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xF020242C)),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(13.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("معاينة معلومات القناة", color = Silver, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                                    Text("رقم ${previewEntry?.first ?: "—"}", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                                Text(previewChannel!!.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp, maxLines = 1)
+                                Text(
+                                    "الدولة: ${channelCountryLabel(previewChannel!!)}  •  التصنيف: ${previewChannel!!.group?.takeIf(String::isNotBlank) ?: "غير محدد"}",
+                                    color = Silver,
+                                    fontSize = 11.sp,
+                                    maxLines = 2
+                                )
+                                Text(
+                                    "المصدر: ${previewChannel!!.sourceNames.takeIf { it.isNotEmpty() }?.joinToString("، ") ?: "القائمة المحلية"}",
+                                    color = MutedText,
+                                    fontSize = 9.sp,
+                                    maxLines = 2
+                                )
+                                Button(
+                                    onClick = { onPlay(previewChannel!!) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("تشغيل القناة", color = ScreenBlack, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
-                        Spacer(Modifier.weight(1f).fillMaxHeight().clickable { showChannelTable = false })
-                    }
+                    } else {
+                        Text("اختر قناة لعرض رقمها وبلدها ومعلوماتها قبل التشغيل.", color = MutedText, fontSize = 11.sp)
                     }
                 }
             }
@@ -1440,12 +1645,12 @@ private fun LiveContent(
     }
 }
 
+
 @Composable
 private fun OnlineSourcesContent(
     status: String,
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
-    onLoadPlaylist: (RemotePlaylistSource) -> Unit,
     onAddToLibrary: (RemotePlaylistSource) -> Unit,
     onShowLibrary: () -> Unit,
     onOpenOfficialUrl: (String) -> Unit,
@@ -1457,7 +1662,7 @@ private fun OnlineSourcesContent(
     ) {
         Text("مصادر القنوات عبر الإنترنت", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
         Text(
-            "قوائم عالمية وعربية وتركية ومصادر بث رسمية. اختر مصدراً لتنزيل قائمته وتشغيل القنوات في RS TV.",
+            "نزّل حزم القنوات العالمية وأضفها إلى مكتبتك. تشغيل القنوات يتم حصراً من صفحة البث المباشر.",
             color = MutedText,
             fontSize = 11.sp
         )
@@ -1477,7 +1682,7 @@ private fun OnlineSourcesContent(
                     Text("عرض المكتبة المجمّعة (${sourceLibraryCount} مصدر)")
                 }
                 Text(
-                    "إضافة مصدر إلى المكتبة لا تستبدل قائمتك الحالية. التشغيل المنفرد فقط يستبدل القائمة النشطة. تُقبل روابط HTTPS فقط؛ وقد تتوقف القنوات أو تُقيّد جغرافياً، والإتاحة العامة لا تثبت حقوق إعادة البث.",
+                    "هذه الصفحة لتنزيل حزم القنوات وحفظها فقط؛ لا يتم تشغيل الفيديو هنا ولا تتغير قائمتك المحلية. افتح «البث المباشر» ثم «مكتبة المصادر» لمشاهدة القنوات. تُقبل روابط HTTPS فقط، وقد تتوقف بعض القنوات أو تُقيّد جغرافياً.",
                     color = MutedText,
                     fontSize = 10.sp
                 )
@@ -1512,9 +1717,6 @@ private fun OnlineSourcesContent(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text("إضافة إلى المكتبة المجمّعة")
-                        }
-                        TextButton(onClick = { onLoadPlaylist(source) }) {
-                            Text("تشغيل منفرد واستبدال القائمة النشطة", color = Silver, fontSize = 11.sp)
                         }
                     }
                 }
