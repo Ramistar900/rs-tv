@@ -144,12 +144,10 @@ jobs:
 
             Attached:
             - app-release.apk: signed release build
-            - app-debug.apk: debug/testing build
 
-            This release is a draft. Review it and publish manually when ready.
+            Debug APKs remain available only as test artifacts and are not included in the official release.
           draft: false
           prerelease: false
           files: |
             app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/apk/debug/app-debug.apk
           fail_on_unmatched_files: true
