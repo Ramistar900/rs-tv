@@ -13,7 +13,10 @@ internal enum class AdultContentType {
 }
 
 internal object AdultContentPolicy {
-    private val explicitPattern = Regex(
+    private val explicitGroupPattern = Regex(
+        """(?i)(?:^|[,;|/])\s*(?:xxx|porn|pornographic|erotic|adult|adults|adult\s+(?:content|channels|movies|entertainment)|sex\s*(?:tv|channel))(?:$|[,;|/])|للكبار فقط|محتوى صريح|إباحي|اباحي|إباحية|اباحية|قنوات جنسية"""
+    )
+    private val explicitNamePattern = Regex(
         """(?i)(?:^|[^a-z0-9])(?:xxx|porn|pornographic|erotic|adult\s*(?:tv|channel|entertainment)|sex\s*(?:tv|channel))(?:$|[^a-z0-9])|للكبار فقط|محتوى صريح|إباحي|اباحي|إباحية|اباحية|قنوات جنسية"""
     )
     private val ageRatingPattern = Regex(
@@ -21,8 +24,9 @@ internal object AdultContentPolicy {
     )
 
     fun classify(channel: RSTVChannel): AdultContentType? {
-        val nameAndGroup = listOfNotNull(channel.name, channel.group).joinToString(" ")
-        if (explicitPattern.containsMatchIn(nameAndGroup)) return AdultContentType.EXPLICIT
+        if (explicitGroupPattern.containsMatchIn(channel.group.orEmpty()) ||
+            explicitNamePattern.containsMatchIn(channel.name)
+        ) return AdultContentType.EXPLICIT
 
         val rating = channel.contentRating?.trim().orEmpty()
         if (rating.isNotBlank() && ageRatingPattern.matches(rating)) {
