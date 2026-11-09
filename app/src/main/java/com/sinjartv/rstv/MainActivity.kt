@@ -266,12 +266,14 @@ private fun RSTVHome() {
     var libraryRevision by remember { mutableIntStateOf(0) }
     var historyRevision by remember { mutableIntStateOf(0) }
     var derivedCollections by remember { mutableStateOf(DerivedChannelCollections()) }
+    var favoriteUrls by remember { mutableStateOf<Set<String>>(emptySet()) }
     LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery) {
         val userSnapshot = channels.toList()
         val sourceSnapshot = sourceLibraryChannels.toList()
         val (favoriteSnapshot, historySnapshot) = withContext(Dispatchers.IO) {
             LocalLibraryStore.favoriteStreams(context) to LocalLibraryStore.history(context)
         }
+        favoriteUrls = favoriteSnapshot
         derivedCollections = withContext(Dispatchers.Default) {
             deriveChannelCollections(
                 userChannels = userSnapshot,
