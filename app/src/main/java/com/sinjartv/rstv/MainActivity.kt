@@ -1619,8 +1619,14 @@ private fun OnlineSourcesContent(
                 Text(status, color = SoftWhite, fontSize = 11.sp)
                 Text(sourceLibraryStatus, color = Silver, fontSize = 10.sp)
                 Text(
-                    "القنوات الفريدة المحمّلة: $sourceLibraryChannelCount • قوائم المصادر: $sourceLibraryCount",
+                    "الباقات المتاحة: ${sources.size} • الباقات المحمّلة: $sourceLibraryCount",
                     color = SoftWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+                Text(
+                    "القنوات الفريدة المحمّلة: $sourceLibraryChannelCount",
+                    color = Silver,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
                 )
