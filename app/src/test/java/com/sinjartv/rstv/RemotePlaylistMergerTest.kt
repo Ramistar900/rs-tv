@@ -96,6 +96,26 @@ class RemotePlaylistMergerTest {
     }
 
     @Test
+    fun infersArabicCountryFromDynamicCountryPackageId() {
+        val snapshot = RemoteSourceSnapshot(
+            id = "iptv-org-sy",
+            name = "IPTV-org — سوريا",
+            provider = "iptv-org/iptv",
+            attribution = null,
+            content = """
+                #EXTM3U
+                #EXTINF:-1 group-title="News",Example Syria News
+                https://sy.example/live.m3u8
+            """.trimIndent()
+        )
+
+        val merged = RemotePlaylistMerger.merge(listOf(snapshot))
+
+        assertEquals(1, merged.size)
+        assertEquals("سوريا", merged.single().country)
+    }
+
+    @Test
     fun keepsDifferentQueryTokensAsSeparateStreams() {
         val snapshots = listOf(
             RemoteSourceSnapshot(
