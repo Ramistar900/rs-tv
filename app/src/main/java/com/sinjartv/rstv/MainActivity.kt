@@ -189,7 +189,7 @@ private fun RSTVHome() {
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
     var showingSourceLibrary by remember { mutableStateOf(false) }
-    var countryPackageSources by remember { mutableStateOf(RemotePlaylistSources.countryPackages(emptyList())) }
+    var countryPackageSources by remember { mutableStateOf(RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()) }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
@@ -301,9 +301,9 @@ private fun RSTVHome() {
                 WorldChannelCatalogParser.parseCountryCodes(catalogJson)
             }
         }.onSuccess { countryCodes ->
-            countryPackageSources = RemotePlaylistSources.countryPackages(countryCodes)
+            countryPackageSources = RemotePlaylistSources.countryPackages(countryCodes) + RemotePlaylistSources.douboCountryPackages()
         }.onFailure {
-            countryPackageSources = RemotePlaylistSources.countryPackages(emptyList())
+            countryPackageSources = RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()
         }
     }
 
