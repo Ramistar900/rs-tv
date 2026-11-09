@@ -299,10 +299,7 @@ private fun RSTVHome() {
                 context.assets.open("candidates.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
             }
             withContext(Dispatchers.Default) {
-                WorldChannelCatalogParser.parse(catalogJson)
-                    .map { it.countryCode }
-                    .filter { it.matches(Regex("[A-Z]{2}")) }
-                    .distinct()
+                WorldChannelCatalogParser.parseCountryCodes(catalogJson)
             }
         }.onSuccess { countryCodes ->
             countryPackageSources = RemotePlaylistSources.countryPackages(countryCodes)
