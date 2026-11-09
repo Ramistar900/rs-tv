@@ -534,26 +534,17 @@ private fun RSTVHome() {
             status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
             return
         }
-        val activeQueue = if (showingSourceLibrary) {
-            derivedCollections.regularSourceLibraryChannels
-        } else {
-            derivedCollections.regularChannels
-        }
-        val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
-        val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
         selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
         LocalLibraryStore.addToHistory(context, channel.streamUrl)
         historyRevision++
-        val mediaSources = queue.map { item ->
-            val httpFactory = DefaultHttpDataSource.Factory()
-                .setDefaultRequestProperties(item.httpHeaders)
-            val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
-            DefaultMediaSourceFactory(dataSourceFactory)
-                .createMediaSource(MediaItem.fromUri(item.streamUrl))
-        }
-        exoPlayer.setMediaSources(mediaSources, startIndex, 0L)
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(channel.httpHeaders)
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+        val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
+            .createMediaSource(MediaItem.fromUri(channel.streamUrl))
+        exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
