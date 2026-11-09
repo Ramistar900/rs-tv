@@ -643,6 +643,8 @@ internal object RemotePlaylistSources {
         else -> "آسيا وبقية العالم"
     }
 
+    fun countryNameForPackageCode(code: String): String = countryName(code)
+
     private fun countryName(code: String): String =
         arabCountryNames[code.uppercase(Locale.ROOT)]
             ?: run {
