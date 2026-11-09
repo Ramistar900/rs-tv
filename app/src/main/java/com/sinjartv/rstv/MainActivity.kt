@@ -191,7 +191,6 @@ private fun RSTVHome() {
     var showingSourceLibrary by remember { mutableStateOf(false) }
     var countryPackageSources by remember { mutableStateOf(RemotePlaylistSources.countryPackages(emptyList())) }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
-    val uriHandler = LocalUriHandler.current
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
     var selectedTab by remember { mutableStateOf(RSTVTab.HOME) }
@@ -1064,7 +1063,7 @@ private val channelCategoryOrder = listOf(
     "الأفلام والمسلسلات",
     "قنوات الأطفال",
     "القنوات الدينية",
-    "القنوات العالمية"
+    "قنوات متنوعة"
 )
 
 private fun normalizedChannelText(value: String): String =
@@ -1097,7 +1096,7 @@ private fun channelCategory(channel: RSTVChannel): String {
             listOf("السعود", "سوريا", "مصر", "العراق", "الاردن", "فلسطين", "المغرب", "الجزائر", "تونس", "لبنان", "الامارات", "الكويت", "قطر", "عمان", "اليمن", "البحرين", "ليبيا", "السودان").any { it in country } ||
             hasAny("arabic", "العربية", "عربي") ->
             "القنوات العربية"
-        else -> "القنوات العالمية"
+        else -> "قنوات متنوعة"
     }
 }
 
