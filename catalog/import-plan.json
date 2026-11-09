@@ -1,9 +1,9 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "project": "RS TV",
-  "mode": "scheduled_worldwide_internet_candidate_import",
+  "mode": "iptv_m3u_country_package_discovery",
   "language": "ar",
-  "scope": "internet_only",
+  "scope": "internet_only_iptv_m3u_m3u8",
   "endpoints": {
     "channels": "https://iptv-org.github.io/api/channels.json",
     "streams": "https://iptv-org.github.io/api/streams.json",
@@ -42,24 +42,6 @@
     "all_behavior": "Show all imported candidates from every represented country in one combined list; keep country attribution on every record.",
     "country_behavior": "Filter the same catalogue by exact ISO 3166-1 alpha-2 country code.",
     "unknown_country_behavior": "Keep the candidate under ZZ with a neutral globe icon; never infer country from language or channel name."
-  },
-  "youtube_live_discovery": {
-    "provider": "YouTube Data API v3",
-    "endpoint": "https://www.googleapis.com/youtube/v3/search",
-    "required_parameters": [
-      "part=snippet",
-      "type=video",
-      "eventType=live"
-    ],
-    "credential": "YOUTUBE_API_KEY",
-    "playback_policy": "Use the official YouTube watch URL/player only; never extract or rehost the media stream.",
-    "coverage_note": "Search results are query-, quota-, language-, and region-dependent, not a complete inventory of all live YouTube channels."
-  },
-  "official_web_channels": {
-    "source": "Official broadcaster websites and authorized embeds",
-    "import_mode": "country-by-country verified directory",
-    "playback_policy": "Use official embeddable player when allowed; otherwise open the broadcaster website.",
-    "limitation": "There is no universal index of every global broadcaster website."
   },
   "movie_and_series_discovery": {
     "metadata_provider": "TMDB",
@@ -108,7 +90,7 @@
     "stale_stream_action": "hide from default approved catalogue pending recheck",
     "preserve_source_attribution": true
   },
-  "important": "This is a discovery/import contract. Imported records are candidates, not automatically free, authorized, stable, or approved.",
+  "important": "Channel discovery and imports use IPTV M3U/M3U8 sources only. Public URLs and technical reachability do not prove redistribution rights, free access in every territory, or sustained playback.",
   "implementation": {
     "importer": "tools/import_channel_candidates.py",
     "tests": "tools/test_import_channel_candidates.py",
@@ -143,7 +125,7 @@
   "online_playlist_sources": {
     "mode": "user_initiated_remote_m3u_download",
     "app_file": "app/src/main/java/com/sinjartv/rstv/RemotePlaylistSources.kt",
-    "behavior": "The user selects one source in the IPTV Sources screen; the app downloads it over HTTPS, parses HTTPS channel stream URLs, and saves or refreshes that package in a separate imported-channel library. Source selection never starts playback and never replaces the user playlist. Imported packages are played only from the Live Broadcast screen. The source list is fetched again on next selection; no client background polling is required.",
+    "behavior": "The user selects an IPTV M3U/M3U8 source in the Sources screen; the app downloads it over HTTPS, parses valid HTTPS channel URLs, and stores the package in a separate imported-channel library. Source selection never starts playback and never replaces the personal playlist. Imported packages are played only from Live Broadcast. Channel discovery is IPTV M3U/M3U8 only; there are no standalone world-directory, YouTube, or webpage-only channel tabs.",
     "limits": {
       "max_download_bytes": 12582912,
       "connect_timeout_ms": 15000,
@@ -192,11 +174,48 @@
         "id": "freecasthub",
         "url": "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u",
         "coverage": "secondary public-broadcast candidate list"
+      },
+      {
+        "id": "doubo-country-playlists",
+        "url": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/{country_code_lowercase}.m3u",
+        "coverage": "128 separately listed countries and regions; one M3U package per country; UK uses uk",
+        "attribution": "Doubo Public Channel Directory, CC BY 4.0 for directory/link-selection data only"
       }
     ],
-    "safety": "Sources are discovery/playback entry points, not proof of blanket redistribution rights. The app never downloads video content itself, never follows cross-host or non-HTTPS redirects, rejects insecure/credential-bearing stream URLs and preserves provider attribution. Paid/DRM/conditional-access streams must not be bypassed."
+    "safety": "Sources are discovery/playback entry points, not proof of blanket redistribution rights. The app never downloads video content itself, never follows cross-host or non-HTTPS redirects, rejects insecure/credential-bearing stream URLs and preserves provider attribution. Paid/DRM/conditional-access streams must not be bypassed.",
+    "country_packages": {
+      "doubo_published_country_count": 128,
+      "doubo_template": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/{country_code_lowercase}.m3u",
+      "doubo_uk_alias": "uk",
+      "iptv_org_template": "https://iptv-org.github.io/iptv/countries/{country_code_lowercase}.m3u",
+      "arab_country_codes": [
+        "AE",
+        "BH",
+        "DJ",
+        "DZ",
+        "EG",
+        "IQ",
+        "JO",
+        "KM",
+        "KW",
+        "LB",
+        "LY",
+        "MA",
+        "MR",
+        "OM",
+        "PS",
+        "QA",
+        "SA",
+        "SD",
+        "SO",
+        "SY",
+        "TN",
+        "YE"
+      ],
+      "arab_country_policy": "One separate M3U package per Arab country; never combine Syria, Lebanon, Iraq or other country entries into one country package.",
+      "deduplication": "Merge imported packages by canonical stream URL and HTTP-header profile; overlapping country/category/global playlists must not inflate unique-channel totals."
+    }
   },
-  "official_broadcaster_web_destinations": "Al Jazeera Arabic and English, CGTN, Euronews, and NASA+ are presented as external official playback pages; they are not extracted into private media URLs.",
   "adult_content_policy": {
     "categories": [
       "age_rated",
@@ -207,22 +226,11 @@
       "content-rating",
       "rating"
     ],
-    "classification": "Only explicit age labels (TV-MA, NC-17, R18, 18+) and clear adult category labels are classified. Generic Movies/Series labels are not adult classifications.",
-    "ordinary_catalogue": "Adult-classified stream URLs are excluded from normal live, search, favourites and recent-channel surfaces, including when duplicate source metadata conflicts.",
-    "playback": "Blocked until a source has passed separate rights review.",
+    "classification": "Only explicit age labels and clear adult category labels are classified. Generic Movies/Series labels are not adult classifications.",
+    "ordinary_catalogue": "Adult-classified stream URLs are excluded from normal live, search, favourites, and recent-channel surfaces.",
+    "playback": "Do not import into the normal playable library unless source rights and age-policy review pass.",
     "approved_free_m3u_sources": [],
-    "source_policy": "Do not add public, anonymous, pirated, subscription-only, DRM-protected or unclear-rights sources. A free URL is not proof of permission to stream or redistribute.",
-    "access": "PIN-gated local section; salted PBKDF2 verifier, temporary lockout after repeated failures, optional hidden navigation entry.",
-    "private_discovery_package_ids": [
-      "iptv-org-movies",
-      "iptv-org-series"
-    ],
-    "private_package_storage": "Downloaded separately from the ordinary IPTV source library. These are broad movies/series discovery lists, not adult packages; only explicitly age-rated or explicit-labeled entries may be shown in the PIN-protected private section. Unclassified entries remain isolated.",
-    "official_mature_service": {
-      "id": "taboovision",
-      "url": "https://taboo.vision/",
-      "integration": "External official information link only; no M3U extraction or in-app playback.",
-      "device_note": "Provider states TCL Smart TV preloading is available and Android TV support is coming soon; availability can vary."
-    }
+    "source_policy": "No anonymous, pirated, subscription-only, DRM-protected, or unclear-rights adult sources. A free URL is not proof of permission to stream or redistribute.",
+    "ui_policy": "No separate private/PIN tab is exposed in the app. Adult-classified entries remain excluded from ordinary channel browsing."
   }
 }
