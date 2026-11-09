@@ -1215,15 +1215,18 @@ private fun LiveContent(
 ) {
     var showChannelTable by remember { mutableStateOf(false) }
     val fullscreenFocusRequester = remember { FocusRequester() }
+    var orderedGroups by remember { mutableStateOf(emptyList<Pair<String, List<RSTVChannel>>>()) }
     var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
     LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
         val channelSnapshot = channels.toList()
-        numberedChannels = withContext(Dispatchers.Default) {
+        val groups = withContext(Dispatchers.Default) {
             orderedChannelGroups(channelSnapshot)
-                .flatMap { it.second }
-                .distinctBy { it.streamUrl }
-                .mapIndexed { index, channel -> (index + 1) to channel }
         }
+        orderedGroups = groups
+        numberedChannels = groups
+            .flatMap { it.second }
+            .distinctBy { it.streamUrl }
+            .mapIndexed { index, channel -> (index + 1) to channel }
     }
     val selectedChannelNumber = numberedChannels
         .firstOrNull { it.second.streamUrl == selectedChannel?.streamUrl }
@@ -1397,7 +1400,7 @@ private fun LiveContent(
                     EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
                 }
             } else {
-                val groupedChannels = orderedChannelGroups(channels)
+                val groupedChannels = orderedGroups
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1518,17 +1521,27 @@ private fun FullscreenChannelSelectorDialog(
 ) {
     var query by remember { mutableStateOf("") }
     var previewChannel by remember(activeChannel?.streamUrl) { mutableStateOf(activeChannel) }
-    val numberedChannels = remember(channels) {
-        orderedChannelGroups(channels)
-            .flatMap { it.second }
-            .distinctBy { it.streamUrl }
-            .mapIndexed { index, channel -> (index + 1) to channel }
+    var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    var filteredChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
+        val channelSnapshot = channels.toList()
+        numberedChannels = withContext(Dispatchers.Default) {
+            orderedChannelGroups(channelSnapshot)
+                .flatMap { it.second }
+                .distinctBy { it.streamUrl }
+                .mapIndexed { index, channel -> (index + 1) to channel }
+        }
     }
-    val filteredChannels = numberedChannels.filter { (_, channel) ->
-        query.isBlank() ||
-            channel.name.contains(query, ignoreCase = true) ||
-            channelCountryLabel(channel).contains(query, ignoreCase = true) ||
-            channel.group.orEmpty().contains(query, ignoreCase = true)
+    LaunchedEffect(numberedChannels, query) {
+        val channelSnapshot = numberedChannels
+        filteredChannels = withContext(Dispatchers.Default) {
+            channelSnapshot.filter { (_, channel) ->
+                query.isBlank() ||
+                    channel.name.contains(query, ignoreCase = true) ||
+                    channelCountryLabel(channel).contains(query, ignoreCase = true) ||
+                    channel.group.orEmpty().contains(query, ignoreCase = true)
+            }
+        }
     }
     val previewEntry = numberedChannels.firstOrNull {
         it.second.streamUrl == previewChannel?.streamUrl
