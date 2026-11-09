@@ -818,7 +818,8 @@ internal object RemotePlaylistSources {
             id.startsWith("doubo-country-") -> id.removePrefix("doubo-country-").uppercase(Locale.ROOT)
             else -> return null
         }
-        return code.takeIf { it.matches(Regex("[A-Z]{2}")) }
+        val normalizedCode = if (code == "UK") "GB" else code
+        return normalizedCode.takeIf { it.matches(Regex("[A-Z]{2}")) }
     }
 
     private fun groupOrderForCountry(group: String): Int = when (group) {
