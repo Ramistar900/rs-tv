@@ -570,7 +570,7 @@ private fun RSTVHome() {
                     sourceLibraryStatus = sourceLibraryStatus,
                     sourceLibraryCount = sourceLibraryCount,
                     sourceLibraryChannelCount = sourceLibraryChannels.size,
-                    onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                    onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
                     onShowSourceLibrary = ::showSourceLibrary,
                     channels = when {
                         selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -643,7 +643,7 @@ private fun RSTVHome() {
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
                             sourceLibraryChannelCount = sourceLibraryChannels.size,
-                            onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                            onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -695,7 +695,7 @@ private fun RSTVHome() {
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
                             sourceLibraryChannelCount = sourceLibraryChannels.size,
-                            onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                            onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
