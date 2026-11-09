@@ -1,145 +1,71 @@
-# RS TV Global Internet Catalogue
+# RS TV IPTV Package Catalogue
 
-RS TV plays television delivered over the internet. A broadcaster may also be a traditional satellite channel; RS TV can play its official/public online feed when available. Direct dish reception, DVB tuners, orbital tuning and satellite frequencies are not performed by a phone/TV Box app.
+RS TV discovers and imports live television through IPTV playlist sources (M3U/M3U8). The app does not tune satellite frequencies or require a dish: a satellite broadcaster is available only when an online stream is published and the source permits its use.
 
-## Worldwide live-channel discovery
+## IPTV packages are the channel-discovery entry point
 
-The scheduled importer uses the IPTV-org structured API datasets for channels, streams, countries, languages, categories, logos, feeds, and the upstream blocklist. It joins each stream to its stable channel ID and retains country/language/category attribution.
+The standalone «العالمية» tab and YouTube live-discovery tab are not part of the current navigation. The «مصادر IPTV» screen is the channel-package directory. It downloads a selected playlist; it does not play video inside the source page and does not replace the user's own local playlist. Imported channels are available from «البث المباشر».
 
-- **الكل** combines candidates from every country represented in the source.
-- Country filters use exact ISO 3166-1 alpha-2 metadata.
-- Channels without a source country are retained as `ZZ` with a neutral globe icon; no flag is guessed.
-- Categories and language labels are taken from source metadata.
-- Stream candidates must use HTTPS, have a host, and contain no URL credentials.
-- Duplicate stream URLs are removed per channel.
-- Adult, closed/replaced, blocklisted, and no-HTTPS-stream records are excluded.
-- Every generated record remains `candidate`, `not_reviewed`, and `unrated`.
+The package directory is grouped by region and country. Arabic country packages are listed separately, including:
+- سوريا، لبنان، العراق، فلسطين، الأردن، مصر، السعودية، الإمارات، البحرين، الكويت، قطر، عُمان، اليمن، السودان، ليبيا، تونس، الجزائر، المغرب، موريتانيا، الصومال، جيبوتي، وجزر القمر.
+- Europe, North America (including the United States and Canada), Latin America and South America, East Asia, the rest of Asia, Africa, and Oceania.
+- Additional category packages for movies, series, sports, news, documentary, music, children, and other classifications.
 
-See [sources.json](sources.json) for the source registry and [import-plan.json](import-plan.json) for the source/field contract.
+## Country-package sources
 
-Run the importer locally:
+### Doubo Public Channel Directory
 
-```sh
-python -m unittest discover -s tools -p 'test_*.py' -v
-python tools/import_channel_candidates.py
-```
+RS TV includes country M3U packages for the 128 countries and regions currently listed by Doubo. Each country has a separate package, including Syria, Lebanon, Iraq, the United States, Canada and Türkiye. The source directory says it is updated daily and lists channels whose broadcasters make them freely and publicly available. Its 2026-11-08 snapshot reported 2,982 listed channels across 128 countries and regions; this number changes and is not an RS TV verified-playback count.
 
-GitHub Actions refreshes `catalog/generated/candidates.json` daily and when the importer changes. The generated file is a discovery/review queue, not a ready-to-play or rights-cleared playlist. The importer does not guarantee that every country or broadcaster is represented; it is limited to upstream source coverage.
+Doubo describes its filtering policy as limiting entries to streams served from a broadcaster's own website, a broadcast-grade CDN or an official free platform; it says it excludes paid channels and channels subject to rights-holder objections. The directory/index data is CC BY 4.0 and RS TV displays attribution. This licence applies to the directory data, not the underlying programmes: stream/content rights remain with broadcasters, and geographic restrictions may apply. The directory also states that it does not provide or relay channel content.
 
+- Directory and current counts: https://doubo.tv/en/playlists/
+- Country data and methodology: https://doubo.tv/en/data/free-tv-channels/
+- M3U country files are published under the directory's countries path.
 
-## Additional online channel sources in the Android app
+### IPTV-org
 
-The **مصادر IPTV** screen offers user-initiated M3U downloads from several independent publishing projects:
+The app also provides country and category playlists from IPTV-org. Its country package list is generated from country metadata in the bundled review catalogue and includes the Arab country codes even when the current snapshot has no candidate stream for that country. These are community-maintained discovery playlists. Their inclusion in an M3U index does not establish licensing, current availability, or successful playback.
 
-- **Doubo Public Channel Directory**: worldwide, Türkiye, and Arabic-language lists. Its publisher describes a daily build with an official-domain/allowlisted-host policy and first-media-segment checks. The link selection/index data is CC BY 4.0; RS TV credits the directory. This is not a licence to redistribute the underlying programmes.
-- **IPTV-org playlists**: worldwide, Arab-region, and Türkiye lists. This is a large community-maintained discovery catalogue; availability and rights vary by channel.
-- **Free-TV/IPTV**: a smaller quality-focused community list whose README says it targets channels officially offered free in at least one market; regional blocks can apply.
-- **FreeCastHub public IPTV**: an experimental supplementary list; its category files are subsets of the same catalogue and are not counted as new sources.
-- **M3UPT**: a Portuguese community playlist with international entries; non-HTTPS, restricted, encrypted, and unsupported entries are filtered by the app parser and still require technical and rights review.
-- **Romaxa55 World IPTV**: a large community aggregation that states it checks its collected channel URLs every six hours. It is treated as one additional discovery feed, not as an independent origin for every channel; the RS TV library deduplicates its URLs against all other feeds. Its own automated checks do not establish playback on every device, geographic availability, or redistribution rights.
+The structured importer uses the upstream channels, streams, countries, languages, categories, logos, feeds and blocklist datasets. The bundled candidate snapshot in this branch was generated on 2026-11-08 and contained:
+- 31,758 channel records in the upstream channel dataset;
+- 18,637 stream records;
+- 8,622 channel candidates with HTTPS streams;
+- 180 represented countries with candidates.
 
-The app also exposes IPTV-org category slices for animation, auto, business, classic, comedy, cooking, culture, documentary, education, entertainment, family, general, kids, legislative, lifestyle, music, news, outdoor, public, relax, religious, science, travel, and weather. These are official category paths documented by the upstream project. They are alternate views of the same global dataset, not 24 independent channel inventories; exact stream URLs are deduplicated by the RS TV catalogue and health scanner. Adult and undefined categories are intentionally excluded.
+These are candidate/metadata counts, not the number of unique working channels in the RS TV app. All imported records are marked candidate, not_reviewed, and unrated. The parser can index up to 50,000 candidate records, but that capacity limit is not a statement that 50,000 eligible channels currently exist.
 
-The **مصادر IPTV** screen is a package downloader only: it downloads the selected M3U list, checks HTTPS and a size limit, validates redirects against the source's exact host, parses HTTPS channel entries, and stores the package in the separate imported-channel library. It does not start playback and does not replace the user's local playlist. Selecting a source again refreshes that package. To watch imported channels, open **البث المباشر** and choose the imported source library; fullscreen playback opens a numbered channel selector with search and a receiver-style channel information panel. Official broadcaster destinations (Al Jazeera Arabic/English, CGTN, Euronews and NASA+) open the broadcaster's own website/player instead of extracting or proxying its media.
+## Deduplication and import behavior
 
-These playlists include traditional linear television brands and channels that may also be carried by satellite, but the app receives them through their online streams. It does not tune a satellite dish or emulate a satellite receiver.
+- Each selected M3U source is downloaded separately, with HTTPS, size limits and redirect-host validation.
+- Imported lists are stored in the IPTV source library, separate from the user's local playlist.
+- When packages are merged, entries are deduplicated by canonical stream URL and HTTP-header profile. Identical URLs across country, language, category and global lists are not counted as additional channels.
+- Country metadata is taken from the playlist entry when present; for country-specific packages, the country is inferred from the package identifier when the entry omits it.
+- Selecting a package again refreshes that package. The user can clear the imported-source library without deleting their personal playlist or favourites.
+- The screen is a package downloader, not a live player. To watch imported entries, open «البث المباشر» and choose the imported source library.
 
-## Official sports and film destinations
+Different URLs for the same broadcaster may still represent separate feeds or mirrors. Deduplication by URL does not prove that differently addressed feeds are different broadcasters, nor does matching channel names prove that two streams are the same.
 
-RS TV includes a separate official-service directory grouped into sports and films. These entries open the rights holder or licensed platform; they are not converted into direct M3U links and are not scraped or re-hosted.
+## Rights, safety and availability
 
-### Sports
+An HTTPS URL, public M3U file, or successful HTTP response is not by itself evidence of permission to redistribute or watch a channel. Country lists may include geo-restricted feeds, streams may stop working, and broadcaster rights vary by competition, programme and territory. RS TV must not add pirated sources, paid channels without a valid entitlement, DRM/access-control bypasses, anonymous file hosts, or channels whose rights/source cannot be established.
 
-The app's **مصادر IPTV** list now also includes two direct category playlists for sports discovery:
-- **Doubo Sports**: a separate daily-updated M3U. Doubo currently lists 100 sports channels in its directory; this is a publisher-reported count, not 100 independently verified working streams.
-- **IPTV-org Sports**: a worldwide category playlist. It overlaps the main IPTV-org index and country lists, so the RS TV source merger removes exact duplicate stream URLs.
+The app filters malformed and non-HTTPS playlist entries. Technical checks are diagnostic only; passing an endpoint or manifest check does not establish playback on every device or legal permission. Only entries with separate source/rights evidence and technical verification should be described as approved or licensed. The app must not promise that every channel is available in Türkiye.
 
-The app also exposes dedicated **IPTV-org Movies** and **IPTV-org Series** linear-channel lists. These are scheduled TV channels, not on-demand movie files. The health scan includes these category lists, but deduplicates their exact stream URLs across all worldwide feeds.
+## Movies and series packages
 
-- **FIFA+** — selected live football matches, archive matches and original programming. The live schedule and rights vary by competition and territory.
-- **Eurovision Sport** — free live events, replays and highlights across sports such as athletics, aquatics, cycling and combat sports. Individual event rights and availability can vary by country.
-- **Red Bull TV** — selected live events, replays, sports films and documentaries, including motorsport and action sports; event coverage varies by region.
-- **TRT Spor** — official Turkish broadcaster page. Particular match videos or feeds may be geo-restricted according to rights.
-- **Fubo Sports Network** — free ad-supported sports programming through selected distribution partners; it is not a universal free feed of premium leagues and its supported platforms/territories are limited.
-
-These links are useful starting points, not promises that every event is available free in Türkiye. Check the event schedule and territory notice on the provider itself. The unverified “Alwan Sports” name is not added as a source until an official operator website or rights-holder confirmation can be identified.
-
-### Films and series
-
-- **Rakuten TV Free / Live TV** — free ad-supported films, series and live channels in supported countries and on supported devices.
-- **Pluto TV** — free ad-supported live channels and on-demand films; the catalogue differs by country.
-- **Tubi** — free ad-supported films and selected live channels in markets listed by Tubi (including the US, Canada, Mexico, parts of LATAM, the UK and Australia); Türkiye is not listed as a supported market.
-- **Plex** — free films and live channels in supported countries. Plex currently lists Türkiye among countries where its free Live TV service is unavailable.
-- **Internet Archive Moving Image Archive** — a discovery collection for films and archival material. Rights must be checked for each item and each version before describing it as public-domain or reusing it.
-
-The app opens these providers through their official player/app or website. It does not expose premium channels as free, bypass DRM, or assume a publicly accessible archive item is automatically in the public domain.
-
-## YouTube live broadcasts
-
-YouTube live discovery is designed around the official YouTube Data API v3 search endpoint with `type=video` and `eventType=live`. It requires a protected `YOUTUBE_API_KEY`. Results depend on search terms, supported languages/regions, quota, and availability; they are not a complete index of all YouTube live channels. Playback must use the official YouTube watch route or approved official player integration. RS TV must not extract or rehost YouTube media streams.
-
-## Official broadcaster websites and internet services
-
-A universal index of every live broadcaster website does not exist. Add verified official website entries by country and use the broadcaster's permitted embed/player. When embedding is unavailable or not permitted, open the broadcaster website or official service app. Do not scrape protected players or reverse-engineer private APIs.
-
-FAST services such as Pluto TV, Rakuten TV Live, and Samsung TV Plus remain official-service links. Their channel availability, geographic restrictions, and device support are controlled by their operators; RS TV will not extract their streams.
-
-## Films and series catalogue
-
-TMDB can provide international movie/TV metadata, including titles, descriptions, artwork, seasons, episodes, and availability metadata where offered. It requires a `TMDB_API_KEY`, attribution, and compliance with its current terms. TMDB metadata is not a film/episode stream and does not grant playback or redistribution rights. Commercial licensing must be reviewed separately.
-
-Internet Archive can be searched for collection metadata, but every item needs an item-level rights check before being described as free or public-domain content. A listing alone is not sufficient rights evidence.
-
-For every film/series record, keep metadata provider, country availability, official watch provider or item-level rights evidence, attribution, and last review time. Never add pirated streams or bypass DRM/subscriptions.
-
-## Admission states and reliability
-
-- `candidate`: imported from a discovery source; not reviewed.
-- `stream_checked`: technical URL/playback probe passed; rights remain unverified.
-- `rights_reviewed`: evidence supports the intended catalogue use.
-- `approved`: passes both technical and rights review.
-- `rejected`: unavailable, unauthorized, paid/encrypted without entitlement, or rights unclear.
-
-Only `approved` sources can appear in the default playable catalogue. Technical reachability is not copyright permission. Prefer official broadcaster/CDN endpoints, preserve source attribution, show last checked time, and hide stale or repeatedly failing streams. Never promise zero buffering.
+The IPTV Movies and Series category playlists represent linear television channels with schedules; they are not a library of on-demand film files or episode downloads. The existing Movies library remains a separate app feature. Metadata from sources such as TMDB does not itself supply a video stream or grant playback/redistribution rights.
 
 ## Quality labels
 
-Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p), Full HD (1080p), HD (720p), or SD only when the stream actually provides that rendition. Auto is the default; never upscale and label as native 4K.
-
+Imported quality labels are hints, not verified resolution. Show 4K UHD (2160p), Full HD (1080p), HD (720p), or SD only when the stream actually provides that rendition. Auto is the default; never upscale and label it as native 4K.
 
 ## Automated playlist quality audit
 
-A separate read-only GitHub Actions workflow checks the configured public M3U source endpoints daily and on manual request. It reports source availability, M3U structure, unique HTTPS URL counts, eligible direct-stream URL counts, global unique stream URLs across all sources, cross-source duplicates, duplicate URLs, unsafe/non-HTTPS URLs, known platform page links, missing names, orphan URLs, and incomplete entries. The report is published in the GitHub Actions run summary; an artifact ZIP is also attempted when repository artifact storage is available.
+The read-only GitHub Actions workflow audits configured M3U endpoints for availability, playlist structure, unique HTTPS URL counts, and duplicates. Additional channel endpoint/stream scans may be skipped for pull-request runs, and even a successful endpoint response does not prove real-device playback or rights.
 
-This audit does **not** request individual channel streams, measure playback uptime/bitrate/resolution, or review copyright. It never changes the candidate catalogue or promotes entries to approved. Every channel remains a candidate until separate technical playback and rights review are completed.
+The health workflow must not relay, store, transcode or publish channel media. Reports are diagnostic and must not automatically promote sources to legally approved or guaranteed-working status.
 
+## Legacy private-section data
 
-## Bounded channel endpoint sampling
-
-The daily quality workflow also samples up to six HTTPS channel endpoints from each configured playlist, selected evenly across the eligible entries rather than only from the beginning. It requests at most 64 KiB per endpoint with an eight-second timeout, rejects non-public/unresolvable hosts, rejects cross-host or non-HTTPS redirects, and does not fetch HLS segments or play media. Results distinguish HTTP response, HLS/DASH manifest, media response, timeout, network error, forbidden/geo-restricted, not found, and unexpected content. This is a lightweight endpoint check only: it does not prove that a viewer can play the channel, verify video quality, or establish redistribution rights. Reports remain diagnostic and do not modify or approve catalogue entries.
-
-
-## Rotating global stream-health scan
-
-The daily audit now collects the direct HTTPS entries from all configured playlists, removes duplicate canonical stream URLs across the complete source set, and checks a rotating batch of up to 600 unique URLs using bounded concurrency. The batch rotates by UTC day so that a catalogue of many thousands of links is not hammered in one workflow run. The report shows the total unique candidate URLs, batch number, source attribution, per-result status, and how many HLS first segments or direct media bytes were actually received. Raw stream URLs (including query tokens) are omitted from the report.
-
-For HLS, the checker fetches a bounded manifest and attempts to retrieve the first media segment. It skips encrypted HLS playlists rather than trying to obtain keys. For direct media, it requests only a bounded byte range. DASH manifests are structurally checked, and manifests advertising content protection are identified; this is not a complete DASH playback test. Temporary failures, geo-blocks and server errors remain diagnostic statuses and are not a basis for instantly deleting a channel. Every batch is a snapshot; the full catalogue is revisited over successive scheduled runs.
-
-This still is not playback on a real phone/TV box, a sustained uptime/bitrate test, or a legal review. A successful first segment does not grant streaming rights. Only separately rights-reviewed entries may ever be approved for the default catalogue.
-
-## Private content section (خاص)
-
-RS TV has a separate **خاص** area protected by a user-created 4–8 digit PIN, with two independently classified content groups:
-
-- **Age-rated films/series and channels**: surfaced only when M3U metadata supplies an explicit rating such as `TV-MA`, `NC-17`, or `18+`.
-- **Explicit adult-channel candidates**: classified from clearly explicit category/name labels, not from generic `Movies` or `Series` groups.
-
-The movie and series discovery packages (`iptv-org-movies` and `iptv-org-series`) are downloaded into a dedicated private package directory, separate from the ordinary source library. Those playlists are broad discovery lists, **not 18+ packages**. Only entries with an explicit maturity label are displayed in the private section; all other entries remain isolated and are not added to live browsing, search, favourites, or history. A generic movie/series label is never treated as an adult rating.
-
-The PIN itself is not stored: the app stores a random salt and a PBKDF2-derived verifier, compares verifiers in constant time, temporarily blocks further attempts after five incorrect entries, and re-locks the section when the user leaves it. The section can be hidden from navigation. Private-package downloads can be cleared separately from the ordinary IPTV source library.
-
-**No free, legally authorized adult M3U source has been approved for RS TV at this time.** A public M3U URL is not evidence that the broadcaster permits redistribution or playback. Classified entries remain unapproved candidates and playback remains blocked until separate technical and rights review. No anonymous, pirated, DRM-bypassing, or subscription-only source is added.
-
-The section also lists TabooVision as an external provider-information link only. Its official website describes an age-verified, ad-supported mature FAST channel and currently says Android TV support is coming soon; RS TV does not extract or play its stream. See [TabooVision's official information](https://taboo.vision/).
-
-The PIN is a local access gate, not legal age verification or a substitute for device-level parental controls.
+The old «خاص»/PIN interface has been removed from app navigation. The change does not automatically erase any legacy files that may already exist in a user's separate private-package storage directory; unrelated local data is left untouched by the update.
