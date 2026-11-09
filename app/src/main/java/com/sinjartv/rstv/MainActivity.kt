@@ -113,6 +113,8 @@ import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
@@ -246,6 +248,7 @@ private fun RSTVHome() {
         current as? Activity
     }
     val scope = rememberCoroutineScope()
+    val libraryWriteMutex = remember { Mutex() }
     val channels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
@@ -263,15 +266,11 @@ private fun RSTVHome() {
     var libraryRevision by remember { mutableIntStateOf(0) }
     var historyRevision by remember { mutableIntStateOf(0) }
     var derivedCollections by remember { mutableStateOf(DerivedChannelCollections()) }
-    val favoriteUrls = remember(favouriteRevision) {
-        LocalLibraryStore.favoriteStreams(context)
-    }
     LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery) {
         val userSnapshot = channels.toList()
         val sourceSnapshot = sourceLibraryChannels.toList()
-        val favoriteSnapshot = favoriteUrls
-        val historySnapshot = withContext(Dispatchers.IO) {
-            LocalLibraryStore.history(context)
+        val (favoriteSnapshot, historySnapshot) = withContext(Dispatchers.IO) {
+            LocalLibraryStore.favoriteStreams(context) to LocalLibraryStore.history(context)
         }
         derivedCollections = withContext(Dispatchers.Default) {
             deriveChannelCollections(
@@ -537,8 +536,14 @@ private fun RSTVHome() {
         selectedChannel = channel
         selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
-        LocalLibraryStore.addToHistory(context, channel.streamUrl)
-        historyRevision++
+        scope.launch {
+            libraryWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.addToHistory(context, channel.streamUrl)
+                }
+            }
+            historyRevision++
+        }
         val httpFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(channel.httpHeaders)
         val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
@@ -551,8 +556,14 @@ private fun RSTVHome() {
 
     fun toggleFavourite(channel: RSTVChannel) {
         if (isRestrictedAdultChannel(channel)) return
-        LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
-        favouriteRevision++
+        scope.launch {
+            libraryWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
+                }
+            }
+            favouriteRevision++
+        }
     }
 
     val regularChannels = derivedCollections.regularChannels
