@@ -580,36 +580,49 @@ private fun RSTVHome() {
             text = { Text(action.message) },
             confirmButton = {
                 TextButton(onClick = {
-                    when (action) {
-                        ClearAction.PLAYLIST -> {
-                            LocalLibraryStore.clearPlaylist(context)
-                            channels.clear()
-                            libraryRevision++
-                            exoPlayer.stop()
-                            exoPlayer.clearMediaItems()
-                            selectedChannel = null
-                            status = "تم حذف القائمة المحلية"
-                        }
-                        ClearAction.HISTORY -> {
-                            LocalLibraryStore.clearHistory(context)
-                            historyRevision++
-                            status = "تم مسح سجل المشاهدة"
-                        }
-                        ClearAction.FAVORITES -> {
-                            LocalLibraryStore.clearFavorites(context)
-                            favouriteRevision++
-                            status = "تم مسح المفضلة"
-                        }
-                        ClearAction.SOURCE_LIBRARY -> {
-                            LocalLibraryStore.clearRemoteSources(context)
-                            sourceLibraryChannels.clear()
-                            libraryRevision++
-                            sourceLibraryCount = 0
-                            sourceLibraryStatus = "تم مسح مكتبة المصادر"
-                            status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
+                    pendingClear = null
+                    scope.launch {
+                        runCatching {
+                            libraryWriteMutex.withLock {
+                                withContext(Dispatchers.IO) {
+                                    when (action) {
+                                        ClearAction.PLAYLIST -> LocalLibraryStore.clearPlaylist(context)
+                                        ClearAction.HISTORY -> LocalLibraryStore.clearHistory(context)
+                                        ClearAction.FAVORITES -> LocalLibraryStore.clearFavorites(context)
+                                        ClearAction.SOURCE_LIBRARY -> LocalLibraryStore.clearRemoteSources(context)
+                                    }
+                                }
+                            }
+                        }.onSuccess {
+                            when (action) {
+                                ClearAction.PLAYLIST -> {
+                                    channels.clear()
+                                    libraryRevision++
+                                    exoPlayer.stop()
+                                    exoPlayer.clearMediaItems()
+                                    selectedChannel = null
+                                    status = "تم حذف القائمة المحلية"
+                                }
+                                ClearAction.HISTORY -> {
+                                    historyRevision++
+                                    status = "تم مسح سجل المشاهدة"
+                                }
+                                ClearAction.FAVORITES -> {
+                                    favouriteRevision++
+                                    status = "تم مسح المفضلة"
+                                }
+                                ClearAction.SOURCE_LIBRARY -> {
+                                    sourceLibraryChannels.clear()
+                                    libraryRevision++
+                                    sourceLibraryCount = 0
+                                    sourceLibraryStatus = "تم مسح مكتبة المصادر"
+                                    status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
+                                }
+                            }
+                        }.onFailure { error ->
+                            status = "تعذر إكمال الحذف: ${error.message ?: "خطأ غير معروف"}"
                         }
                     }
-                    pendingClear = null
                 }) { Text("تأكيد", color = AccentRed) }
             },
             dismissButton = {
