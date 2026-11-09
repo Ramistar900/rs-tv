@@ -153,6 +153,7 @@ private enum class ClearAction(val title: String, val message: String) {
 
 private data class DerivedChannelCollections(
     val adultStreamKeys: Set<String> = emptySet(),
+    val channelByStreamUrl: Map<String, RSTVChannel> = emptyMap(),
     val regularChannels: List<RSTVChannel> = emptyList(),
     val regularSourceLibraryChannels: List<RSTVChannel> = emptyList(),
     val favoriteChannels: List<RSTVChannel> = emptyList(),
@@ -193,6 +194,7 @@ private fun deriveChannelCollections(
 
     return DerivedChannelCollections(
         adultStreamKeys = adultKeys,
+        channelByStreamUrl = knownByStreamUrl,
         regularChannels = regularUser,
         regularSourceLibraryChannels = regularSources,
         favoriteChannels = favorites,
@@ -311,7 +313,7 @@ private fun RSTVHome() {
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val currentUrl = mediaItem?.localConfiguration?.uri?.toString()
-                val currentChannel = (channels + sourceLibraryChannels).firstOrNull { it.streamUrl == currentUrl }
+                val currentChannel = currentUrl?.let { derivedCollections.channelByStreamUrl[it] }
                 if (currentChannel != null) {
                     selectedChannel = currentChannel
                     status = "القناة الحالية: ${currentChannel.name}"
