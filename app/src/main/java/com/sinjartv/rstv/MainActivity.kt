@@ -532,8 +532,11 @@ private fun RSTVHome() {
             status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
             return
         }
-        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels)
-            .filterNot(::isRestrictedAdultChannel)
+        val activeQueue = if (showingSourceLibrary) {
+            derivedCollections.regularSourceLibraryChannels
+        } else {
+            derivedCollections.regularChannels
+        }
         val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
         val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
@@ -585,6 +588,7 @@ private fun RSTVHome() {
                         }
                         ClearAction.HISTORY -> {
                             LocalLibraryStore.clearHistory(context)
+                            historyRevision++
                             status = "تم مسح سجل المشاهدة"
                         }
                         ClearAction.FAVORITES -> {
@@ -1217,20 +1221,22 @@ private fun LiveContent(
     val fullscreenFocusRequester = remember { FocusRequester() }
     var orderedGroups by remember { mutableStateOf(emptyList<Pair<String, List<RSTVChannel>>>()) }
     var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    var numberByStreamUrl by remember { mutableStateOf(emptyMap<String, Int>()) }
     LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
         val channelSnapshot = channels.toList()
-        val groups = withContext(Dispatchers.Default) {
-            orderedChannelGroups(channelSnapshot)
+        val result = withContext(Dispatchers.Default) {
+            val groups = orderedChannelGroups(channelSnapshot)
+            val numbered = groups
+                .flatMap { it.second }
+                .distinctBy { it.streamUrl }
+                .mapIndexed { index, channel -> (index + 1) to channel }
+            Triple(groups, numbered, numbered.associate { it.second.streamUrl to it.first })
         }
-        orderedGroups = groups
-        numberedChannels = groups
-            .flatMap { it.second }
-            .distinctBy { it.streamUrl }
-            .mapIndexed { index, channel -> (index + 1) to channel }
+        orderedGroups = result.first
+        numberedChannels = result.second
+        numberByStreamUrl = result.third
     }
-    val selectedChannelNumber = numberedChannels
-        .firstOrNull { it.second.streamUrl == selectedChannel?.streamUrl }
-        ?.first
+    val selectedChannelNumber = numberByStreamUrl[selectedChannel?.streamUrl]
     var showChannelInfo by remember { mutableStateOf(false) }
 
     LaunchedEffect(isFullscreenPlayer, selectedChannel?.streamUrl) {
@@ -1522,15 +1528,19 @@ private fun FullscreenChannelSelectorDialog(
     var query by remember { mutableStateOf("") }
     var previewChannel by remember(activeChannel?.streamUrl) { mutableStateOf(activeChannel) }
     var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    var numberByStreamUrl by remember { mutableStateOf(emptyMap<String, Pair<Int, RSTVChannel>>()) }
     var filteredChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
     LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
         val channelSnapshot = channels.toList()
-        numberedChannels = withContext(Dispatchers.Default) {
-            orderedChannelGroups(channelSnapshot)
+        val result = withContext(Dispatchers.Default) {
+            val numbered = orderedChannelGroups(channelSnapshot)
                 .flatMap { it.second }
                 .distinctBy { it.streamUrl }
                 .mapIndexed { index, channel -> (index + 1) to channel }
+            numbered to numbered.associateBy { it.second.streamUrl }
         }
+        numberedChannels = result.first
+        numberByStreamUrl = result.second
     }
     LaunchedEffect(numberedChannels, query) {
         val channelSnapshot = numberedChannels
@@ -1543,9 +1553,7 @@ private fun FullscreenChannelSelectorDialog(
             }
         }
     }
-    val previewEntry = numberedChannels.firstOrNull {
-        it.second.streamUrl == previewChannel?.streamUrl
-    }
+    val previewEntry = numberByStreamUrl[previewChannel?.streamUrl]
 
     Dialog(
         onDismissRequest = onDismiss,
