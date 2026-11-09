@@ -1593,7 +1593,7 @@ private fun OnlineSourcesContent(
         "أمريكا الجنوبية واللاتينية", "شرق آسيا", "آسيا وبقية العالم",
         "الدول الإفريقية", "أوقيانوسيا", "أوروبا", "أمريكا الجنوبية",
         "قنوات الأفلام", "قنوات المسلسلات", "قنوات الرياضة",
-        "فهارس وباقات IPTV العالمية"
+        "فهارس IPTV الإضافية"
     )
     val groupedSources = remember(sources) {
         sources.groupBy { it.packageGroup }
