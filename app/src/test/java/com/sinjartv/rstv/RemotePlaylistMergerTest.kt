@@ -116,6 +116,26 @@ class RemotePlaylistMergerTest {
     }
 
     @Test
+    fun infersArabicCountryFromDouboCountryPackageId() {
+        val snapshot = RemoteSourceSnapshot(
+            id = "doubo-country-sy",
+            name = "Doubo — سوريا",
+            provider = "Doubo Public Channel Directory",
+            attribution = "CC BY 4.0",
+            content = """
+                #EXTM3U
+                #EXTINF:-1 group-title="News",Example Syria News
+                https://sy.example/live.m3u8
+            """.trimIndent()
+        )
+
+        val merged = RemotePlaylistMerger.merge(listOf(snapshot))
+
+        assertEquals(1, merged.size)
+        assertEquals("سوريا", merged.single().country)
+    }
+
+    @Test
     fun keepsDifferentQueryTokensAsSeparateStreams() {
         val snapshots = listOf(
             RemoteSourceSnapshot(
