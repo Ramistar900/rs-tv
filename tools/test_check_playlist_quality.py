@@ -41,6 +41,23 @@ class PlaylistQualityTests(unittest.TestCase):
         self.assertTrue({"doubo-sports", "iptv-org-sports", "iptv-org-movies", "iptv-org-series"} <= ids)
         self.assertTrue({"iptv-org-animation", "iptv-org-auto", "iptv-org-business", "iptv-org-classic", "iptv-org-comedy", "iptv-org-cooking", "iptv-org-culture", "iptv-org-documentary", "iptv-org-education", "iptv-org-entertainment", "iptv-org-family", "iptv-org-general", "iptv-org-kids", "iptv-org-legislative", "iptv-org-lifestyle", "iptv-org-music", "iptv-org-news", "iptv-org-outdoor", "iptv-org-public", "iptv-org-relax", "iptv-org-religious", "iptv-org-science", "iptv-org-travel", "iptv-org-weather"} <= ids)
 
+    def test_audit_includes_all_128_doubo_country_playlists(self):
+        country_sources = [
+            (source_id, url) for source_id, url in SOURCES
+            if source_id.startswith("doubo-country-")
+        ]
+        self.assertEqual(len(country_sources), 128)
+        self.assertEqual(len({source_id for source_id, _ in country_sources}), 128)
+        self.assertEqual(len({url for _, url in country_sources}), 128)
+        urls = dict(country_sources)
+        self.assertIn("doubo-country-sy", urls)
+        self.assertIn("doubo-country-lb", urls)
+        self.assertIn("doubo-country-iq", urls)
+        self.assertIn("doubo-country-us", urls)
+        self.assertIn("doubo-country-ca", urls)
+        self.assertTrue(urls["doubo-country-gb"].endswith("/countries/uk.m3u"))
+        self.assertTrue(all(url.startswith("https://cdn.jsdelivr.net/") for _, url in country_sources))
+
     def test_platform_pages_are_not_direct_streams(self):
         self.assertTrue(is_page_only_platform("https://www.youtube.com/watch?v=abc"))
         self.assertFalse(is_page_only_platform("https://news.example.org/live.m3u8"))
