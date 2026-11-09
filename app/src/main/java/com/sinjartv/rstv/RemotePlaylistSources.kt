@@ -599,21 +599,23 @@ internal object RemotePlaylistSources {
 
     fun countryPackages(countryCodes: Collection<String>): List<RemotePlaylistSource> {
         val existingIds = playlists.mapTo(HashSet()) { it.id }
+        val existingUrls = playlists.mapTo(HashSet()) { it.playlistUrl }
         return (countryCodes.map { it.trim().uppercase(Locale.ROOT) } + arabCountryCodes)
             .filter { it.matches(Regex("[A-Z]{2}")) }
             .distinct()
             .filterNot { "iptv-org-${it.lowercase(Locale.ROOT)}" in existingIds }
             .sortedWith(compareBy<String>({ countryGroupFor(it) }, { countryName(it) }))
-            .map { code ->
+            .mapNotNull { code ->
                 val playlistCode = if (code == "GB") "uk" else code.lowercase(Locale.ROOT)
                 val id = "iptv-org-${playlistCode}"
-                RemotePlaylistSource(
+                val source = RemotePlaylistSource(
                     id = id,
                     name = "IPTV-org — ${countryName(code)}",
                     description = "باقة قنوات ${countryName(code)} من فهرس IPTV-org. تُنزّل كقائمة IPTV فقط؛ عدد القنوات وتوفرها يتغيران حسب تحديث المصدر، ويجب مراجعة حقوق كل قناة قبل اعتبارها مرخصة.",
                     playlistUrl = "https://iptv-org.github.io/iptv/countries/${playlistCode}.m3u",
                     provider = "iptv-org/iptv"
                 )
+                source.takeUnless { it.playlistUrl in existingUrls }
             }
     }
 
