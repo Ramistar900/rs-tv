@@ -38,7 +38,7 @@ internal object RemotePlaylistSources {
     val playlists = listOf(
         RemotePlaylistSource(
             id = "doubo-world",
-            name = "Doubo — القنوات العالمية",
+            name = "Doubo — فهرس القنوات الكامل",
             description = "فهرس يومي لقنوات يعلن ناشره أنها متاحة مجاناً للعامة. يفحص الروابط إلى أول مقطع فيديو ويستخدم نطاقات المحطات الرسمية أو CDN/منصات مجانية معتمدة ضمن سياسته.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.m3u",
             provider = "Doubo Public Channel Directory",
@@ -74,7 +74,7 @@ internal object RemotePlaylistSources {
         ),
         RemotePlaylistSource(
             id = "iptv-org-world",
-            name = "IPTV-org — العالم",
+            name = "IPTV-org — فهرس القنوات الكامل",
             description = "فهرس مجتمعي واسع لقنوات الإنترنت، مقسّم بحسب الدول واللغات والتصنيفات. الروابط مرشحة وليست كلها مضمونة أو مرخصة.",
             playlistUrl = "https://iptv-org.github.io/iptv/index.m3u",
             provider = "iptv-org/iptv"
@@ -782,13 +782,13 @@ internal object RemotePlaylistSources {
             id == "iptv-org-north-america" -> "أمريكا الشمالية"
             id in setOf("iptv-org-south-america", "iptv-org-latin-america") -> "أمريكا الجنوبية واللاتينية"
             id == "iptv-org-east-asia" -> "شرق آسيا"
-            else -> "فهارس وباقات IPTV العالمية"
+            else -> "فهارس IPTV الإضافية"
         }
     }
 
     private fun countryGroupFor(code: String): String = when (code.uppercase(Locale.ROOT)) {
         in arabCountryCodes -> "الدول العربية"
-        code.uppercase(Locale.ROOT) == "TR" -> "باقات تركيا"
+        "TR" -> "باقات تركيا"
         in europeanCountryCodes -> "الدول الأوروبية"
         in northAmericanCountryCodes -> "أمريكا الشمالية"
         in eastAsianCountryCodes -> "شرق آسيا"
