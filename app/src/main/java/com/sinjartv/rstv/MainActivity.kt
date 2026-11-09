@@ -151,6 +151,65 @@ private enum class ClearAction(val title: String, val message: String) {
     SOURCE_LIBRARY("مسح مكتبة مصادر IPTV", "سيتم حذف نسخ قوائم المصادر المجمّعة فقط، دون حذف قائمة المستخدم أو المفضلة."),
 }
 
+private data class DerivedChannelCollections(
+    val adultStreamKeys: Set<String> = emptySet(),
+    val regularChannels: List<RSTVChannel> = emptyList(),
+    val regularSourceLibraryChannels: List<RSTVChannel> = emptyList(),
+    val favoriteChannels: List<RSTVChannel> = emptyList(),
+    val recentChannels: List<RSTVChannel> = emptyList(),
+    val visibleChannels: List<RSTVChannel> = emptyList(),
+    val visibleSourceLibraryChannels: List<RSTVChannel> = emptyList()
+)
+
+private fun deriveChannelCollections(
+    userChannels: List<RSTVChannel>,
+    sourceChannels: List<RSTVChannel>,
+    favoriteUrls: Set<String>,
+    historyUrls: List<String>,
+    searchQuery: String
+): DerivedChannelCollections {
+    val knownByKey = linkedMapOf<String, RSTVChannel>()
+    (userChannels + sourceChannels).forEach { channel ->
+        val key = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
+        val existing = knownByKey[key]
+        if (existing == null || (!AdultContentPolicy.isAdult(existing) && AdultContentPolicy.isAdult(channel))) {
+            knownByKey[key] = channel
+        }
+    }
+
+    val adultKeys = knownByKey.filterValues(AdultContentPolicy::isAdult).keys
+    val regularUser = userChannels.filter { channel ->
+        RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders) !in adultKeys
+    }
+    val regularSources = sourceChannels.filter { channel ->
+        RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders) !in adultKeys
+    }
+    val knownByStreamUrl = knownByKey.values.associateBy { it.streamUrl }
+    val favorites = knownByKey.values.filter { !AdultContentPolicy.isAdult(it) && it.streamUrl in favoriteUrls }
+    val recent = historyUrls.mapNotNull { knownByStreamUrl[it] }
+        .filterNot(AdultContentPolicy::isAdult)
+        .distinctBy { it.streamUrl }
+    val query = searchQuery.trim()
+
+    return DerivedChannelCollections(
+        adultStreamKeys = adultKeys,
+        regularChannels = regularUser,
+        regularSourceLibraryChannels = regularSources,
+        favoriteChannels = favorites,
+        recentChannels = recent,
+        visibleChannels = regularUser.filter { channel ->
+            query.isBlank() ||
+                channel.name.contains(query, ignoreCase = true) ||
+                channel.group.orEmpty().contains(query, ignoreCase = true)
+        },
+        visibleSourceLibraryChannels = regularSources.filter { channel ->
+            query.isBlank() ||
+                channel.name.contains(query, ignoreCase = true) ||
+                channel.group.orEmpty().contains(query, ignoreCase = true)
+        }
+    )
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -199,6 +258,29 @@ private fun RSTVHome() {
     var status by remember { mutableStateOf("مرحباً بك في RS TV") }
     var skippedUnsafeLinks by remember { mutableIntStateOf(0) }
     var favouriteRevision by remember { mutableIntStateOf(0) }
+    var libraryRevision by remember { mutableIntStateOf(0) }
+    var historyRevision by remember { mutableIntStateOf(0) }
+    var derivedCollections by remember { mutableStateOf(DerivedChannelCollections()) }
+    val favoriteUrls = remember(favouriteRevision) {
+        LocalLibraryStore.favoriteStreams(context)
+    }
+    LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery) {
+        val userSnapshot = channels.toList()
+        val sourceSnapshot = sourceLibraryChannels.toList()
+        val favoriteSnapshot = favoriteUrls
+        val historySnapshot = withContext(Dispatchers.IO) {
+            LocalLibraryStore.history(context)
+        }
+        derivedCollections = withContext(Dispatchers.Default) {
+            deriveChannelCollections(
+                userChannels = userSnapshot,
+                sourceChannels = sourceSnapshot,
+                favoriteUrls = favoriteSnapshot,
+                historyUrls = historySnapshot,
+                searchQuery = searchQuery
+            )
+        }
+    }
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
     var isFullscreenPlayer by remember { mutableStateOf(false) }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
@@ -210,11 +292,7 @@ private fun RSTVHome() {
 
     fun isRestrictedAdultChannel(channel: RSTVChannel): Boolean {
         val targetKey = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
-        return AdultContentPolicy.isAdult(channel) ||
-            (channels + sourceLibraryChannels).any { candidate ->
-                AdultContentPolicy.isAdult(candidate) &&
-                    RemotePlaylistMerger.canonicalStreamKey(candidate.streamUrl, candidate.httpHeaders) == targetKey
-            }
+        return AdultContentPolicy.isAdult(channel) || targetKey in derivedCollections.adultStreamKeys
     }
 
     DisposableEffect(isFullscreenPlayer, activity) {
@@ -270,6 +348,7 @@ private fun RSTVHome() {
             if (parsed.isValidPlaylist) {
                 channels.clear()
                 channels.addAll(parsed.channels)
+                libraryRevision++
                 skippedUnsafeLinks = parsed.skippedUnsafeLinks
                 status = "تمت استعادة ${parsed.channels.size} قناة محفوظة"
             }
@@ -283,6 +362,7 @@ private fun RSTVHome() {
             }
             sourceLibraryChannels.clear()
             sourceLibraryChannels.addAll(mergedSources)
+            libraryRevision++
             sourceLibraryCount = savedSources.size
             sourceLibraryStatus = "تمت استعادة ${savedSources.size} قوائم مصدر و${mergedSources.size} قناة بعد إزالة التكرار"
         }.onFailure {
@@ -330,6 +410,7 @@ private fun RSTVHome() {
                     selectedChannel = null
                     channels.clear()
                     channels.addAll(parsed.channels)
+                    libraryRevision++
                     skippedUnsafeLinks = parsed.skippedUnsafeLinks
                     status = if (parsed.channels.isEmpty()) {
                         "القائمة صحيحة، لكنها لا تحتوي روابط HTTPS صالحة للتشغيل"
@@ -420,6 +501,7 @@ private fun RSTVHome() {
                 }
                 sourceLibraryChannels.clear()
                 sourceLibraryChannels.addAll(mergedSources)
+                libraryRevision++
                 sourceLibraryCount = savedSources.size
                 sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر محفوظة و${mergedSources.size} قناة فريدة بعد إزالة التكرار"
                 remotePlaylistStatus = buildString {
@@ -458,6 +540,7 @@ private fun RSTVHome() {
         selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
         LocalLibraryStore.addToHistory(context, channel.streamUrl)
+        historyRevision++
         val mediaSources = queue.map { item ->
             val httpFactory = DefaultHttpDataSource.Factory()
                 .setDefaultRequestProperties(item.httpHeaders)
@@ -476,39 +559,12 @@ private fun RSTVHome() {
         favouriteRevision++
     }
 
-    val favoriteUrls = remember(favouriteRevision) {
-        LocalLibraryStore.favoriteStreams(context)
-    }
-    val combinedChannels = channels + sourceLibraryChannels
-    val allKnownChannels = combinedChannels
-        .groupBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
-        .values
-        .map { candidates ->
-            candidates.firstOrNull(AdultContentPolicy::isAdult) ?: candidates.first()
-        }
-    val adultStreamKeys = allKnownChannels.filter(AdultContentPolicy::isAdult)
-        .map { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
-        .toSet()
-    val regularChannels = channels.filterNot {
-        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
-    }
-    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot {
-        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
-    }
-    val favoriteChannels = allKnownChannels.filterNot(AdultContentPolicy::isAdult)
-        .filter { it.streamUrl in favoriteUrls }
-    val recentChannels = LocalLibraryStore.history(context)
-        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url && !AdultContentPolicy.isAdult(it) } }
-    val visibleChannels = regularChannels.filter { channel ->
-        searchQuery.isBlank() ||
-            channel.name.contains(searchQuery, ignoreCase = true) ||
-            channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
-    }
-    val visibleSourceLibraryChannels = regularSourceLibraryChannels.filter { channel ->
-        searchQuery.isBlank() ||
-            channel.name.contains(searchQuery, ignoreCase = true) ||
-            channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
-    }
+    val regularChannels = derivedCollections.regularChannels
+    val regularSourceLibraryChannels = derivedCollections.regularSourceLibraryChannels
+    val favoriteChannels = derivedCollections.favoriteChannels
+    val recentChannels = derivedCollections.recentChannels
+    val visibleChannels = derivedCollections.visibleChannels
+    val visibleSourceLibraryChannels = derivedCollections.visibleSourceLibraryChannels
 
     pendingClear?.let { action ->
         AlertDialog(
@@ -521,6 +577,7 @@ private fun RSTVHome() {
                         ClearAction.PLAYLIST -> {
                             LocalLibraryStore.clearPlaylist(context)
                             channels.clear()
+                            libraryRevision++
                             exoPlayer.stop()
                             exoPlayer.clearMediaItems()
                             selectedChannel = null
@@ -538,6 +595,7 @@ private fun RSTVHome() {
                         ClearAction.SOURCE_LIBRARY -> {
                             LocalLibraryStore.clearRemoteSources(context)
                             sourceLibraryChannels.clear()
+                            libraryRevision++
                             sourceLibraryCount = 0
                             sourceLibraryStatus = "تم مسح مكتبة المصادر"
                             status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
