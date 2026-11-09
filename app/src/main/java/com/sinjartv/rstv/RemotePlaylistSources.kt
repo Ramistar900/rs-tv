@@ -20,6 +20,14 @@ internal data class RemotePlaylistSource(
         get() = RemotePlaylistSources.packageGroupFor(id)
 }
 
+internal data class RemotePlaylistPackage(
+    val id: String,
+    val name: String,
+    val description: String,
+    val packageGroup: String,
+    val sources: List<RemotePlaylistSource>
+)
+
 internal enum class OfficialDestinationCategory(val title: String) {
     SPORTS("قنوات ومنصات الرياضة"),
     MOVIES("الأفلام والمسلسلات"),
@@ -600,7 +608,7 @@ internal object RemotePlaylistSources {
     fun countryPackages(countryCodes: Collection<String>): List<RemotePlaylistSource> {
         val existingIds = playlists.mapTo(HashSet()) { it.id }
         val existingUrls = playlists.mapTo(HashSet()) { it.playlistUrl }
-        return (countryCodes.map { it.trim().uppercase(Locale.ROOT) } + arabCountryCodes)
+        return (countryCodes.map { it.trim().uppercase(Locale.ROOT) } + arabCountryCodes + setOf("FR", "BE"))
             .filter { it.matches(Regex("[A-Z]{2}")) }
             .distinct()
             .filterNot { "iptv-org-${it.lowercase(Locale.ROOT)}" in existingIds }
@@ -764,6 +772,67 @@ internal object RemotePlaylistSources {
                     allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
                 )
             }
+
+    fun displayPackages(sources: List<RemotePlaylistSource>): List<RemotePlaylistPackage> {
+        val countrySources = linkedMapOf<String, MutableList<RemotePlaylistSource>>()
+        val otherPackages = mutableListOf<RemotePlaylistPackage>()
+
+        sources.distinctBy { it.id }.forEach { source ->
+            val countryCode = countryCodeForSourceId(source.id)
+            if (countryCode == null) {
+                otherPackages += RemotePlaylistPackage(
+                    id = source.id,
+                    name = source.name,
+                    description = source.description,
+                    packageGroup = source.packageGroup,
+                    sources = listOf(source)
+                )
+            } else {
+                countrySources.getOrPut(countryCode) { mutableListOf() } += source
+            }
+        }
+
+        val combinedCountryPackages = countrySources.map { (countryCode, countryEntries) ->
+            val uniqueSources = countryEntries.distinctBy { it.playlistUrl.trim().lowercase(Locale.ROOT) }
+            val displayCountryName = countryName(countryCode)
+            RemotePlaylistPackage(
+                id = "country-$countryCode",
+                name = displayCountryName,
+                description = if (uniqueSources.size > 1) {
+                    "باقة موحدة لقنوات ${displayCountryName} تجمع ${uniqueSources.size} مصادر IPTV. تُدمج القوائم مع إزالة روابط البث المتطابقة قبل عرض القنوات."
+                } else {
+                    "باقة قنوات ${displayCountryName} من مصدر IPTV متاح. تُزال روابط البث المتطابقة عند دمج المكتبة."
+                },
+                packageGroup = countryGroupFor(countryCode),
+                sources = uniqueSources
+            )
+        }.sortedWith(compareBy({ groupOrderForCountry(it.packageGroup) }, { it.name }))
+
+        return combinedCountryPackages + otherPackages
+    }
+
+    private fun countryCodeForSourceId(id: String): String? {
+        val code = when {
+            id == "doubo-turkey" -> "TR"
+            id.startsWith("iptv-org-") -> id.removePrefix("iptv-org-").uppercase(Locale.ROOT)
+            id.startsWith("doubo-country-") -> id.removePrefix("doubo-country-").uppercase(Locale.ROOT)
+            else -> return null
+        }
+        return code.takeIf { it.matches(Regex("[A-Z]{2}")) }
+    }
+
+    private fun groupOrderForCountry(group: String): Int = when (group) {
+        "الدول العربية" -> 0
+        "باقات تركيا" -> 1
+        "الدول الأوروبية" -> 2
+        "أمريكا الشمالية" -> 3
+        "أمريكا الجنوبية واللاتينية" -> 4
+        "شرق آسيا" -> 5
+        "آسيا وبقية العالم" -> 6
+        "الدول الإفريقية" -> 7
+        "أوقيانوسيا" -> 8
+        else -> 9
+    }
 
     fun packageGroupFor(id: String): String {
         val countryCode = when {
