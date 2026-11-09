@@ -10,7 +10,7 @@ class RemotePlaylistSourcesTest {
     @Test
     fun allRemotePlaylistSourcesUseHttpsAndApprovedHosts() {
         assertTrue(RemotePlaylistSources.playlists.isNotEmpty())
-        (RemotePlaylistSources.playlists + RemotePlaylistSources.countryPackages(listOf("SY", "LB", "IQ", "US", "CA"))).forEach { source ->
+        (RemotePlaylistSources.playlists + RemotePlaylistSources.countryPackages(listOf("SY", "LB", "IQ", "US", "CA")) + RemotePlaylistSources.douboCountryPackages()).forEach { source ->
             val uri = URI(source.playlistUrl)
             assertTrue(source.id.isNotBlank())
             assertTrue(uri.scheme.equals("https", ignoreCase = true))
@@ -21,7 +21,7 @@ class RemotePlaylistSourcesTest {
 
     @Test
     fun douboListsAllowOnlyKnownJsDelivrRedirectHosts() {
-        val douboSources = RemotePlaylistSources.playlists.filter { it.id.startsWith("doubo-") }
+        val douboSources = RemotePlaylistSources.playlists.filter { it.id.startsWith("doubo-") } + RemotePlaylistSources.douboCountryPackages()
         assertTrue(douboSources.isNotEmpty())
         douboSources.forEach { source ->
             assertTrue("cdn.jsdelivr.net" in source.allowedHosts)
@@ -80,6 +80,32 @@ class RemotePlaylistSourcesTest {
             assertEquals("iptv-org/iptv", source.provider)
             assertTrue(source.playlistUrl.startsWith("https://iptv-org.github.io/iptv/countries/"))
             assertTrue(source.playlistUrl.endsWith(".m3u"))
+        }
+    }
+
+    @Test
+    fun douboCountryPackagesCoverAll128PublishedCountriesWithoutDuplicates() {
+        val packages = RemotePlaylistSources.douboCountryPackages()
+        assertEquals(128, packages.size)
+        assertEquals(128, packages.map { it.id }.distinct().size)
+        assertEquals(128, packages.map { it.playlistUrl }.distinct().size)
+
+        val byId = packages.associateBy { it.id }
+        listOf("sy", "lb", "iq", "us", "ca", "de", "fr", "gb", "tr").forEach { code ->
+            assertTrue("Missing Doubo country: $code", "doubo-country-$code" in byId)
+        }
+        assertEquals("الدول العربية", byId.getValue("doubo-country-sy").packageGroup)
+        assertEquals("الدول العربية", byId.getValue("doubo-country-lb").packageGroup)
+        assertEquals("الدول العربية", byId.getValue("doubo-country-iq").packageGroup)
+        assertEquals("أمريكا الشمالية", byId.getValue("doubo-country-us").packageGroup)
+        assertEquals("أمريكا الشمالية", byId.getValue("doubo-country-ca").packageGroup)
+        assertEquals("باقات تركيا", byId.getValue("doubo-country-tr").packageGroup)
+        packages.forEach { source ->
+            assertEquals("Doubo Public Channel Directory", source.provider)
+            assertTrue(source.playlistUrl.startsWith("https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/"))
+            assertTrue(source.playlistUrl.endsWith(".m3u"))
+            assertTrue("cdn.jsdelivr.net" in source.allowedHosts)
+            assertFalse(source.attribution.isNullOrBlank())
         }
     }
 
