@@ -113,6 +113,36 @@ class RemotePlaylistSourcesTest {
     }
 
     @Test
+    fun countrySourcesArePresentedAsOneCombinedPackagePerCountry() {
+        val sources = RemotePlaylistSources.playlists +
+            RemotePlaylistSources.countryPackages(listOf("FR", "BE")) +
+            RemotePlaylistSources.douboCountryPackages()
+        val packages = RemotePlaylistSources.displayPackages(sources)
+
+        listOf("FR", "BE").forEach { code ->
+            val countryPackage = packages.single { it.id == "country-$code" }
+            assertEquals(1, packages.count { it.id == "country-$code" })
+            assertTrue(countryPackage.sources.size >= 2)
+            assertTrue(countryPackage.sources.any { it.provider == "iptv-org/iptv" })
+            assertTrue(countryPackage.sources.any { it.provider == "Doubo Public Channel Directory" })
+            assertEquals("الدول الأوروبية", countryPackage.packageGroup)
+            assertEquals(countryPackage.sources.size, countryPackage.sources.map { it.playlistUrl }.distinct().size)
+        }
+    }
+
+    @Test
+    fun arabicCountryNamesAlsoAppearOnlyOnceAcrossTwoProviders() {
+        val sources = RemotePlaylistSources.playlists +
+            RemotePlaylistSources.countryPackages(listOf("SY", "LB", "IQ")) +
+            RemotePlaylistSources.douboCountryPackages()
+        val packages = RemotePlaylistSources.displayPackages(sources)
+
+        listOf("SY", "LB", "IQ").forEach { code ->
+            assertEquals(1, packages.count { it.id == "country-$code" })
+        }
+    }
+
+    @Test
     fun groupedIndexesAreExplicitlySameProviderAndPortugueseListHasAttribution() {
         val sources = RemotePlaylistSources.playlists.associateBy { it.id }
         listOf(
