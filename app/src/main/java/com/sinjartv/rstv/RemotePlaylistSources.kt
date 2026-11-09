@@ -571,7 +571,7 @@ internal object RemotePlaylistSources {
 
     private val europeanCountryCodes = setOf(
         "AD", "AL", "AT", "AX", "BA", "BE", "BG", "BY", "CH", "CY", "CZ", "DE",
-        "DK", "EE", "ES", "FI", "FO", "FR", "GB", "GE", "GG", "GI", "GR", "HR",
+        "DK", "EE", "ES", "FI", "FO", "FR", "GB", "GE", "GG", "GI", "GR", "HR", "TR",
         "HU", "IE", "IM", "IS", "IT", "JE", "LI", "LT", "LU", "LV", "MC", "MD",
         "ME", "MK", "MT", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE", "SI",
         "SJ", "SK", "SM", "UA", "UK", "VA", "XK"
@@ -638,6 +638,7 @@ internal object RemotePlaylistSources {
 
     private fun countryGroupFor(code: String): String = when (code.uppercase(Locale.ROOT)) {
         in arabCountryCodes -> "الدول العربية"
+        code.uppercase(Locale.ROOT) == "TR" -> "باقات تركيا"
         in europeanCountryCodes -> "الدول الأوروبية"
         in northAmericanCountryCodes -> "أمريكا الشمالية"
         in eastAsianCountryCodes -> "شرق آسيا"
