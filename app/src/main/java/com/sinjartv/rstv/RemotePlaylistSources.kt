@@ -578,6 +578,7 @@ internal object RemotePlaylistSources {
     )
 
     private val northAmericanCountryCodes = setOf("US", "CA", "GL", "BM")
+    private val eastAsianCountryCodes = setOf("CN", "HK", "JP", "KP", "KR", "MO", "MN", "TW")
     private val latinAmericanCountryCodes = setOf(
         "AG", "AI", "AR", "AW", "BB", "BL", "BO", "BQ", "BR", "BS", "BZ", "CL",
         "CO", "CR", "CU", "CW", "DM", "DO", "EC", "FK", "GD", "GF", "GP", "GT",
@@ -625,6 +626,8 @@ internal object RemotePlaylistSources {
             id.contains("movie") -> "قنوات الأفلام"
             id.contains("series") -> "قنوات المسلسلات"
             id.contains("sports") -> "قنوات الرياضة"
+            id.contains("arab") -> "باقات عربية مجمعة"
+            id.contains("turkey") -> "باقات تركيا"
             id in setOf("iptv-org-europe", "iptv-org-western-europe") -> "أوروبا"
             id == "iptv-org-north-america" -> "أمريكا الشمالية"
             id in setOf("iptv-org-south-america", "iptv-org-latin-america") -> "أمريكا الجنوبية واللاتينية"
@@ -637,6 +640,7 @@ internal object RemotePlaylistSources {
         in arabCountryCodes -> "الدول العربية"
         in europeanCountryCodes -> "الدول الأوروبية"
         in northAmericanCountryCodes -> "أمريكا الشمالية"
+        in eastAsianCountryCodes -> "شرق آسيا"
         in latinAmericanCountryCodes -> "أمريكا الجنوبية واللاتينية"
         in africanCountryCodes -> "الدول الإفريقية"
         in oceaniaCountryCodes -> "أوقيانوسيا"
