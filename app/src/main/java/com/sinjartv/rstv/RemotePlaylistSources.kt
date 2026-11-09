@@ -813,7 +813,7 @@ internal object RemotePlaylistSources {
 
     private fun countryCodeForSourceId(id: String): String? {
         val code = when {
-            id == "doubo-turkey" -> "TR"
+            id == "doubo-turkey" || id == "iptv-org-turkey" -> "TR"
             id.startsWith("iptv-org-") -> id.removePrefix("iptv-org-").uppercase(Locale.ROOT)
             id.startsWith("doubo-country-") -> id.removePrefix("doubo-country-").uppercase(Locale.ROOT)
             else -> return null
