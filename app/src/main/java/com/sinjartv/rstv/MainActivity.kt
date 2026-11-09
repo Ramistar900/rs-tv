@@ -264,7 +264,9 @@ private fun RSTVHome() {
         withContext(Dispatchers.IO) {
             LocalLibraryStore.loadPlaylist(context)
         }?.let { saved ->
-            val parsed = M3uPlaylistParser.parse(saved)
+            val parsed = withContext(Dispatchers.Default) {
+                M3uPlaylistParser.parse(saved)
+            }
             if (parsed.isValidPlaylist) {
                 channels.clear()
                 channels.addAll(parsed.channels)
@@ -367,29 +369,49 @@ private fun RSTVHome() {
         }
     }
 
-    fun addRemotePlaylistToLibrary(source: RemotePlaylistSource) {
-        remotePlaylistStatus = "جارٍ إضافة ${source.name} إلى مكتبة المصادر..."
+    fun addRemotePlaylistPackageToLibrary(playlistPackage: RemotePlaylistPackage) {
+        remotePlaylistStatus = "جارٍ جمع باقة ${playlistPackage.name} من ${playlistPackage.sources.size} مصادر..."
         scope.launch {
-            runCatching {
-                val content = withContext(Dispatchers.IO) {
-                    RemotePlaylistDownloader.download(source)
-                }
-                val parsed = withContext(Dispatchers.Default) {
-                    M3uPlaylistParser.parse(content)
-                }
-                require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
-                require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في هذه القائمة" }
+            val downloadedSources = mutableListOf<String>()
+            val failedSources = mutableListOf<String>()
+            var importedChannelCount = 0
 
-                val snapshot = RemoteSourceSnapshot(
-                    id = source.id,
-                    name = source.name,
-                    provider = source.provider,
-                    attribution = source.attribution,
-                    content = content
-                )
-                withContext(Dispatchers.IO) {
-                    LocalLibraryStore.saveRemoteSource(context, snapshot)
+            playlistPackage.sources.distinctBy { it.playlistUrl }.forEach { source ->
+                runCatching {
+                    val content = withContext(Dispatchers.IO) {
+                        RemotePlaylistDownloader.download(source)
+                    }
+                    val parsed = withContext(Dispatchers.Default) {
+                        M3uPlaylistParser.parse(content)
+                    }
+                    require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
+                    require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في هذه القائمة" }
+
+                    val snapshot = RemoteSourceSnapshot(
+                        id = source.id,
+                        name = source.name,
+                        provider = source.provider,
+                        attribution = source.attribution,
+                        content = content
+                    )
+                    withContext(Dispatchers.IO) {
+                        LocalLibraryStore.saveRemoteSource(context, snapshot)
+                    }
+                    parsed.channels.size
+                }.onSuccess { count ->
+                    importedChannelCount += count
+                    downloadedSources += source.provider
+                }.onFailure { error ->
+                    failedSources += "${source.provider}: ${error.message ?: "تعذر التنزيل"}"
                 }
+            }
+
+            if (downloadedSources.isEmpty()) {
+                remotePlaylistStatus = "تعذر تنزيل باقة ${playlistPackage.name}: ${failedSources.joinToString("؛ ")}"
+                return@launch
+            }
+
+            runCatching {
                 val savedSources = withContext(Dispatchers.IO) {
                     LocalLibraryStore.loadRemoteSources(context)
                 }
@@ -399,10 +421,15 @@ private fun RSTVHome() {
                 sourceLibraryChannels.clear()
                 sourceLibraryChannels.addAll(mergedSources)
                 sourceLibraryCount = savedSources.size
-                sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر و${mergedSources.size} قناة فريدة"
-                remotePlaylistStatus = "تمت إضافة ${parsed.channels.size} قناة من ${source.name}. قائمتك الحالية لم تتغير."
+                sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر محفوظة و${mergedSources.size} قناة فريدة بعد إزالة التكرار"
+                remotePlaylistStatus = buildString {
+                    append("تم جمع باقة ${playlistPackage.name}: ${downloadedSources.size} من ${playlistPackage.sources.size} مصادر، و${importedChannelCount} مدخلاً قبل إزالة التكرار. ")
+                    append("أصبحت المكتبة تضم ${mergedSources.size} قناة فريدة.")
+                    if (failedSources.isNotEmpty()) append(" تعذر بعض المصادر: ${failedSources.joinToString("؛ ")}")
+                    append(" قائمتك المحلية لم تتغير.")
+                }
             }.onFailure { error ->
-                remotePlaylistStatus = "تعذرت إضافة ${source.name}: ${error.message ?: "خطأ غير معروف"}"
+                remotePlaylistStatus = "تم تنزيل بعض مصادر ${playlistPackage.name} لكن تعذر تحديث المكتبة: ${error.message ?: "خطأ غير معروف"}"
             }
         }
     }
@@ -792,7 +819,7 @@ private fun ScreenBody(
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
     sourceLibraryChannelCount: Int,
-    onAddSourceToLibrary: (RemotePlaylistSource) -> Unit,
+    onAddSourceToLibrary: (RemotePlaylistPackage) -> Unit,
     onShowSourceLibrary: () -> Unit,
     channels: List<RSTVChannel>,
     recentChannels: List<RSTVChannel>,
@@ -1130,11 +1157,15 @@ private fun LiveContent(
 ) {
     var showChannelTable by remember { mutableStateOf(false) }
     val fullscreenFocusRequester = remember { FocusRequester() }
-    val numberedChannels = remember(channels) {
-        orderedChannelGroups(channels)
-            .flatMap { it.second }
-            .distinctBy { it.streamUrl }
-            .mapIndexed { index, channel -> (index + 1) to channel }
+    var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
+        val channelSnapshot = channels.toList()
+        numberedChannels = withContext(Dispatchers.Default) {
+            orderedChannelGroups(channelSnapshot)
+                .flatMap { it.second }
+                .distinctBy { it.streamUrl }
+                .mapIndexed { index, channel -> (index + 1) to channel }
+        }
     }
     val selectedChannelNumber = numberedChannels
         .firstOrNull { it.second.streamUrl == selectedChannel?.streamUrl }
@@ -1583,7 +1614,7 @@ private fun OnlineSourcesContent(
     sourceLibraryCount: Int,
     sourceLibraryChannelCount: Int,
     sources: List<RemotePlaylistSource>,
-    onAddToLibrary: (RemotePlaylistSource) -> Unit,
+    onAddToLibrary: (RemotePlaylistPackage) -> Unit,
     onShowLibrary: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1594,8 +1625,9 @@ private fun OnlineSourcesContent(
         "قنوات الأفلام", "قنوات المسلسلات", "قنوات الرياضة",
         "فهارس IPTV الإضافية"
     )
-    val groupedSources = remember(sources) {
-        sources.groupBy { it.packageGroup }
+    val packages = remember(sources) { RemotePlaylistSources.displayPackages(sources) }
+    val groupedPackages = remember(packages) {
+        packages.groupBy { it.packageGroup }
             .toList()
             .sortedWith(compareBy(
                 { groupOrder.indexOf(it.first).let { index -> if (index < 0) Int.MAX_VALUE else index } },
@@ -1618,7 +1650,7 @@ private fun OnlineSourcesContent(
                 Text(status, color = SoftWhite, fontSize = 11.sp)
                 Text(sourceLibraryStatus, color = Silver, fontSize = 10.sp)
                 Text(
-                    "الباقات المتاحة: ${sources.size} • الباقات المحمّلة: $sourceLibraryCount",
+                    "الباقات المتاحة: ${packages.size} • مصادر محفوظة: $sourceLibraryCount",
                     color = SoftWhite,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
@@ -1647,11 +1679,13 @@ private fun OnlineSourcesContent(
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            groupedSources.forEach { (group, groupSources) ->
+            groupedPackages.forEach { (group, groupEntries) ->
                 item(key = "package-group-$group") {
                     Text(group, color = Silver, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
-                items(groupSources, key = { it.id }) { source ->
+                items(groupEntries, key = { it.id }) { playlistPackage ->
+                    val providers = playlistPackage.sources.map { it.provider }.distinct()
+                    val attributions = playlistPackage.sources.mapNotNull { it.attribution }.distinct()
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = PanelBlack),
@@ -1661,18 +1695,22 @@ private fun OnlineSourcesContent(
                             modifier = Modifier.fillMaxWidth().padding(13.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(source.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(source.description, color = MutedText, fontSize = 11.sp)
-                            Text("المصدر: ${source.provider}", color = Silver, fontSize = 10.sp)
-                            source.attribution?.let {
-                                Text(it, color = MutedText, fontSize = 9.sp)
+                            Text(playlistPackage.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(playlistPackage.description, color = MutedText, fontSize = 11.sp)
+                            Text(
+                                "المصادر: ${providers.joinToString(" + ")} • عدد القوائم: ${playlistPackage.sources.size}",
+                                color = Silver,
+                                fontSize = 10.sp
+                            )
+                            attributions.forEach { attribution ->
+                                Text(attribution, color = MutedText, fontSize = 9.sp)
                             }
                             Button(
-                                onClick = { onAddToLibrary(source) },
+                                onClick = { onAddToLibrary(playlistPackage) },
                                 colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("تنزيل الباقة إلى المكتبة")
+                                Text("تنزيل الباقة الموحّدة إلى المكتبة")
                             }
                         }
                     }
