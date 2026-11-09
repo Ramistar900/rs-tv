@@ -1,32 +1,54 @@
 # RS TV — Sinjar TV Show
 
-RS TV is an independent Android TV app for phones, tablets, Android TV, and TV boxes. It plays television delivered over the internet, including online feeds of traditional satellite broadcasters when publicly available. Direct dish/DVB reception and satellite-frequency tuning are not provided.
+RS TV is an Android app for phones, tablets, Android TV and TV boxes. Live television is discovered and imported through IPTV M3U/M3U8 playlists. The app does not tune satellite frequencies, operate a dish or require satellite hardware; a satellite broadcaster is available only when it publishes an online stream.
 
-## Implemented Android features
+## Current app structure
 
-- Adaptive navigation: bottom navigation on compact screens and a navigation rail on wide screens/TV layouts.
-- Arabic-first interface with a black, red, and silver visual identity.
-- Local M3U/M3U8 import, channel name/group search, and HTTPS stream playback.
-- In-app online source directory for worldwide, Arab-region, Arabic-language, and Türkiye M3U lists from IPTV-org and Doubo, plus dedicated sports, movies and series category playlists, and Free-TV/FreeCastHub supplementary lists.
-- User-initiated remote playlist download with HTTPS-only connections, exact-host redirect allowlisting, response-size and timeout limits; the selected source replaces the active local playlist.
-- Official external live destinations grouped into sports (FIFA+, Eurovision Sport, Red Bull TV, TRT Spor, Fubo Sports Network), movies/series (Rakuten TV Free, Pluto TV, Tubi, Plex, Internet Archive), and general broadcasters. Each opens the official service; regional availability and rights vary.
-- Local persistence for the imported playlist, favorites, and recent channel history.
-- XMLTV programme-guide import, secure XML parsing, and channel matching through M3U `tvg-id` and XMLTV `channel` IDs.
-- Android TV launcher entry and a dedicated TV banner; custom vector launcher icon.
-- Settings to re-import local data and clear the saved playlist, favorites, or viewing history.
-- Debug APK upload as a GitHub Actions artifact after tests and build succeed.
+- Adaptive Arabic-first interface for phones and Android TV.
+- Home, Live Broadcast, IPTV Sources, Favorites, Movies Library, Programme Guide and Settings.
+- The standalone «العالمية», YouTube discovery and old private/PIN tabs are removed from navigation.
+- IPTV Sources is the only channel-discovery entry point. It presents country and regional M3U packages; the source page downloads a playlist but does not start playback.
+- Downloaded source packages are saved in a separate imported-channel library. The user's local playlist, favorites and viewing history remain separate.
+- Imported channels are watched from Live Broadcast. The source downloader does not replace the local playlist.
+- Re-downloading a source refreshes its saved package. Duplicate stream URLs are removed when packages are merged, using the canonical URL and HTTP-header profile.
+- XMLTV programme-guide import, secure XML parsing and channel matching through M3U tvg-id and XMLTV channel IDs.
+- Adult-classified entries are excluded from ordinary channel browsing. There is no separate private/PIN content tab.
 
-## Worldwide content discovery
+## IPTV country and region packages
 
-- Automated worldwide internet-channel candidate import from the IPTV-org structured catalogue, with country, language, category, logo, feed, and blocklist metadata.
-- The global candidate file is refreshed daily and remains a review queue. It is not automatically treated as free, authorized, stable, or ready to play.
-- A rotating daily health scan checks up to 600 globally deduplicated HTTPS stream URLs, including the first HLS media segment where possible; a pass is not a full device playback test or rights approval.
-- YouTube live discovery is planned through the official YouTube Data API and requires a protected `YOUTUBE_API_KEY`; results use official YouTube playback routes.
-- Official broadcaster websites and internet services are added as verified external/embedded sources, according to each provider's rules.
-- International movie and series metadata can be discovered through TMDB after configuring `TMDB_API_KEY` and attribution. Metadata is separate from streaming rights and playback.
-- Public collection media such as Internet Archive items requires an item-by-item rights review.
+The source directory is grouped by region and country. Arabic countries are separate packages, including Syria, Lebanon, Iraq, Palestine, Jordan, Egypt, Saudi Arabia, the Gulf countries and North Africa. Other groups include Europe, North America (United States and Canada), Latin America and South America, East Asia, other Asian countries, Africa and Oceania.
 
-See [Global Internet Catalogue](catalog/README.md), [source registry](catalog/sources.json), and [import plan](catalog/import-plan.json).
+The app includes:
+- 128 separate Doubo country M3U package entries, with the UK country path mapped to the publisher's UK playlist.
+- IPTV-org global, regional, country, language and category M3U packages.
+- Separate movie, series and sports category playlists, plus further topic categories.
+- Other supplementary playlist sources, each labelled with its provider and source-specific notes.
+
+Country, category and global playlists overlap. They are alternate packages, not additive channel counts. The imported library removes matching canonical stream URLs when sources are combined.
+
+## Catalogue size and the 50,000 target
+
+The bundled IPTV-org candidate snapshot generated on 2026-11-08 contained 31,758 upstream channel records, 18,637 stream records and 8,622 channel candidates with HTTPS streams across 180 represented countries. Every record remained marked candidate, not_reviewed and unrated.
+
+The Doubo directory's 2026-11-08 published snapshot reported 2,982 listed channels across 128 countries and regions. Its country lists overlap its worldwide and category playlists, and it also overlaps other IPTV indexes. These published counts must not be added together as unique working RS TV channels.
+
+The Android candidate index parser supports up to 50,000 records. That is a processing limit, not a claim that the library currently contains 50,000 unique, working or licensed channels. The app shows the number of available packages and the number of unique channels actually imported. The 50,000 target is not yet achieved.
+
+## Rights, safety and reliability
+
+An HTTPS URL, an M3U listing, or a successful HTTP response does not prove permission to redistribute or watch a channel. Public feeds may be geo-restricted, may stop working, or may have rights limited by territory, programme or event.
+
+Doubo describes a publisher-side filter for feeds from broadcaster sites, broadcast-grade CDNs and official free platforms; its CC BY 4.0 licence applies to directory/link-selection data, not to the underlying programmes. IPTV-org and other community playlists are discovery sources and remain unreviewed unless separate channel-level checks pass. RS TV must not add pirated, paid-without-entitlement, DRM-bypassed, malicious, or unclear-rights streams, and it must not claim a source is licensed solely because it is public or technically reachable.
+
+The playlist downloader accepts HTTPS stream URLs, applies source host/redirect and size checks, and keeps downloaded packages separate from the local playlist. Technical validation is not a legal approval or a guarantee of device playback.
+
+## Catalogue and source documentation
+
+- [IPTV package catalogue and source limitations](catalog/README.md)
+- [IPTV source registry](catalog/sources.json)
+- [M3U country-package import plan](catalog/import-plan.json)
+
+The daily playlist quality audit now includes the 128 Doubo country M3U endpoints in its source registry. Pull-request runs execute audit unit tests; live endpoint/channel checks are skipped in pull-request context and run on the scheduled/default-branch workflow. An audit pass does not establish broadcast rights or real-device playback.
 
 ## Build and test
 
@@ -36,34 +58,13 @@ Requirements: JDK 17, Android SDK Platform 35, and Gradle 8.9.
 gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 ```
 
-GitHub Actions runs the M3U and XMLTV parser unit tests and assembles a debug APK for changes to Android sources, Gradle configuration, or the workflow. Successful runs publish the APK as the `rs-tv-debug-apk` workflow artifact for 14 days.
-
-## Playlist and guide behavior
-
-- Only HTTPS stream URLs with a valid host are accepted by the current M3U parser. HTTP, file, and other non-HTTPS stream entries are skipped.
-- Imported playlists are copied into the app's private local storage; they are not uploaded to a server.
-- Favorites and recent viewing history stay on the device.
-- XMLTV parsing rejects DTD declarations and external entities, limits input size and the number of parsed programme entries, and ignores malformed programme rows.
-- Programme matching uses the playlist channel's `tvg-id` and the XMLTV programme's `channel` value.
-- Playlist/logo metadata is untrusted input. The app does not yet download arbitrary logo URLs.
-
-## Channel and media rights
-
-Imported public URLs are discovery candidates only. Public reachability or free-to-air reception does not establish redistribution rights. Do not bypass DRM, conditional access, paid subscriptions, or provider entitlement. Open YouTube and restricted broadcaster streams through their official playback routes.
-
-## Community VPN
-
-The chosen direction is an optional, user-controlled Community VPN with provider-issued configuration imported on-device. This remains a security design only; there are no configured VPN servers or working VPN controls. Read [RS VPN Community Security Design](docs/RS-VPN-COMMUNITY-SECURITY.md). A VPN does not grant rights to streams or decrypt paid channels.
+GitHub Actions runs parser/source unit tests and assembles a debug APK for pull-request validation. A successful workflow build is necessary but is not a substitute for installing and testing the APK on a real phone, Android TV or TV box. Do not merge the current package changes until the user has tested the build.
 
 ## Remaining validation
 
-- Connect the approved global channel catalogue to the Android app after rights review and verify its update/cache behavior.
-- Configure and test official YouTube live discovery using a protected API key and YouTube's official playback route.
-- Configure TMDB metadata access and provider attribution after terms/licensing review.
-- Test playback against a lawful HTTPS stream on real Android phone, tablet, Android TV, and TV-box hardware.
-- Verify D-pad focus behavior and screen scaling on multiple TV launchers and remote controls.
-- Integrate the original `rs-tv-logo.png` artwork into Android resources; the current launcher icon/banner are vector placeholders in the RS TV color palette.
-- Complete EPG edge-case checks against real provider XMLTV files and device timezone behavior.
-- Add signed release configuration after the debug APK has been device-tested.
+- Complete the current PR's Android unit tests and APK build.
+- Install the new APK and test country-package downloads, country names, duplicate removal, live playback, D-pad navigation and the existing local playlist on real devices.
+- Run the scheduled source endpoint and channel-health checks after the changes are merged, then inspect the resulting unique-stream totals and failures.
+- Add sources to the approved playable library only after source, rights, geographic and technical checks pass.
 
-No physical device playback, provider API integration, VPN connection, or release signing is claimed as completed.
+No physical-device playback test or 50,000-channel achievement is claimed as completed.

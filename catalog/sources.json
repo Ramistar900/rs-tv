@@ -1,7 +1,7 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "project": "RS TV",
-  "purpose": "Worldwide discovery registry for internet live channels and legal film/series metadata. Every external record is a candidate until source, availability, and rights are checked.",
+  "purpose": "IPTV M3U/M3U8 channel-source registry. The Android channel discovery screen downloads IPTV playlists only; every imported entry remains subject to separate technical and rights review.",
   "sources": [
     {
       "id": "iptv-org-api",
@@ -35,70 +35,6 @@
       "notes": "Community-maintained playlist discovery source. Do not assume stream reachability means authorized redistribution."
     },
     {
-      "id": "youtube-live-api",
-      "name": "YouTube live broadcasts",
-      "type": "official_live_video_discovery_api",
-      "url": "https://www.googleapis.com/youtube/v3/search",
-      "status": "integration_requires_youtube_data_api_key",
-      "required_parameters": [
-        "part=snippet",
-        "type=video",
-        "eventType=live"
-      ],
-      "credential": "YOUTUBE_API_KEY",
-      "playback": "Open the official YouTube watch page or approved official player integration; do not extract or rehost YouTube media streams.",
-      "notes": "Search results depend on query, quota, language, and region; they are not a complete inventory of every worldwide YouTube live channel."
-    },
-    {
-      "id": "official-broadcaster-sites",
-      "name": "Official broadcaster live websites",
-      "type": "official_website_directory",
-      "status": "manual_or_partner_verified_catalogue",
-      "playback": "Use official embed/player links where permitted; otherwise open the broadcaster website.",
-      "notes": "No universal index covers every broadcaster website. Add entries by country with the official domain and source attribution; never scrape protected players or bypass access controls."
-    },
-    {
-      "id": "tmdb-movie-tv-metadata",
-      "name": "The Movie Database movie and TV metadata",
-      "type": "movie_series_metadata_api",
-      "url": "https://api.themoviedb.org/3",
-      "status": "integration_requires_tmdb_api_key_and_terms_review",
-      "credential": "TMDB_API_KEY",
-      "notes": "Metadata, titles, descriptions, posters, and discovery only. TMDB metadata does not provide streaming rights or playback. Follow attribution and licensing requirements; commercial use requires separate review."
-    },
-    {
-      "id": "internet-archive-media",
-      "name": "Internet Archive media discovery",
-      "type": "public_collection_metadata_search",
-      "url": "https://archive.org/advancedsearch.php",
-      "status": "item_level_rights_review_required",
-      "notes": "Searchable public collection metadata. Review the rights/usage information for each item; do not treat an Archive listing as automatic public-domain clearance."
-    },
-    {
-      "id": "pluto-tv",
-      "name": "Pluto TV",
-      "type": "official_free_streaming_service",
-      "url": "https://pluto.tv/where-to-watch",
-      "status": "official_service_link_only",
-      "notes": "Availability and playback are controlled by the service and may vary by country/device. Do not extract or rehost streams."
-    },
-    {
-      "id": "rakuten-tv-live",
-      "name": "Rakuten TV Live / Free",
-      "type": "official_free_streaming_service",
-      "url": "https://support.rakuten.tv/hc/en-us/articles/360016822920-Live-TV",
-      "status": "official_service_link_only",
-      "notes": "Availability varies by country and device. Use official service playback."
-    },
-    {
-      "id": "samsung-tv-plus",
-      "name": "Samsung TV Plus",
-      "type": "official_free_streaming_service",
-      "url": "https://www.samsungtvplus.com/help-center.html",
-      "status": "official_service_link_only",
-      "notes": "Device and regional restrictions apply. Do not extract or rehost streams."
-    },
-    {
       "id": "doubo-public-directory",
       "name": "Doubo Public Channel Directory",
       "type": "daily_refreshed_curated_internet_playlist",
@@ -130,70 +66,6 @@
       "status": "experimental_secondary_candidate_source_on_user_request",
       "license": "Unlicense (as stated by repository)",
       "notes": "Small supplementary collection grouped by news, sports, weather and education. Maintainer rights claims are not independent proof; every channel still needs review."
-    },
-    {
-      "id": "fifa-plus",
-      "name": "FIFA+ official live football and archive",
-      "type": "official_free_or_rights-cleared_sports_platform",
-      "url": "https://www.plus.fifa.com/en",
-      "status": "official_service_link_only",
-      "notes": "FIFA+ publishes selected live matches, archive matches, and original programming. The live schedule and territory rights vary by competition and country; a link is not a guarantee that every match is free in every territory."
-    },
-    {
-      "id": "eurovision-sport",
-      "name": "Eurovision Sport",
-      "type": "official_free_sports_streaming_platform",
-      "url": "https://eurovisionsport.com/en",
-      "status": "official_service_link_only",
-      "notes": "EBU-backed free live and on-demand sports destination. Event availability, territories, and rights windows vary by event."
-    },
-    {
-      "id": "red-bull-tv",
-      "name": "Red Bull TV",
-      "type": "official_free_sports_and_documentary_platform",
-      "url": "https://www.redbull.com/int-en/tv",
-      "status": "official_service_link_only",
-      "notes": "Official free sports event streams, replays, documentaries, and sports films. Event rights and live coverage vary by region and schedule."
-    },
-    {
-      "id": "trt-spor",
-      "name": "TRT Spor official live page",
-      "type": "official_broadcaster_live_website",
-      "url": "https://www.trtspor.com.tr/canli-yayin-izle/trt-spor",
-      "status": "official_website_link_only",
-      "notes": "Official Turkish sports broadcaster page. Some events or videos can be region-restricted by rights; do not treat the page as a guaranteed direct stream."
-    },
-    {
-      "id": "fubo-sports-network",
-      "name": "Fubo Sports Network",
-      "type": "official_free_ad_supported_sports_network",
-      "url": "https://www.fubosportsnetwork.com/",
-      "status": "official_service_link_only",
-      "notes": "Free ad-supported sports programming distributed through selected partner platforms. Availability is limited by country and distribution platform; this is not a free source for all premium league rights."
-    },
-    {
-      "id": "tubi",
-      "name": "Tubi",
-      "type": "official_free_ad_supported_movies_and_live_tv",
-      "url": "https://tubitv.com/",
-      "status": "official_service_link_only",
-      "notes": "Official free, ad-supported movies and selected live channels. Tubi lists availability in the US, Canada, Mexico, LATAM, UK, and Australia; it does not list Türkiye as a supported market."
-    },
-    {
-      "id": "plex-live-tv",
-      "name": "Plex free movies and live TV",
-      "type": "official_free_ad_supported_movies_and_live_tv",
-      "url": "https://www.plex.tv/watch-free/",
-      "status": "official_service_link_only",
-      "notes": "Official free movies and live TV. Plex currently excludes Türkiye from the countries where its free Live TV service is available; include as a destination for supported territories only."
-    },
-    {
-      "id": "internet-archive-movies",
-      "name": "Internet Archive Moving Image Archive",
-      "type": "public_collection_item_level_rights_review",
-      "url": "https://archive.org/details/movies",
-      "status": "item_level_rights_review_required",
-      "notes": "Publicly accessible collection of films and moving images. Rights and terms must be checked per item and per version; public access alone does not prove public-domain or redistribution status."
     },
     {
       "id": "doubo-sports",
@@ -292,11 +164,11 @@
     "Do not mark a channel, film, or episode rights-cleared solely because a page or stream is publicly reachable.",
     "Do not include paid, encrypted, DRM-protected, leaked, or unauthorized streams.",
     "Do not scrape, extract, proxy, or rehost streams from official platforms without written permission.",
-    "Open YouTube and restricted broadcaster content through official playback routes.",
     "Keep metadata discovery separate from a playable video source.",
     "Preserve source attribution, country/region availability, and review timestamps.",
     "Treat all external URLs and metadata as untrusted input.",
-    "The app may offer source M3U playlists for user-initiated download. Each download replaces the active local playlist; only HTTPS stream entries are imported."
+    "The app may offer source M3U playlists for user-initiated download. Downloaded packages are kept separately from the user's local playlist; only valid HTTPS stream entries are imported.",
+    "The channel-discovery UI and channel imports use IPTV M3U/M3U8 sources only; webpage-only video destinations are not channel packages."
   ],
   "reliability_policy": {
     "principle": "Never promise zero buffering. Reliability is measured per source and can change without notice.",
@@ -314,106 +186,40 @@
       "Do not use successful technical playback checks as evidence of copyright permission."
     ]
   },
-  "official_live_destinations": [
+  "metadata_sources": [
     {
-      "id": "aljazeera-ar",
-      "name": "Al Jazeera Arabic live",
-      "url": "https://www.aljazeera.net/video/live",
-      "playback": "Official broadcaster website; open externally."
+      "id": "tmdb-movie-tv-metadata",
+      "name": "The Movie Database movie and TV metadata",
+      "type": "movie_series_metadata_api",
+      "url": "https://api.themoviedb.org/3",
+      "status": "integration_requires_tmdb_api_key_and_terms_review",
+      "credential": "TMDB_API_KEY",
+      "notes": "Metadata, titles, descriptions, posters, and discovery only. TMDB metadata does not provide streaming rights or playback. Follow attribution and licensing requirements; commercial use requires separate review."
     },
     {
-      "id": "aljazeera-en",
-      "name": "Al Jazeera English live",
-      "url": "https://www.aljazeera.com/video/live/",
-      "playback": "Official broadcaster website; open externally."
-    },
-    {
-      "id": "cgtn",
-      "name": "CGTN live channels",
-      "url": "https://www.cgtn.com/tv",
-      "playback": "Official broadcaster website; open externally."
-    },
-    {
-      "id": "euronews",
-      "name": "Euronews Live",
-      "url": "https://www.euronews.com/live",
-      "playback": "Official broadcaster website; regional availability may vary."
-    },
-    {
-      "id": "nasa-plus",
-      "name": "NASA+",
-      "url": "https://plus.nasa.gov/",
-      "playback": "Official free NASA streaming service; use its own player."
-    },
-    {
-      "id": "fifa-plus",
-      "name": "FIFA+ selected live matches",
-      "url": "https://www.plus.fifa.com/en",
-      "playback": "Official service player; country and competition rights vary.",
-      "category": "sports"
-    },
-    {
-      "id": "eurovision-sport",
-      "name": "Eurovision Sport",
-      "url": "https://eurovisionsport.com/en",
-      "playback": "Official free player for selected live events and replays.",
-      "category": "sports"
-    },
-    {
-      "id": "red-bull-tv",
-      "name": "Red Bull TV",
-      "url": "https://www.redbull.com/int-en/tv",
-      "playback": "Official player for selected live sports and documentaries.",
-      "category": "sports"
-    },
-    {
-      "id": "trt-spor",
-      "name": "TRT Spor",
-      "url": "https://www.trtspor.com.tr/canli-yayin-izle/trt-spor",
-      "playback": "Official broadcaster page; individual events may be geoblocked.",
-      "category": "sports"
-    },
-    {
-      "id": "fubo-sports-network",
-      "name": "Fubo Sports Network",
-      "url": "https://www.fubosportsnetwork.com/",
-      "playback": "Official free channel via supported distribution platforms; territory restrictions apply.",
-      "category": "sports"
-    },
-    {
-      "id": "rakuten-tv-free",
-      "name": "Rakuten TV Free / Live TV",
-      "url": "https://www.rakuten.tv/",
-      "playback": "Official ad-supported movie and live-channel service; catalogue depends on country and device.",
-      "category": "movies"
-    },
-    {
-      "id": "pluto-tv",
-      "name": "Pluto TV",
-      "url": "https://pluto.tv/welcome/on-demand",
-      "playback": "Official free live channels and on-demand catalogue; regional availability varies.",
-      "category": "movies"
-    },
-    {
-      "id": "tubi",
-      "name": "Tubi",
-      "url": "https://tubitv.com/",
-      "playback": "Official free service in supported markets; not listed for Türkiye.",
-      "category": "movies"
+      "id": "internet-archive-media",
+      "name": "Internet Archive media discovery",
+      "type": "public_collection_metadata_search",
+      "url": "https://archive.org/advancedsearch.php",
+      "status": "item_level_rights_review_required",
+      "notes": "Searchable public collection metadata. Review the rights/usage information for each item; do not treat an Archive listing as automatic public-domain clearance."
     },
     {
       "id": "internet-archive-movies",
       "name": "Internet Archive Moving Image Archive",
+      "type": "public_collection_item_level_rights_review",
       "url": "https://archive.org/details/movies",
-      "playback": "Review rights at the individual item/version level before presenting as public-domain.",
-      "category": "movies"
-    },
-    {
-      "id": "plex-live-tv",
-      "name": "Plex free movies and Live TV",
-      "url": "https://www.plex.tv/watch-free/",
-      "playback": "Official service; free Live TV is not available in Türkiye.",
-      "category": "movies"
+      "status": "item_level_rights_review_required",
+      "notes": "Publicly accessible collection of films and moving images. Rights and terms must be checked per item and per version; public access alone does not prove public-domain or redistribution status."
     }
-  ]
+  ],
+  "channel_discovery_mode": "IPTV_M3U_ONLY",
+  "country_package_policy": {
+    "doubo_country_packages": 128,
+    "doubo_country_url_template": "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/{country_code_lowercase}.m3u",
+    "united_kingdom_country_path": "uk",
+    "arab_countries_are_separate_packages": true,
+    "iptv_org_country_url_template": "https://iptv-org.github.io/iptv/countries/{country_code_lowercase}.m3u",
+    "deduplication": "Canonical stream URL plus HTTP-header profile across imported packages."
+  }
 }

@@ -44,8 +44,8 @@ internal object M3uPlaylistParser {
     )
 
     fun parse(content: String): M3uParseResult {
-        val lines = content.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
-        if (lines.firstOrNull()?.startsWith("#EXTM3U", ignoreCase = true) != true) {
+        val lines = content.lineSequence().map(String::trim).filter(String::isNotEmpty).iterator()
+        if (!lines.hasNext() || !lines.next().startsWith("#EXTM3U", ignoreCase = true)) {
             return M3uParseResult(emptyList(), 0, 0, false)
         }
 
@@ -65,7 +65,8 @@ internal object M3uPlaylistParser {
         var skippedUnsafeLinks = 0
         var invalidEntries = 0
 
-        for (line in lines.drop(1)) {
+        while (lines.hasNext()) {
+            val line = lines.next()
             if (line.startsWith("#EXTINF:", ignoreCase = true)) {
                 if (pending != null) invalidEntries++
                 val info = line.substringAfter(':')

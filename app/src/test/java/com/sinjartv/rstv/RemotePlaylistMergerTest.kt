@@ -96,6 +96,80 @@ class RemotePlaylistMergerTest {
     }
 
     @Test
+    fun infersArabicCountryFromDynamicCountryPackageId() {
+        val snapshot = RemoteSourceSnapshot(
+            id = "iptv-org-sy",
+            name = "IPTV-org — سوريا",
+            provider = "iptv-org/iptv",
+            attribution = null,
+            content = """
+                #EXTM3U
+                #EXTINF:-1 group-title="News",Example Syria News
+                https://sy.example/live.m3u8
+            """.trimIndent()
+        )
+
+        val merged = RemotePlaylistMerger.merge(listOf(snapshot))
+
+        assertEquals(1, merged.size)
+        assertEquals("سوريا", merged.single().country)
+    }
+
+    @Test
+    fun infersArabicCountryFromDouboCountryPackageId() {
+        val snapshot = RemoteSourceSnapshot(
+            id = "doubo-country-sy",
+            name = "Doubo — سوريا",
+            provider = "Doubo Public Channel Directory",
+            attribution = "CC BY 4.0",
+            content = """
+                #EXTM3U
+                #EXTINF:-1 group-title="News",Example Syria News
+                https://sy.example/live.m3u8
+            """.trimIndent()
+        )
+
+        val merged = RemotePlaylistMerger.merge(listOf(snapshot))
+
+        assertEquals(1, merged.size)
+        assertEquals("سوريا", merged.single().country)
+    }
+
+    @Test
+    fun unifiedFrancePackageRemovesDuplicateStreamsAcrossProviders() {
+        val sources = listOf(
+            RemoteSourceSnapshot(
+                id = "iptv-org-fr",
+                name = "IPTV-org — فرنسا",
+                provider = "iptv-org/iptv",
+                attribution = null,
+                content = """
+                    #EXTM3U
+                    #EXTINF:-1 group-title="News",France News
+                    https://CDN.example:443/france/live.m3u8#iptv-org
+                """.trimIndent()
+            ),
+            RemoteSourceSnapshot(
+                id = "doubo-country-fr",
+                name = "Doubo — فرنسا",
+                provider = "Doubo Public Channel Directory",
+                attribution = "CC BY 4.0",
+                content = """
+                    #EXTM3U
+                    #EXTINF:-1 group-title="News",France News HD
+                    https://cdn.example/france/live.m3u8#doubo
+                """.trimIndent()
+            )
+        )
+
+        val merged = RemotePlaylistMerger.merge(sources)
+
+        assertEquals(1, merged.size)
+        assertEquals("فرنسا", merged.single().country)
+        assertEquals(setOf("iptv-org-fr", "doubo-country-fr"), merged.single().sourceIds)
+    }
+
+    @Test
     fun keepsDifferentQueryTokensAsSeparateStreams() {
         val snapshots = listOf(
             RemoteSourceSnapshot(

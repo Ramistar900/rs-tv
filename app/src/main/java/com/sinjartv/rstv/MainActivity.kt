@@ -40,10 +40,7 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.VideoLibrary
-import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material3.AlertDialog
@@ -92,9 +89,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -116,6 +113,8 @@ import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
@@ -136,27 +135,83 @@ private enum class RSTVTab(
 ) {
     HOME("الرئيسية", Icons.Outlined.Home),
     LIVE("البث المباشر", Icons.Outlined.Tv),
-    WORLD("العالمية", Icons.Outlined.Public),
     SOURCES("مصادر IPTV", Icons.Outlined.CloudDownload),
-    YOUTUBE("YouTube", Icons.Outlined.PlayCircle),
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
     GUIDE("دليل البرامج", Icons.Outlined.CalendarToday),
-    ADULT("+18 للكبار", Icons.Outlined.Lock),
     SETTINGS("الإعدادات", Icons.Outlined.Settings)
 }
 
 private val primaryNavigationTabs = listOf(
-    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES, RSTVTab.WORLD
+    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES
 )
-
-private enum class AdultPinMode { SETUP, VERIFY }
 
 private enum class ClearAction(val title: String, val message: String) {
     PLAYLIST("حذف القائمة المحفوظة", "سيتم حذف قائمة القنوات المحلية من هذا الجهاز."),
     HISTORY("مسح سجل المشاهدة", "سيتم مسح سجل القنوات التي شاهدتها."),
     FAVORITES("مسح المفضلة", "سيتم إزالة جميع القنوات من قائمة المفضلة."),
-    SOURCE_LIBRARY("مسح مكتبة مصادر IPTV", "سيتم حذف نسخ قوائم المصادر المجمّعة فقط، دون حذف قائمة المستخدم أو المفضلة.")
+    SOURCE_LIBRARY("مسح مكتبة مصادر IPTV", "سيتم حذف نسخ قوائم المصادر المجمّعة فقط، دون حذف قائمة المستخدم أو المفضلة."),
+}
+
+private data class DerivedChannelCollections(
+    val adultStreamKeys: Set<String> = emptySet(),
+    val channelByStreamUrl: Map<String, RSTVChannel> = emptyMap(),
+    val regularChannels: List<RSTVChannel> = emptyList(),
+    val regularSourceLibraryChannels: List<RSTVChannel> = emptyList(),
+    val favoriteChannels: List<RSTVChannel> = emptyList(),
+    val recentChannels: List<RSTVChannel> = emptyList(),
+    val visibleChannels: List<RSTVChannel> = emptyList(),
+    val visibleSourceLibraryChannels: List<RSTVChannel> = emptyList()
+)
+
+private fun deriveChannelCollections(
+    userChannels: List<RSTVChannel>,
+    sourceChannels: List<RSTVChannel>,
+    favoriteUrls: Set<String>,
+    historyUrls: List<String>,
+    searchQuery: String
+): DerivedChannelCollections {
+    val knownByKey = linkedMapOf<String, RSTVChannel>()
+    (userChannels + sourceChannels).forEach { channel ->
+        val key = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
+        val existing = knownByKey[key]
+        if (existing == null || (!AdultContentPolicy.isAdult(existing) && AdultContentPolicy.isAdult(channel))) {
+            knownByKey[key] = channel
+        }
+    }
+
+    val adultKeys = knownByKey.filterValues(AdultContentPolicy::isAdult).keys
+    val regularUser = userChannels.filter { channel ->
+        RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders) !in adultKeys
+    }
+    val regularSources = sourceChannels.filter { channel ->
+        RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders) !in adultKeys
+    }
+    val knownByStreamUrl = knownByKey.values.associateBy { it.streamUrl }
+    val favorites = knownByKey.values.filter { !AdultContentPolicy.isAdult(it) && it.streamUrl in favoriteUrls }
+    val recent = historyUrls.mapNotNull { knownByStreamUrl[it] }
+        .filterNot(AdultContentPolicy::isAdult)
+        .distinctBy { it.streamUrl }
+    val query = searchQuery.trim()
+
+    return DerivedChannelCollections(
+        adultStreamKeys = adultKeys,
+        channelByStreamUrl = knownByStreamUrl,
+        regularChannels = regularUser,
+        regularSourceLibraryChannels = regularSources,
+        favoriteChannels = favorites,
+        recentChannels = recent,
+        visibleChannels = regularUser.filter { channel ->
+            query.isBlank() ||
+                channel.name.contains(query, ignoreCase = true) ||
+                channel.group.orEmpty().contains(query, ignoreCase = true)
+        },
+        visibleSourceLibraryChannels = regularSources.filter { channel ->
+            query.isBlank() ||
+                channel.name.contains(query, ignoreCase = true) ||
+                channel.group.orEmpty().contains(query, ignoreCase = true)
+        }
+    )
 }
 
 class MainActivity : ComponentActivity() {
@@ -193,15 +248,14 @@ private fun RSTVHome() {
         current as? Activity
     }
     val scope = rememberCoroutineScope()
+    val libraryWriteMutex = remember { Mutex() }
     val channels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
     var showingSourceLibrary by remember { mutableStateOf(false) }
-    var worldChannels by remember { mutableStateOf<List<WorldChannelCandidate>>(emptyList()) }
-    var worldCatalogStatus by remember { mutableStateOf("جارٍ تحميل الكتالوج العالمي...") }
+    var countryPackageSources by remember { mutableStateOf(RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()) }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
-    val uriHandler = LocalUriHandler.current
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
     var selectedTab by remember { mutableStateOf(RSTVTab.HOME) }
@@ -209,53 +263,39 @@ private fun RSTVHome() {
     var status by remember { mutableStateOf("مرحباً بك في RS TV") }
     var skippedUnsafeLinks by remember { mutableIntStateOf(0) }
     var favouriteRevision by remember { mutableIntStateOf(0) }
+    var libraryRevision by remember { mutableIntStateOf(0) }
+    var historyRevision by remember { mutableIntStateOf(0) }
+    var derivedCollections by remember { mutableStateOf(DerivedChannelCollections()) }
+    var favoriteUrls by remember { mutableStateOf<Set<String>>(emptySet()) }
+    LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery) {
+        val userSnapshot = channels.toList()
+        val sourceSnapshot = sourceLibraryChannels.toList()
+        val (favoriteSnapshot, historySnapshot) = withContext(Dispatchers.IO) {
+            LocalLibraryStore.favoriteStreams(context) to LocalLibraryStore.history(context)
+        }
+        favoriteUrls = favoriteSnapshot
+        derivedCollections = withContext(Dispatchers.Default) {
+            deriveChannelCollections(
+                userChannels = userSnapshot,
+                sourceChannels = sourceSnapshot,
+                favoriteUrls = favoriteSnapshot,
+                historyUrls = historySnapshot,
+                searchQuery = searchQuery
+            )
+        }
+    }
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
     var isFullscreenPlayer by remember { mutableStateOf(false) }
-    var adultAccessGranted by remember { mutableStateOf(false) }
-    var adultSectionHidden by remember { mutableStateOf(AdultAccessStore.isSectionHidden(context)) }
-    var adultPinMode by remember { mutableStateOf<AdultPinMode?>(null) }
-    var adultPinEntry by remember { mutableStateOf("") }
-    var adultPinConfirmation by remember { mutableStateOf("") }
-    var adultPinError by remember { mutableStateOf("") }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
     val exoPlayer = player
 
-    fun requestAdultAccess() {
-        adultPinEntry = ""
-        adultPinConfirmation = ""
-        adultPinError = ""
-        adultPinMode = if (AdultAccessStore.hasPin(context)) AdultPinMode.VERIFY else AdultPinMode.SETUP
-    }
-
     fun navigateToTab(tab: RSTVTab) {
-        if (tab == RSTVTab.ADULT) {
-            if (adultAccessGranted) selectedTab = RSTVTab.ADULT else requestAdultAccess()
-            return
-        }
-        adultAccessGranted = false
         selectedTab = tab
-    }
-
-    fun hideOrShowAdultSection() {
-        val hidden = !adultSectionHidden
-        AdultAccessStore.setSectionHidden(context, hidden)
-        adultSectionHidden = hidden
-        if (hidden) {
-            adultAccessGranted = false
-            selectedTab = RSTVTab.HOME
-        } else {
-            adultAccessGranted = true
-            selectedTab = RSTVTab.ADULT
-        }
     }
 
     fun isRestrictedAdultChannel(channel: RSTVChannel): Boolean {
         val targetKey = RemotePlaylistMerger.canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
-        return AdultContentPolicy.isAdult(channel) ||
-            (channels + sourceLibraryChannels).any { candidate ->
-                AdultContentPolicy.isAdult(candidate) &&
-                    RemotePlaylistMerger.canonicalStreamKey(candidate.streamUrl, candidate.httpHeaders) == targetKey
-            }
+        return AdultContentPolicy.isAdult(channel) || targetKey in derivedCollections.adultStreamKeys
     }
 
     DisposableEffect(isFullscreenPlayer, activity) {
@@ -274,7 +314,7 @@ private fun RSTVHome() {
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val currentUrl = mediaItem?.localConfiguration?.uri?.toString()
-                val currentChannel = (channels + sourceLibraryChannels).firstOrNull { it.streamUrl == currentUrl }
+                val currentChannel = currentUrl?.let { derivedCollections.channelByStreamUrl[it] }
                 if (currentChannel != null) {
                     selectedChannel = currentChannel
                     status = "القناة الحالية: ${currentChannel.name}"
@@ -305,10 +345,13 @@ private fun RSTVHome() {
         withContext(Dispatchers.IO) {
             LocalLibraryStore.loadPlaylist(context)
         }?.let { saved ->
-            val parsed = M3uPlaylistParser.parse(saved)
+            val parsed = withContext(Dispatchers.Default) {
+                M3uPlaylistParser.parse(saved)
+            }
             if (parsed.isValidPlaylist) {
                 channels.clear()
                 channels.addAll(parsed.channels)
+                libraryRevision++
                 skippedUnsafeLinks = parsed.skippedUnsafeLinks
                 status = "تمت استعادة ${parsed.channels.size} قناة محفوظة"
             }
@@ -322,6 +365,7 @@ private fun RSTVHome() {
             }
             sourceLibraryChannels.clear()
             sourceLibraryChannels.addAll(mergedSources)
+            libraryRevision++
             sourceLibraryCount = savedSources.size
             sourceLibraryStatus = "تمت استعادة ${savedSources.size} قوائم مصدر و${mergedSources.size} قناة بعد إزالة التكرار"
         }.onFailure {
@@ -340,13 +384,12 @@ private fun RSTVHome() {
                 context.assets.open("candidates.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
             }
             withContext(Dispatchers.Default) {
-                WorldChannelCatalogParser.parse(catalogJson)
+                WorldChannelCatalogParser.parseCountryCodes(catalogJson)
             }
-        }.onSuccess { imported ->
-            worldChannels = imported
-            worldCatalogStatus = "تم تحميل ${imported.size} قناة مرشّحة من الكتالوج المضمّن"
+        }.onSuccess { countryCodes ->
+            countryPackageSources = RemotePlaylistSources.countryPackages(countryCodes) + RemotePlaylistSources.douboCountryPackages()
         }.onFailure {
-            worldCatalogStatus = "تعذر تحميل الكتالوج العالمي: ${it.message ?: "ملف غير متاح"}"
+            countryPackageSources = RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()
         }
     }
 
@@ -370,6 +413,7 @@ private fun RSTVHome() {
                     selectedChannel = null
                     channels.clear()
                     channels.addAll(parsed.channels)
+                    libraryRevision++
                     skippedUnsafeLinks = parsed.skippedUnsafeLinks
                     status = if (parsed.channels.isEmpty()) {
                         "القائمة صحيحة، لكنها لا تحتوي روابط HTTPS صالحة للتشغيل"
@@ -409,61 +453,14 @@ private fun RSTVHome() {
         }
     }
 
-    fun addRemotePlaylistToLibrary(source: RemotePlaylistSource) {
-        remotePlaylistStatus = "جارٍ إضافة ${source.name} إلى مكتبة المصادر..."
+    fun addRemotePlaylistPackageToLibrary(playlistPackage: RemotePlaylistPackage) {
+        remotePlaylistStatus = "جارٍ جمع باقة ${playlistPackage.name} من ${playlistPackage.sources.size} مصادر..."
         scope.launch {
-            runCatching {
-                val content = withContext(Dispatchers.IO) {
-                    RemotePlaylistDownloader.download(source)
-                }
-                val parsed = withContext(Dispatchers.Default) {
-                    M3uPlaylistParser.parse(content)
-                }
-                require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
-                require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في هذه القائمة" }
+            val downloadedSources = mutableListOf<String>()
+            val failedSources = mutableListOf<String>()
+            var importedChannelCount = 0
 
-                val snapshot = RemoteSourceSnapshot(
-                    id = source.id,
-                    name = source.name,
-                    provider = source.provider,
-                    attribution = source.attribution,
-                    content = content
-                )
-                withContext(Dispatchers.IO) {
-                    LocalLibraryStore.saveRemoteSource(context, snapshot)
-                }
-                val savedSources = withContext(Dispatchers.IO) {
-                    LocalLibraryStore.loadRemoteSources(context)
-                }
-                val mergedSources = withContext(Dispatchers.Default) {
-                    RemotePlaylistMerger.merge(savedSources)
-                }
-                sourceLibraryChannels.clear()
-                sourceLibraryChannels.addAll(mergedSources)
-                sourceLibraryCount = savedSources.size
-                sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر و${mergedSources.size} قناة فريدة"
-                remotePlaylistStatus = "تمت إضافة ${parsed.channels.size} قناة من ${source.name}. قائمتك الحالية لم تتغير."
-            }.onFailure { error ->
-                remotePlaylistStatus = "تعذرت إضافة ${source.name}: ${error.message ?: "خطأ غير معروف"}"
-            }
-        }
-    }
-
-    fun addWorldPlaylistsToLibrary() {
-        val sources = RemotePlaylistSources.worldLibraryBundleIds.mapNotNull { id ->
-            RemotePlaylistSources.playlists.firstOrNull { it.id == id }
-        }
-        if (sources.isEmpty()) {
-            remotePlaylistStatus = "لا توجد مصادر عالمية مهيأة حالياً."
-            return
-        }
-
-        remotePlaylistStatus = "جارٍ تحديث مكتبة القنوات العالمية من ${sources.size} قوائم عامة..."
-        scope.launch {
-            val imported = mutableListOf<Pair<String, Int>>()
-            val failures = mutableListOf<String>()
-
-            sources.forEach { source ->
+            playlistPackage.sources.distinctBy { it.playlistUrl }.forEach { source ->
                 runCatching {
                     val content = withContext(Dispatchers.IO) {
                         RemotePlaylistDownloader.download(source)
@@ -472,7 +469,7 @@ private fun RSTVHome() {
                         M3uPlaylistParser.parse(content)
                     }
                     require(parsed.isValidPlaylist) { "المصدر لم يُرجع قائمة M3U صالحة" }
-                    require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في القائمة" }
+                    require(parsed.channels.isNotEmpty()) { "لم نجد روابط HTTPS صالحة في هذه القائمة" }
 
                     val snapshot = RemoteSourceSnapshot(
                         id = source.id,
@@ -484,37 +481,40 @@ private fun RSTVHome() {
                     withContext(Dispatchers.IO) {
                         LocalLibraryStore.saveRemoteSource(context, snapshot)
                     }
-                    imported += source.name to parsed.channels.size
+                    parsed.channels.size
+                }.onSuccess { count ->
+                    importedChannelCount += count
+                    downloadedSources += source.provider
                 }.onFailure { error ->
-                    failures += "${source.name}: ${error.message ?: "تعذر الاستيراد"}"
+                    failedSources += "${source.provider}: ${error.message ?: "تعذر التنزيل"}"
                 }
             }
 
-            val savedSources = withContext(Dispatchers.IO) {
-                LocalLibraryStore.loadRemoteSources(context)
-            }
-            val mergedSources = withContext(Dispatchers.Default) {
-                RemotePlaylistMerger.merge(savedSources)
-            }
-            sourceLibraryChannels.clear()
-            sourceLibraryChannels.addAll(mergedSources)
-            sourceLibraryCount = savedSources.size
-            sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر و${mergedSources.size} قناة فريدة"
-
-            if (imported.isNotEmpty()) {
-                status = "تم تنزيل حزم القنوات العالمية وحفظها في المكتبة. افتح البث المباشر لعرضها وتشغيلها."
+            if (downloadedSources.isEmpty()) {
+                remotePlaylistStatus = "تعذر تنزيل باقة ${playlistPackage.name}: ${failedSources.joinToString("؛ ")}"
+                return@launch
             }
 
-            remotePlaylistStatus = buildString {
-                if (imported.isNotEmpty()) {
-                    append("تم استيراد ${imported.size} من ${sources.size} مصادر عالمية؛ المكتبة تضم ${mergedSources.size} قناة فريدة.")
-                } else {
-                    append("لم ينجح استيراد أي مصدر عالمي.")
+            runCatching {
+                val savedSources = withContext(Dispatchers.IO) {
+                    LocalLibraryStore.loadRemoteSources(context)
                 }
-                if (failures.isNotEmpty()) {
-                    append(" تعذّر: ")
-                    append(failures.joinToString(" • "))
+                val mergedSources = withContext(Dispatchers.Default) {
+                    RemotePlaylistMerger.merge(savedSources)
                 }
+                sourceLibraryChannels.clear()
+                sourceLibraryChannels.addAll(mergedSources)
+                libraryRevision++
+                sourceLibraryCount = savedSources.size
+                sourceLibraryStatus = "المكتبة تضم ${savedSources.size} مصادر محفوظة و${mergedSources.size} قناة فريدة بعد إزالة التكرار"
+                remotePlaylistStatus = buildString {
+                    append("تم جمع باقة ${playlistPackage.name}: ${downloadedSources.size} من ${playlistPackage.sources.size} مصادر، و${importedChannelCount} مدخلاً قبل إزالة التكرار. ")
+                    append("أصبحت المكتبة تضم ${mergedSources.size} قناة فريدة.")
+                    if (failedSources.isNotEmpty()) append(" تعذر بعض المصادر: ${failedSources.joinToString("؛ ")}")
+                    append(" قائمتك المحلية لم تتغير.")
+                }
+            }.onFailure { error ->
+                remotePlaylistStatus = "تم تنزيل بعض مصادر ${playlistPackage.name} لكن تعذر تحديث المكتبة: ${error.message ?: "خطأ غير معروف"}"
             }
         }
     }
@@ -535,66 +535,45 @@ private fun RSTVHome() {
             status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
             return
         }
-        val activeQueue = (if (showingSourceLibrary) sourceLibraryChannels else channels)
-            .filterNot(::isRestrictedAdultChannel)
-        val queue = if (activeQueue.any { it.streamUrl == channel.streamUrl }) activeQueue else listOf(channel) + activeQueue
-        val startIndex = queue.indexOfFirst { it.streamUrl == channel.streamUrl }.coerceAtLeast(0)
         selectedChannel = channel
         selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
-        LocalLibraryStore.addToHistory(context, channel.streamUrl)
-        val mediaSources = queue.map { item ->
-            val httpFactory = DefaultHttpDataSource.Factory()
-                .setDefaultRequestProperties(item.httpHeaders)
-            val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
-            DefaultMediaSourceFactory(dataSourceFactory)
-                .createMediaSource(MediaItem.fromUri(item.streamUrl))
+        scope.launch {
+            libraryWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.addToHistory(context, channel.streamUrl)
+                }
+            }
+            historyRevision++
         }
-        exoPlayer.setMediaSources(mediaSources, startIndex, 0L)
+        val httpFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(channel.httpHeaders)
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+        val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
+            .createMediaSource(MediaItem.fromUri(channel.streamUrl))
+        exoPlayer.setMediaSource(mediaSource)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
 
     fun toggleFavourite(channel: RSTVChannel) {
         if (isRestrictedAdultChannel(channel)) return
-        LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
-        favouriteRevision++
+        scope.launch {
+            libraryWriteMutex.withLock {
+                withContext(Dispatchers.IO) {
+                    LocalLibraryStore.toggleFavorite(context, channel.streamUrl)
+                }
+            }
+            favouriteRevision++
+        }
     }
 
-    val favoriteUrls = remember(favouriteRevision) {
-        LocalLibraryStore.favoriteStreams(context)
-    }
-    val combinedChannels = channels + sourceLibraryChannels
-    val allKnownChannels = combinedChannels
-        .groupBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
-        .values
-        .map { candidates ->
-            candidates.firstOrNull(AdultContentPolicy::isAdult) ?: candidates.first()
-        }
-    val adultStreamKeys = allKnownChannels.filter(AdultContentPolicy::isAdult)
-        .map { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
-        .toSet()
-    val adultChannels = allKnownChannels.filter(AdultContentPolicy::isAdult)
-    val regularChannels = channels.filterNot {
-        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
-    }
-    val regularSourceLibraryChannels = sourceLibraryChannels.filterNot {
-        RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) in adultStreamKeys
-    }
-    val favoriteChannels = allKnownChannels.filterNot(AdultContentPolicy::isAdult)
-        .filter { it.streamUrl in favoriteUrls }
-    val recentChannels = LocalLibraryStore.history(context)
-        .mapNotNull { url -> allKnownChannels.firstOrNull { it.streamUrl == url && !AdultContentPolicy.isAdult(it) } }
-    val visibleChannels = regularChannels.filter { channel ->
-        searchQuery.isBlank() ||
-            channel.name.contains(searchQuery, ignoreCase = true) ||
-            channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
-    }
-    val visibleSourceLibraryChannels = regularSourceLibraryChannels.filter { channel ->
-        searchQuery.isBlank() ||
-            channel.name.contains(searchQuery, ignoreCase = true) ||
-            channel.group.orEmpty().contains(searchQuery, ignoreCase = true)
-    }
+    val regularChannels = derivedCollections.regularChannels
+    val regularSourceLibraryChannels = derivedCollections.regularSourceLibraryChannels
+    val favoriteChannels = derivedCollections.favoriteChannels
+    val recentChannels = derivedCollections.recentChannels
+    val visibleChannels = derivedCollections.visibleChannels
+    val visibleSourceLibraryChannels = derivedCollections.visibleSourceLibraryChannels
 
     pendingClear?.let { action ->
         AlertDialog(
@@ -603,33 +582,49 @@ private fun RSTVHome() {
             text = { Text(action.message) },
             confirmButton = {
                 TextButton(onClick = {
-                    when (action) {
-                        ClearAction.PLAYLIST -> {
-                            LocalLibraryStore.clearPlaylist(context)
-                            channels.clear()
-                            exoPlayer.stop()
-                            exoPlayer.clearMediaItems()
-                            selectedChannel = null
-                            status = "تم حذف القائمة المحلية"
-                        }
-                        ClearAction.HISTORY -> {
-                            LocalLibraryStore.clearHistory(context)
-                            status = "تم مسح سجل المشاهدة"
-                        }
-                        ClearAction.FAVORITES -> {
-                            LocalLibraryStore.clearFavorites(context)
-                            favouriteRevision++
-                            status = "تم مسح المفضلة"
-                        }
-                        ClearAction.SOURCE_LIBRARY -> {
-                            LocalLibraryStore.clearRemoteSources(context)
-                            sourceLibraryChannels.clear()
-                            sourceLibraryCount = 0
-                            sourceLibraryStatus = "تم مسح مكتبة المصادر"
-                            status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
+                    pendingClear = null
+                    scope.launch {
+                        runCatching {
+                            libraryWriteMutex.withLock {
+                                withContext(Dispatchers.IO) {
+                                    when (action) {
+                                        ClearAction.PLAYLIST -> LocalLibraryStore.clearPlaylist(context)
+                                        ClearAction.HISTORY -> LocalLibraryStore.clearHistory(context)
+                                        ClearAction.FAVORITES -> LocalLibraryStore.clearFavorites(context)
+                                        ClearAction.SOURCE_LIBRARY -> LocalLibraryStore.clearRemoteSources(context)
+                                    }
+                                }
+                            }
+                        }.onSuccess {
+                            when (action) {
+                                ClearAction.PLAYLIST -> {
+                                    channels.clear()
+                                    libraryRevision++
+                                    exoPlayer.stop()
+                                    exoPlayer.clearMediaItems()
+                                    selectedChannel = null
+                                    status = "تم حذف القائمة المحلية"
+                                }
+                                ClearAction.HISTORY -> {
+                                    historyRevision++
+                                    status = "تم مسح سجل المشاهدة"
+                                }
+                                ClearAction.FAVORITES -> {
+                                    favouriteRevision++
+                                    status = "تم مسح المفضلة"
+                                }
+                                ClearAction.SOURCE_LIBRARY -> {
+                                    sourceLibraryChannels.clear()
+                                    libraryRevision++
+                                    sourceLibraryCount = 0
+                                    sourceLibraryStatus = "تم مسح مكتبة المصادر"
+                                    status = "تم حذف مكتبة مصادر IPTV دون المساس بقائمة المستخدم"
+                                }
+                            }
+                        }.onFailure { error ->
+                            status = "تعذر إكمال الحذف: ${error.message ?: "خطأ غير معروف"}"
                         }
                     }
-                    pendingClear = null
                 }) { Text("تأكيد", color = AccentRed) }
             },
             dismissButton = {
@@ -639,98 +634,6 @@ private fun RSTVHome() {
             titleContentColor = SoftWhite,
             textContentColor = MutedText
         )
-    }
-
-    adultPinMode?.let { mode ->
-        AlertDialog(
-            onDismissRequest = { adultPinMode = null },
-            title = {
-                Text(
-                    if (mode == AdultPinMode.SETUP) "إنشاء رمز حماية +18"
-                    else "إدخال رمز حماية +18"
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        if (mode == AdultPinMode.SETUP)
-                            "أنشئ رمزاً من 4 إلى 8 أرقام. لن يُحفظ الرمز نفسه، بل بصمة مشتقة ومملّحة."
-                        else
-                            "أدخل رمز PIN لفتح قسم المحتوى المصنّف للكبار.",
-                        color = MutedText,
-                        fontSize = 12.sp
-                    )
-                    OutlinedTextField(
-                        value = adultPinEntry,
-                        onValueChange = { value ->
-                            adultPinEntry = value.filter { it.isDigit() }.take(8)
-                            adultPinError = ""
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("رمز PIN") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
-                    )
-                    if (mode == AdultPinMode.SETUP) {
-                        OutlinedTextField(
-                            value = adultPinConfirmation,
-                            onValueChange = { value ->
-                                adultPinConfirmation = value.filter { it.isDigit() }.take(8)
-                                adultPinError = ""
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("تأكيد الرمز") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
-                        )
-                    }
-                    if (adultPinError.isNotBlank()) {
-                        Text(adultPinError, color = Color(0xFFFF8A80), fontSize = 11.sp)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (mode == AdultPinMode.SETUP) {
-                        when {
-                            adultPinEntry.length !in 4..8 ->
-                                adultPinError = "اختر رمزاً من 4 إلى 8 أرقام."
-                            adultPinEntry != adultPinConfirmation ->
-                                adultPinError = "الرمزان غير متطابقين."
-                            else -> {
-                                AdultAccessStore.setPin(context, adultPinEntry)
-                                adultAccessGranted = true
-                                selectedTab = RSTVTab.ADULT
-                                adultPinMode = null
-                                adultPinEntry = ""
-                                adultPinConfirmation = ""
-                            }
-                        }
-                    } else if (AdultAccessStore.verifyPin(context, adultPinEntry)) {
-                        adultAccessGranted = true
-                        selectedTab = RSTVTab.ADULT
-                        adultPinMode = null
-                        adultPinEntry = ""
-                    } else {
-                        adultPinEntry = ""
-                        adultPinError = "الرمز غير صحيح أو أن المحاولات موقوفة مؤقتاً."
-                    }
-                }) {
-                    Text(if (mode == AdultPinMode.SETUP) "حفظ وفتح القسم" else "فتح القسم", color = AccentRed)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { adultPinMode = null }) { Text("إلغاء") }
-            },
-            containerColor = PanelRaised,
-            titleContentColor = SoftWhite,
-            textContentColor = MutedText
-        )
-    }
-
-    BackHandler(enabled = selectedTab == RSTVTab.ADULT) {
-        adultAccessGranted = false
-        selectedTab = RSTVTab.HOME
     }
 
     Surface(
@@ -743,19 +646,13 @@ private fun RSTVHome() {
             if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
-                    worldChannels = worldChannels,
-                    adultChannels = adultChannels,
-                    isAdultSectionHidden = adultSectionHidden,
-                    onHideAdultSection = ::hideOrShowAdultSection,
-                    onManageAdult = ::requestAdultAccess,
-                    worldCatalogStatus = worldCatalogStatus,
+                    playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
                     sourceLibraryCount = sourceLibraryCount,
-                    onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                    sourceLibraryChannelCount = sourceLibraryChannels.size,
+                    onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
                     onShowSourceLibrary = ::showSourceLibrary,
-                    onAddWorldSources = ::addWorldPlaylistsToLibrary,
-                    onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                     channels = when {
                         selectedTab == RSTVTab.FAVORITES -> favoriteChannels
                         selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
@@ -803,7 +700,7 @@ private fun RSTVHome() {
                             }
                         }
                     ) {
-                        (if (adultSectionHidden) primaryNavigationTabs else primaryNavigationTabs + RSTVTab.ADULT).forEach { tab ->
+                        primaryNavigationTabs.forEach { tab ->
                             NavigationRailItem(
                                 selected = selectedTab == tab,
                                 onClick = { navigateToTab(tab) },
@@ -822,19 +719,13 @@ private fun RSTVHome() {
                         )
                         ScreenBody(
                             tab = selectedTab,
-                            worldChannels = worldChannels,
-                            adultChannels = adultChannels,
-                            isAdultSectionHidden = adultSectionHidden,
-                            onHideAdultSection = ::hideOrShowAdultSection,
-                            onManageAdult = ::requestAdultAccess,
-                            worldCatalogStatus = worldCatalogStatus,
+                            playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                            sourceLibraryChannelCount = sourceLibraryChannels.size,
+                            onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
-                            onAddWorldSources = ::addWorldPlaylistsToLibrary,
-                            onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
                                 selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
@@ -880,19 +771,13 @@ private fun RSTVHome() {
                         )
                         ScreenBody(
                             tab = selectedTab,
-                            worldChannels = worldChannels,
-                            adultChannels = adultChannels,
-                            isAdultSectionHidden = adultSectionHidden,
-                            onHideAdultSection = ::hideOrShowAdultSection,
-                            onManageAdult = ::requestAdultAccess,
-                            worldCatalogStatus = worldCatalogStatus,
+                            playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            onAddSourceToLibrary = ::addRemotePlaylistToLibrary,
+                            sourceLibraryChannelCount = sourceLibraryChannels.size,
+                            onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
                             onShowSourceLibrary = ::showSourceLibrary,
-                            onAddWorldSources = ::addWorldPlaylistsToLibrary,
-                            onOpenOfficialUrl = { url -> runCatching { uriHandler.openUri(url) } },
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
                                 selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
@@ -930,7 +815,7 @@ private fun RSTVHome() {
                         containerColor = PanelBlack,
                         contentColor = SoftWhite
                     ) {
-                        (if (adultSectionHidden) primaryNavigationTabs else primaryNavigationTabs + RSTVTab.ADULT).forEach { tab ->
+                        primaryNavigationTabs.forEach { tab ->
                             NavigationBarItem(
                                 selected = selectedTab == tab,
                                 onClick = { navigateToTab(tab) },
@@ -1010,19 +895,13 @@ private fun TopHeader(
 @Composable
 private fun ScreenBody(
     tab: RSTVTab,
-    worldChannels: List<WorldChannelCandidate>,
-    adultChannels: List<RSTVChannel>,
-    isAdultSectionHidden: Boolean,
-    onHideAdultSection: () -> Unit,
-    onManageAdult: () -> Unit,
-    worldCatalogStatus: String,
+    playlistSources: List<RemotePlaylistSource>,
     remotePlaylistStatus: String,
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
-    onAddSourceToLibrary: (RemotePlaylistSource) -> Unit,
+    sourceLibraryChannelCount: Int,
+    onAddSourceToLibrary: (RemotePlaylistPackage) -> Unit,
     onShowSourceLibrary: () -> Unit,
-    onAddWorldSources: () -> Unit,
-    onOpenOfficialUrl: (String) -> Unit,
     channels: List<RSTVChannel>,
     recentChannels: List<RSTVChannel>,
     programmes: List<GuideProgramme>,
@@ -1049,7 +928,6 @@ private fun ScreenBody(
     when (tab) {
         RSTVTab.HOME -> HomeContent(
             channelCount = channels.size,
-            worldChannelCount = worldChannels.size,
             recentChannels = recentChannels,
             onPlay = onPlay,
             onNavigate = onNavigate,
@@ -1060,29 +938,13 @@ private fun ScreenBody(
             status = remotePlaylistStatus,
             sourceLibraryStatus = sourceLibraryStatus,
             sourceLibraryCount = sourceLibraryCount,
+            sourceLibraryChannelCount = sourceLibraryChannelCount,
+            sources = playlistSources,
             onAddToLibrary = onAddSourceToLibrary,
             onShowLibrary = onShowSourceLibrary,
-            onOpenOfficialUrl = onOpenOfficialUrl,
             modifier = modifier
         )
-        RSTVTab.WORLD -> WorldCatalogContent(
-            candidates = worldChannels,
-            catalogStatus = worldCatalogStatus,
-            sourceLibraryStatus = sourceLibraryStatus,
-            sourceLibraryCount = sourceLibraryCount,
-            remotePlaylistStatus = remotePlaylistStatus,
-            onAddWorldSources = onAddWorldSources,
-            onShowSourceLibrary = onShowSourceLibrary,
-            modifier = modifier
-        )
-        RSTVTab.YOUTUBE -> YouTubeLiveContent(modifier = modifier)
         RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
-        RSTVTab.ADULT -> AdultContentContent(
-            channels = adultChannels,
-            isSectionHidden = isAdultSectionHidden,
-            onToggleHidden = onHideAdultSection,
-            modifier = modifier
-        )
         RSTVTab.LIVE -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
@@ -1121,7 +983,6 @@ private fun ScreenBody(
             onImportPlaylist = onImportPlaylist,
             onImportGuide = onImportGuide,
             onClear = onClear,
-            onManageAdult = onManageAdult,
             modifier = modifier
         )
     }
@@ -1130,7 +991,6 @@ private fun ScreenBody(
 @Composable
 private fun HomeContent(
     channelCount: Int,
-    worldChannelCount: Int,
     recentChannels: List<RSTVChannel>,
     onPlay: (RSTVChannel) -> Unit,
     onNavigate: (RSTVTab) -> Unit,
@@ -1174,7 +1034,7 @@ private fun HomeContent(
                         }
                     }
                     Text(
-                        "قنوات مباشرة ومصادر عالمية ومكتبة ترفيهية، في واجهة واحدة سهلة الاستخدام.",
+                        "قنوات مباشرة وباقات IPTV حسب الدول والقارات ومكتبة ترفيهية، في واجهة واحدة سهلة الاستخدام.",
                         color = Silver,
                         fontSize = 13.sp
                     )
@@ -1211,28 +1071,18 @@ private fun HomeContent(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("البث المباشر", "شاهد قنواتك وقوائمك", "مشاهدة الآن", R.drawable.royal_smart_tv, Modifier.weight(1f)) {
+                FeatureCard("البث المباشر", "شاهد القنوات المحمّلة", "مشاهدة الآن", R.drawable.royal_smart_tv, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.LIVE)
                 }
-                FeatureCard("القنوات العالمية", "$worldChannelCount قناة مرشّحة", "استكشف العالم", R.drawable.royal_apps_grid, Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.WORLD)
-                }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("مصادر IPTV", "قوائم بث قابلة للتحديث", "إدارة المصادر", R.drawable.royal_playlist, Modifier.weight(1f)) {
+                FeatureCard("مصادر IPTV", "باقات حسب القارات والدول", "إدارة الباقات", R.drawable.royal_playlist, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.SOURCES)
                 }
-                FeatureCard("الأفلام والمسلسلات", "اكتشف مكتبة الترفيه", "فتح المكتبة", R.drawable.royal_media_video, Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.MOVIES)
-                }
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FeatureCard("YouTube المباشر", "اكتشاف البث الرسمي", "استكشاف", R.drawable.royal_play, Modifier.weight(1f)) {
-                    onNavigate(RSTVTab.YOUTUBE)
+                FeatureCard("الأفلام والمسلسلات", "اكتشف مكتبة الترفيه", "فتح المكتبة", R.drawable.royal_media_video, Modifier.weight(1f)) {
+                    onNavigate(RSTVTab.MOVIES)
                 }
                 FeatureCard("دليل البرامج", "مواعيد وبرامج القنوات", "عرض الدليل", R.drawable.royal_apps_grid, Modifier.weight(1f)) {
                     onNavigate(RSTVTab.GUIDE)
@@ -1320,7 +1170,7 @@ private val channelCategoryOrder = listOf(
     "الأفلام والمسلسلات",
     "قنوات الأطفال",
     "القنوات الدينية",
-    "القنوات العالمية"
+    "قنوات متنوعة"
 )
 
 private fun normalizedChannelText(value: String): String =
@@ -1353,7 +1203,7 @@ private fun channelCategory(channel: RSTVChannel): String {
             listOf("السعود", "سوريا", "مصر", "العراق", "الاردن", "فلسطين", "المغرب", "الجزائر", "تونس", "لبنان", "الامارات", "الكويت", "قطر", "عمان", "اليمن", "البحرين", "ليبيا", "السودان").any { it in country } ||
             hasAny("arabic", "العربية", "عربي") ->
             "القنوات العربية"
-        else -> "القنوات العالمية"
+        else -> "قنوات متنوعة"
     }
 }
 
@@ -1388,15 +1238,24 @@ private fun LiveContent(
 ) {
     var showChannelTable by remember { mutableStateOf(false) }
     val fullscreenFocusRequester = remember { FocusRequester() }
-    val numberedChannels = remember(channels) {
-        orderedChannelGroups(channels)
-            .flatMap { it.second }
-            .distinctBy { it.streamUrl }
-            .mapIndexed { index, channel -> (index + 1) to channel }
+    var orderedGroups by remember { mutableStateOf(emptyList<Pair<String, List<RSTVChannel>>>()) }
+    var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    var numberByStreamUrl by remember { mutableStateOf(emptyMap<String, Int>()) }
+    LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
+        val channelSnapshot = channels.toList()
+        val result = withContext(Dispatchers.Default) {
+            val groups = orderedChannelGroups(channelSnapshot)
+            val numbered = groups
+                .flatMap { it.second }
+                .distinctBy { it.streamUrl }
+                .mapIndexed { index, channel -> (index + 1) to channel }
+            Triple(groups, numbered, numbered.associate { it.second.streamUrl to it.first })
+        }
+        orderedGroups = result.first
+        numberedChannels = result.second
+        numberByStreamUrl = result.third
     }
-    val selectedChannelNumber = numberedChannels
-        .firstOrNull { it.second.streamUrl == selectedChannel?.streamUrl }
-        ?.first
+    val selectedChannelNumber = numberByStreamUrl[selectedChannel?.streamUrl]
     var showChannelInfo by remember { mutableStateOf(false) }
 
     LaunchedEffect(isFullscreenPlayer, selectedChannel?.streamUrl) {
@@ -1566,7 +1425,7 @@ private fun LiveContent(
                     EmptyState("لا توجد نتائج", "جرّب اسماً أو تصنيفاً آخر.")
                 }
             } else {
-                val groupedChannels = orderedChannelGroups(channels)
+                val groupedChannels = orderedGroups
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1687,21 +1546,33 @@ private fun FullscreenChannelSelectorDialog(
 ) {
     var query by remember { mutableStateOf("") }
     var previewChannel by remember(activeChannel?.streamUrl) { mutableStateOf(activeChannel) }
-    val numberedChannels = remember(channels) {
-        orderedChannelGroups(channels)
-            .flatMap { it.second }
-            .distinctBy { it.streamUrl }
-            .mapIndexed { index, channel -> (index + 1) to channel }
+    var numberedChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    var numberByStreamUrl by remember { mutableStateOf(emptyMap<String, Pair<Int, RSTVChannel>>()) }
+    var filteredChannels by remember { mutableStateOf(emptyList<Pair<Int, RSTVChannel>>()) }
+    LaunchedEffect(channels.size, channels.firstOrNull()?.streamUrl, channels.lastOrNull()?.streamUrl) {
+        val channelSnapshot = channels.toList()
+        val result = withContext(Dispatchers.Default) {
+            val numbered = orderedChannelGroups(channelSnapshot)
+                .flatMap { it.second }
+                .distinctBy { it.streamUrl }
+                .mapIndexed { index, channel -> (index + 1) to channel }
+            numbered to numbered.associateBy { it.second.streamUrl }
+        }
+        numberedChannels = result.first
+        numberByStreamUrl = result.second
     }
-    val filteredChannels = numberedChannels.filter { (_, channel) ->
-        query.isBlank() ||
-            channel.name.contains(query, ignoreCase = true) ||
-            channelCountryLabel(channel).contains(query, ignoreCase = true) ||
-            channel.group.orEmpty().contains(query, ignoreCase = true)
+    LaunchedEffect(numberedChannels, query) {
+        val channelSnapshot = numberedChannels
+        filteredChannels = withContext(Dispatchers.Default) {
+            channelSnapshot.filter { (_, channel) ->
+                query.isBlank() ||
+                    channel.name.contains(query, ignoreCase = true) ||
+                    channelCountryLabel(channel).contains(query, ignoreCase = true) ||
+                    channel.group.orEmpty().contains(query, ignoreCase = true)
+            }
+        }
     }
-    val previewEntry = numberedChannels.firstOrNull {
-        it.second.streamUrl == previewChannel?.streamUrl
-    }
+    val previewEntry = numberByStreamUrl[previewChannel?.streamUrl]
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1839,18 +1710,32 @@ private fun OnlineSourcesContent(
     status: String,
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
-    onAddToLibrary: (RemotePlaylistSource) -> Unit,
+    sourceLibraryChannelCount: Int,
+    sources: List<RemotePlaylistSource>,
+    onAddToLibrary: (RemotePlaylistPackage) -> Unit,
     onShowLibrary: () -> Unit,
-    onOpenOfficialUrl: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text("مصادر القنوات عبر الإنترنت", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    val groupOrder = listOf(
+        "الدول العربية", "باقات عربية مجمعة", "باقات تركيا", "الدول الأوروبية", "أمريكا الشمالية",
+        "أمريكا الجنوبية واللاتينية", "شرق آسيا", "آسيا وبقية العالم",
+        "الدول الإفريقية", "أوقيانوسيا", "أوروبا", "أمريكا الجنوبية",
+        "قنوات الأفلام", "قنوات المسلسلات", "قنوات الرياضة",
+        "فهارس IPTV الإضافية"
+    )
+    val packages = remember(sources) { RemotePlaylistSources.displayPackages(sources) }
+    val groupedPackages = remember(packages) {
+        packages.groupBy { it.packageGroup }
+            .toList()
+            .sortedWith(compareBy(
+                { groupOrder.indexOf(it.first).let { index -> if (index < 0) Int.MAX_VALUE else index } },
+                { it.first }
+            ))
+    }
+    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("باقات ومصادر IPTV", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
         Text(
-            "نزّل حزم القنوات العالمية وأضفها إلى مكتبتك. تشغيل القنوات يتم حصراً من صفحة البث المباشر.",
+            "كل القنوات تُكتشف عبر قوائم IPTV بصيغة M3U. اختر القارة أو الدولة؛ سوريا ولبنان والعراق وبقية الدول العربية مفصولة كلٌّ على حدة.",
             color = MutedText,
             fontSize = 11.sp
         )
@@ -1862,15 +1747,27 @@ private fun OnlineSourcesContent(
             Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(status, color = SoftWhite, fontSize = 11.sp)
                 Text(sourceLibraryStatus, color = Silver, fontSize = 10.sp)
+                Text(
+                    "الباقات المتاحة: ${packages.size} • مصادر محفوظة: $sourceLibraryCount",
+                    color = SoftWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+                Text(
+                    "القنوات الفريدة المحمّلة: $sourceLibraryChannelCount",
+                    color = Silver,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
                 Button(
                     onClick = onShowLibrary,
                     enabled = sourceLibraryCount > 0,
                     colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
                 ) {
-                    Text("عرض المكتبة المجمّعة (${sourceLibraryCount} مصدر)")
+                    Text("عرض مكتبة القنوات المحمّلة ($sourceLibraryChannelCount)")
                 }
                 Text(
-                    "هذه الصفحة لتنزيل حزم القنوات وحفظها فقط؛ لا يتم تشغيل الفيديو هنا ولا تتغير قائمتك المحلية. افتح «البث المباشر» ثم «مكتبة المصادر» لمشاهدة القنوات. تُقبل روابط HTTPS فقط، وقد تتوقف بعض القنوات أو تُقيّد جغرافياً.",
+                    "هذه الصفحة لتنزيل حزم IPTV فقط؛ لا تشغّل الفيديو هنا ولا تستبدل قائمتك المحلية. افتح «البث المباشر» لمشاهدة القنوات. تُزال روابط البث المتطابقة عند دمج المصادر. وجود رابط HTTPS في فهرس عام لا يثبت وحده ترخيص القناة أو استمرار عملها.",
                     color = MutedText,
                     fontSize = 10.sp
                 )
@@ -1880,356 +1777,40 @@ private fun OnlineSourcesContent(
             modifier = Modifier.fillMaxWidth().weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item {
-                Text("قوائم IPTV القابلة للتحديث", color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            items(RemotePlaylistSources.playlists, key = { it.id }) { source ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = PanelBlack),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(13.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+            groupedPackages.forEach { (group, groupEntries) ->
+                item(key = "package-group-$group") {
+                    Text(group, color = Silver, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+                items(groupEntries, key = { it.id }) { playlistPackage ->
+                    val providers = playlistPackage.sources.map { it.provider }.distinct()
+                    val attributions = playlistPackage.sources.mapNotNull { it.attribution }.distinct()
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text(source.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(source.description, color = MutedText, fontSize = 11.sp)
-                        Text("المصدر: ${source.provider}", color = Silver, fontSize = 10.sp)
-                        source.attribution?.let {
-                            Text(it, color = MutedText, fontSize = 9.sp)
-                        }
-                        Button(
-                            onClick = { onAddToLibrary(source) },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                            shape = RoundedCornerShape(10.dp)
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(13.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("إضافة إلى المكتبة المجمّعة")
+                            Text(playlistPackage.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(playlistPackage.description, color = MutedText, fontSize = 11.sp)
+                            Text(
+                                "المصادر: ${providers.joinToString(" + ")} • عدد القوائم: ${playlistPackage.sources.size}",
+                                color = Silver,
+                                fontSize = 10.sp
+                            )
+                            attributions.forEach { attribution ->
+                                Text(attribution, color = MutedText, fontSize = 9.sp)
+                            }
+                            Button(
+                                onClick = { onAddToLibrary(playlistPackage) },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("تنزيل الباقة الموحّدة إلى المكتبة")
+                            }
                         }
-                    }
-                }
-            }
-            item {
-                Text(OfficialDestinationCategory.SPORTS.title, color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            items(RemotePlaylistSources.officialDestinations.filter { it.category == OfficialDestinationCategory.SPORTS }, key = { it.id }) { destination ->
-                OfficialDestinationCard(destination, onOpenOfficialUrl)
-            }
-            item {
-                Text(OfficialDestinationCategory.MOVIES.title, color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            items(RemotePlaylistSources.officialDestinations.filter { it.category == OfficialDestinationCategory.MOVIES }, key = { it.id }) { destination ->
-                OfficialDestinationCard(destination, onOpenOfficialUrl)
-            }
-            item {
-                Text(OfficialDestinationCategory.GENERAL.title, color = Silver, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            items(RemotePlaylistSources.officialDestinations.filter { it.category == OfficialDestinationCategory.GENERAL }, key = { it.id }) { destination ->
-                OfficialDestinationCard(destination, onOpenOfficialUrl)
-            }
-        }
-    }
-}
-
-@Composable
-private fun OfficialDestinationCard(
-    destination: OfficialLiveDestination,
-    onOpenOfficialUrl: (String) -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = PanelBlack),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(destination.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                Text(destination.description, color = MutedText, fontSize = 10.sp)
-            }
-            TextButton(onClick = { onOpenOfficialUrl(destination.url) }) {
-                Text("فتح رسمي", color = AccentRed, fontSize = 11.sp)
-            }
-        }
-    }
-}
-
-private data class WorldFilterOption(val key: String, val label: String)
-
-@Composable
-private fun WorldCatalogContent(
-    candidates: List<WorldChannelCandidate>,
-    catalogStatus: String,
-    sourceLibraryStatus: String,
-    sourceLibraryCount: Int,
-    remotePlaylistStatus: String,
-    onAddWorldSources: () -> Unit,
-    onShowSourceLibrary: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var query by remember { mutableStateOf("") }
-    var selectedCountry by remember { mutableStateOf("ALL") }
-    var selectedCategory by remember { mutableStateOf("ALL") }
-    var selectedLanguage by remember { mutableStateOf("ALL") }
-
-    val countries = remember(candidates) {
-        listOf(WorldFilterOption("ALL", "كل الدول")) +
-            candidates.distinctBy { it.countryCode }
-                .sortedBy { it.countryName }
-                .map { WorldFilterOption(it.countryCode, "${it.countryFlag} ${it.countryName}") }
-    }
-    val categories = remember(candidates) {
-        val labels = linkedMapOf<String, String>()
-        candidates.forEach { channel ->
-            channel.categoryIds.forEachIndexed { index, id ->
-                labels.putIfAbsent(id, channel.categoryLabels.getOrNull(index) ?: id)
-            }
-        }
-        listOf(WorldFilterOption("ALL", "كل التصنيفات")) +
-            labels.map { (id, label) -> WorldFilterOption(id, label) }.sortedBy { it.label }
-    }
-    val languages = remember(candidates) {
-        val labels = linkedMapOf<String, String>()
-        candidates.forEach { channel ->
-            channel.languageSearchValues.forEachIndexed { index, code ->
-                labels.putIfAbsent(code, channel.languageLabels.getOrNull(index) ?: code)
-            }
-        }
-        listOf(WorldFilterOption("ALL", "كل اللغات")) +
-            labels.map { (code, label) -> WorldFilterOption(code, label) }.sortedBy { it.label }
-    }
-    val visibleCandidates = candidates.filter { channel ->
-        val matchesQuery = query.isBlank() ||
-            channel.name.contains(query, ignoreCase = true) ||
-            channel.alternativeNames.any { it.contains(query, ignoreCase = true) } ||
-            channel.countryName.contains(query, ignoreCase = true)
-        val matchesCountry = selectedCountry == "ALL" || channel.countryCode == selectedCountry
-        val matchesCategory = selectedCategory == "ALL" || selectedCategory in channel.categoryIds
-        val matchesLanguage = selectedLanguage == "ALL" || selectedLanguage in channel.languageSearchValues
-        matchesQuery && matchesCountry && matchesCategory && matchesLanguage
-    }
-    val uriHandler = LocalUriHandler.current
-
-    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("القنوات العالمية", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-        Text(
-            "استورد قوائم القنوات العالمية إلى المشغّل الداخلي، ثم تصفّح القنوات وشغّلها من داخل التطبيق.",
-            color = MutedText,
-            fontSize = 11.sp
-        )
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = PanelRaised),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                Modifier.fillMaxWidth().padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("مكتبة البث العالمية", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(
-                    "يجلب التطبيق قوائم عالمية وعربية وتركية من مصادر IPTV، ويحفظها في مكتبة منفصلة دون استبدال قائمتك المحلية.",
-                    color = MutedText,
-                    fontSize = 11.sp
-                )
-                Button(
-                    onClick = onAddWorldSources,
-                    enabled = !remotePlaylistStatus.startsWith("جارٍ تحديث مكتبة القنوات العالمية"),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
-                    shape = RoundedCornerShape(11.dp)
-                ) {
-                    Text(
-                        if (remotePlaylistStatus.startsWith("جارٍ تحديث مكتبة القنوات العالمية")) {
-                            "جارٍ تنزيل القوائم..."
-                        } else {
-                            "تحديث واستيراد القنوات العالمية"
-                        },
-                        color = ScreenBlack,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Button(
-                    onClick = onShowSourceLibrary,
-                    enabled = sourceLibraryCount > 0,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PanelBlack,
-                        contentColor = SoftWhite,
-                        disabledContainerColor = PanelBlack.copy(alpha = 0.45f),
-                        disabledContentColor = MutedText
-                    ),
-                    shape = RoundedCornerShape(11.dp)
-                ) {
-                    Text("فتح مكتبة القنوات المستوردة (${sourceLibraryCount} مصدر)")
-                }
-                Text(sourceLibraryStatus, color = Silver, fontSize = 10.sp)
-                Text(remotePlaylistStatus, color = SoftWhite, fontSize = 10.sp)
-                Text(
-                    "تُزال القنوات المكررة. توفر الرابط لا يضمن استمرار البث أو حقوق إعادة نشر المحتوى.",
-                    color = MutedText,
-                    fontSize = 9.sp
-                )
-            }
-        }
-        Text("دليل الدول والقنوات الرسمية", color = Silver, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text(
-            "هذا الدليل يعرض بيانات القناة وموقعها الرسمي؛ التشغيل داخل التطبيق يكون من قوائم IPTV المستوردة أعلاه.",
-            color = MutedText,
-            fontSize = 10.sp
-        )
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("ابحث عن قناة أو دولة") }
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            WorldFilterDropdown(
-                title = "الدولة",
-                selectedKey = selectedCountry,
-                options = countries,
-                onSelected = { selectedCountry = it },
-                modifier = Modifier.weight(1f)
-            )
-            WorldFilterDropdown(
-                title = "التصنيف",
-                selectedKey = selectedCategory,
-                options = categories,
-                onSelected = { selectedCategory = it },
-                modifier = Modifier.weight(1f)
-            )
-        }
-        WorldFilterDropdown(
-            title = "اللغة",
-            selectedKey = selectedLanguage,
-            options = languages,
-            onSelected = { selectedLanguage = it },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(
-            "${visibleCandidates.size} / ${candidates.size} محطة في الدليل",
-            color = SoftWhite,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp
-        )
-        Text(catalogStatus, color = MutedText, fontSize = 10.sp)
-        if (visibleCandidates.isEmpty()) {
-            EmptyState(
-                title = if (candidates.isEmpty()) "الدليل العالمي غير متاح" else "لا توجد نتائج",
-                description = if (candidates.isEmpty()) {
-                    "يمكنك مع ذلك استيراد القوائم العالمية من بطاقة مكتبة البث أعلاه."
-                } else {
-                    "غيّر الدولة أو اللغة أو التصنيف أو عبارة البحث."
-                }
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(visibleCandidates, key = { it.id }) { candidate ->
-                    WorldChannelCard(candidate) {
-                        candidate.websiteUrl?.let { url ->
-                            runCatching { uriHandler.openUri(url) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-@Composable
-private fun WorldFilterDropdown(
-    title: String,
-    selectedKey: String,
-    options: List<WorldFilterOption>,
-    onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedLabel = options.firstOrNull { it.key == selectedKey }?.label ?: title
-    Box(modifier) {
-        TextButton(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("$title: $selectedLabel", color = SoftWhite, maxLines = 1, fontSize = 11.sp)
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.heightIn(max = 340.dp)
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label, fontSize = 12.sp) },
-                    onClick = {
-                        onSelected(option.key)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorldChannelCard(
-    channel: WorldChannelCandidate,
-    onOpenOfficialWebsite: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = PanelBlack),
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(13.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(channel.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(
-                        "${channel.countryFlag} ${channel.countryName} • ${channel.countryCode}",
-                        color = MutedText,
-                        fontSize = 10.sp
-                    )
-                }
-                Text("مرشّحة", color = AccentRed, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-            }
-            if (channel.languageLabels.isNotEmpty()) {
-                Text("اللغات: ${channel.languageLabels.joinToString("، ")}", color = Silver, fontSize = 10.sp)
-            }
-            if (channel.categoryLabels.isNotEmpty()) {
-                Text("التصنيفات: ${channel.categoryLabels.joinToString(" • ")}", color = MutedText, fontSize = 10.sp)
-            }
-            Text(
-                if (channel.candidateStreamCount > 0) {
-                    "${channel.candidateStreamCount} رابط بث مبدئي • غير معتمد للتشغيل"
-                } else {
-                    "لا يوجد رابط بث ضمن بيانات المصدر"
-                },
-                color = MutedText,
-                fontSize = 10.sp
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "لم تُراجع حقوق البث بعد",
-                    color = AccentRed,
-                    fontSize = 10.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                if (channel.websiteUrl != null) {
-                    TextButton(onClick = onOpenOfficialWebsite) {
-                        Text("موقع القناة", color = Silver, fontSize = 11.sp)
                     }
                 }
             }
@@ -2438,114 +2019,11 @@ private fun ProgrammeCard(programme: GuideProgramme) {
 }
 
 @Composable
-private fun AdultContentContent(
-    channels: List<RSTVChannel>,
-    isSectionHidden: Boolean,
-    onToggleHidden: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val ageRatedChannels = channels.filter { AdultContentPolicy.classify(it) == AdultContentType.AGE_RATED }
-    val explicitChannels = channels.filter { AdultContentPolicy.classify(it) == AdultContentType.EXPLICIT }
-
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            Text("+18 للكبار فقط", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
-            Text(
-                "قسم منفصل لا يظهر في البحث أو المفضلة أو قوائم البث العادية. يلزم رمز PIN للدخول.",
-                color = MutedText,
-                fontSize = 12.sp
-            )
-        }
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = PanelRaised),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("تنبيه الترخيص", color = Silver, fontWeight = FontWeight.Bold)
-                    Text(
-                        "لا توجد حالياً حزمة IPTV مجانية ثبت أنها تملك إذناً واضحاً لبث محتوى +18. القنوات المكتشفة في قوائم M3U تبقى محجوبة ولا تعمل حتى مراجعة حقوق مصدرها. لن نستخدم روابط مسروقة أو قوائم مجهولة.",
-                        color = MutedText,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-        item {
-            Text("أفلام ومسلسلات بتصنيف عمري 18+", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text("يُعتمد التصنيف فقط عند وجود بيانات عمرية صريحة مثل TV-MA أو NC-17 أو 18+.", color = MutedText, fontSize = 11.sp)
-        }
-        if (ageRatedChannels.isEmpty()) {
-            item {
-                EmptyState("لا توجد قنوات معتمدة بعد", "لم يتم العثور على قناة ذات تصنيف عمري 18+ من مصدر تمت مراجعته.")
-            }
-        } else {
-            items(ageRatedChannels, key = { it.streamUrl }) { channel ->
-                AdultCandidateCard(channel, "تصنيف عمري 18+")
-            }
-        }
-        item {
-            Text("قنوات ذات محتوى صريح للبالغين", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text("هذه الفئة منفصلة تماماً عن الأفلام والمسلسلات المصنّفة عمرياً.", color = MutedText, fontSize = 11.sp)
-        }
-        if (explicitChannels.isEmpty()) {
-            item {
-                EmptyState("لا توجد مصادر قانونية معتمدة", "لن نضيف قناة صريحة إلا من مشغّل رسمي يثبت السماح بالبث المجاني.")
-            }
-        } else {
-            items(explicitChannels, key = { it.streamUrl }) { channel ->
-                AdultCandidateCard(channel, "محتوى صريح — محجوب للمراجعة")
-            }
-        }
-        item {
-            Button(
-                onClick = onToggleHidden,
-                colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(if (isSectionHidden) "إظهار +18 في القائمة" else "إخفاء +18 من القائمة")
-            }
-        }
-        item {
-            Text(
-                "إخفاء القسم يمنع ظهوره في شريط التنقل. يمكن إدارته مجدداً من بطاقة «إدارة قسم +18» في الرئيسية، بعد إدخال PIN.",
-                color = MutedText,
-                fontSize = 11.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun AdultCandidateCard(channel: RSTVChannel, label: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = PanelBlack),
-        shape = RoundedCornerShape(13.dp)
-    ) {
-        Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(channel.name, color = SoftWhite, fontWeight = FontWeight.Bold)
-            Text(label, color = Silver, fontSize = 11.sp)
-            Text(
-                "المصدر: " + (channel.group ?: "قائمة مستوردة") + " • حالة البث: محجوب حتى مراجعة الحقوق",
-                color = MutedText,
-                fontSize = 10.sp
-            )
-        }
-    }
-}
-
-@Composable
 private fun SettingsContent(
     status: String,
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
     onClear: (ClearAction) -> Unit,
-    onManageAdult: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -2555,9 +2033,6 @@ private fun SettingsContent(
         item {
             Text("الإعدادات", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text("إدارة مكتبتك المحلية وتجربة التشغيل", color = MutedText, fontSize = 12.sp)
-        }
-        item {
-            SettingsAction("إدارة قسم +18", "حماية القسم برمز PIN وإظهار القسم أو إخفاؤه", onManageAdult)
         }
         item {
             SettingsAction("استيراد / استبدال قائمة M3U", "يتم حفظ القائمة داخل مساحة التطبيق الخاصة", onImportPlaylist)
@@ -2652,54 +2127,6 @@ private fun readBoundedDocument(context: Context, uri: Uri): String {
         }
     }
     return output.toByteArray().toString(Charsets.UTF_8)
-}
-
-@Composable
-private fun YouTubeLiveContent(modifier: Modifier = Modifier) {
-    val uriHandler = LocalUriHandler.current
-    var query by remember { mutableStateOf("قنوات مباشرة") }
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Text("البث المباشر عبر YouTube", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text(
-            "ابحث وافتح نتائج البث من منصة YouTube الرسمية. لا يشغّل RS TV فيديوهات YouTube عبر روابط غير رسمية ولا يتجاوز قيود المنصة.",
-            color = MutedText,
-            fontSize = 13.sp
-        )
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("اسم القناة أو موضوع البث") }
-        )
-        Button(
-            onClick = {
-                val encoded = Uri.encode(query.trim().ifBlank { "قنوات مباشرة" })
-                uriHandler.openUri("https://www.youtube.com/results?search_query=$encoded")
-            },
-            enabled = query.isNotBlank(),
-            colors = ButtonDefaults.buttonColors(containerColor = AccentRed)
-        ) {
-            Text("فتح البحث الرسمي في YouTube")
-        }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = PanelBlack),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("تكامل API داخل التطبيق: غير مفعّل بعد", color = SoftWhite, fontWeight = FontWeight.Bold)
-                Text(
-                    "لإضافة نتائج مباشرة داخل RS TV نحتاج مفتاح YouTube Data API محفوظاً كسرّ في بيئة البناء/الخادم، ثم مراجعة شروط API وطريقة التشغيل الرسمية. لم نضع مفتاحاً داخل التطبيق.",
-                    color = MutedText,
-                    fontSize = 12.sp
-                )
-            }
-        }
-    }
 }
 
 @Composable

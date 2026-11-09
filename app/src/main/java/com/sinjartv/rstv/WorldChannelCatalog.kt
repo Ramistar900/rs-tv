@@ -19,8 +19,31 @@ internal data class WorldChannelCandidate(
 )
 
 internal object WorldChannelCatalogParser {
-    private const val MAX_CATALOG_CHARS = 15_000_000
-    private const val MAX_RECORDS = 20_000
+    private const val MAX_CATALOG_CHARS = 64 * 1024 * 1024
+    private const val MAX_RECORDS = 50_000
+
+    fun parseCountryCodes(json: String): List<String> {
+        require(json.length <= MAX_CATALOG_CHARS) { "ملف الكتالوج أكبر من الحد المسموح" }
+        val root = JSONObject(json)
+        val records = root.optJSONArray("records")
+            ?: throw IllegalArgumentException("ملف الكتالوج لا يحتوي records")
+        require(records.length() <= MAX_RECORDS) { "عدد سجلات القنوات يتجاوز الحد المسموح" }
+
+        val countryCodes = linkedSetOf<String>()
+        for (index in 0 until records.length()) {
+            val record = records.optJSONObject(index) ?: continue
+            if (record.optString("status") != "candidate") continue
+            val countryCode = record.optJSONObject("country")
+                ?.optString("code")
+                ?.trim()
+                ?.uppercase()
+                .orEmpty()
+            if (countryCode.matches(Regex("[A-Z]{2}")) && countryCode != "ZZ") {
+                countryCodes += countryCode
+            }
+        }
+        return countryCodes.sorted()
+    }
 
     fun parse(json: String): List<WorldChannelCandidate> {
         require(json.length <= MAX_CATALOG_CHARS) { "ملف الكتالوج أكبر من الحد المسموح" }

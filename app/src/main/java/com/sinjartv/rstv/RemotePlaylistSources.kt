@@ -5,6 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.util.Locale
 
 internal data class RemotePlaylistSource(
     val id: String,
@@ -14,6 +15,17 @@ internal data class RemotePlaylistSource(
     val provider: String,
     val attribution: String? = null,
     val allowedHosts: Set<String> = setOf(URI(playlistUrl).host.lowercase())
+) {
+    val packageGroup: String
+        get() = RemotePlaylistSources.packageGroupFor(id)
+}
+
+internal data class RemotePlaylistPackage(
+    val id: String,
+    val name: String,
+    val description: String,
+    val packageGroup: String,
+    val sources: List<RemotePlaylistSource>
 )
 
 internal enum class OfficialDestinationCategory(val title: String) {
@@ -31,19 +43,10 @@ internal data class OfficialLiveDestination(
 )
 
 internal object RemotePlaylistSources {
-    val worldLibraryBundleIds = listOf(
-        "doubo-world",
-        "doubo-arabic",
-        "doubo-turkey",
-        "iptv-org-world",
-        "iptv-org-arab",
-        "iptv-org-turkey"
-    )
-
     val playlists = listOf(
         RemotePlaylistSource(
             id = "doubo-world",
-            name = "Doubo — القنوات العالمية",
+            name = "Doubo — فهرس القنوات الكامل",
             description = "فهرس يومي لقنوات يعلن ناشره أنها متاحة مجاناً للعامة. يفحص الروابط إلى أول مقطع فيديو ويستخدم نطاقات المحطات الرسمية أو CDN/منصات مجانية معتمدة ضمن سياسته.",
             playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/index.m3u",
             provider = "Doubo Public Channel Directory",
@@ -79,7 +82,7 @@ internal object RemotePlaylistSources {
         ),
         RemotePlaylistSource(
             id = "iptv-org-world",
-            name = "IPTV-org — العالم",
+            name = "IPTV-org — فهرس القنوات الكامل",
             description = "فهرس مجتمعي واسع لقنوات الإنترنت، مقسّم بحسب الدول واللغات والتصنيفات. الروابط مرشحة وليست كلها مضمونة أو مرخصة.",
             playlistUrl = "https://iptv-org.github.io/iptv/index.m3u",
             provider = "iptv-org/iptv"
@@ -543,108 +546,341 @@ internal object RemotePlaylistSources {
         )
     )
 
-    val officialDestinations = listOf(
-        OfficialLiveDestination(
-            id = "fifa-plus",
-            name = "FIFA+ — كرة القدم العالمية",
-            description = "مباريات مباشرة مختارة من اتحادات وطنية وأرشيف ومحتوى أصلي مجاني؛ جدول المباريات وحقوق المشاهدة يختلفان حسب الدولة والبطولة.",
-            url = "https://www.plus.fifa.com/en",
-            category = OfficialDestinationCategory.SPORTS
-        ),
-        OfficialLiveDestination(
-            id = "eurovision-sport",
-            name = "Eurovision Sport — رياضات العالم",
-            description = "منصة مجانية للأحداث الرياضية المباشرة والإعادات والملخصات، مثل ألعاب القوى والسباحة والدراجات والرياضات القتالية؛ بعض الأحداث محدودة إقليمياً.",
-            url = "https://eurovisionsport.com/en",
-            category = OfficialDestinationCategory.SPORTS
-        ),
-        OfficialLiveDestination(
-            id = "red-bull-tv",
-            name = "Red Bull TV — رياضات وأفلام",
-            description = "بث مجاني لأحداث مختارة في رياضة المحركات والدراجات والتزلج وركوب الأمواج، إضافة إلى أفلام ووثائقيات رياضية؛ التغطية تتغير حسب الحدث والمنطقة.",
-            url = "https://www.redbull.com/int-en/tv",
-            category = OfficialDestinationCategory.SPORTS
-        ),
-        OfficialLiveDestination(
-            id = "trt-spor",
-            name = "TRT Spor — تركيا",
-            description = "صفحة البث الرسمية للقناة التركية؛ بعض المباريات والمقاطع قد تكون مقيدة بحقوق المنطقة أو لا تعمل خارج نطاق الترخيص.",
-            url = "https://www.trtspor.com.tr/canli-yayin-izle/trt-spor",
-            category = OfficialDestinationCategory.SPORTS
-        ),
-        OfficialLiveDestination(
-            id = "fubo-sports-network",
-            name = "Fubo Sports Network",
-            description = "شبكة رياضية مجانية مدعومة بالإعلانات عبر منصات توزيع مختارة، مع تغطية إقليمية تختلف حسب البلد والمنصة؛ ليست باقة جميع الدوريات المدفوعة.",
-            url = "https://www.fubosportsnetwork.com/",
-            category = OfficialDestinationCategory.SPORTS
-        ),
-        OfficialLiveDestination(
-            id = "rakuten-tv-free",
-            name = "Rakuten TV — Free وLive TV",
-            description = "أفلام ومسلسلات وقنوات مباشرة مجانية مدعومة بالإعلانات، وتشمل بعض القنوات الرياضية؛ الكتالوج وطريقة الدخول يختلفان حسب البلد والجهاز.",
-            url = "https://www.rakuten.tv/",
-            category = OfficialDestinationCategory.MOVIES
-        ),
-        OfficialLiveDestination(
-            id = "pluto-tv",
-            name = "Pluto TV — أفلام وقنوات مجانية",
-            description = "مئات القنوات وعناوين أفلام مجانية مدعومة بالإعلانات؛ عدد القنوات والمحتوى والتوفر الجغرافي يتغير حسب البلد.",
-            url = "https://pluto.tv/welcome/on-demand",
-            category = OfficialDestinationCategory.MOVIES
-        ),
-        OfficialLiveDestination(
-            id = "tubi",
-            name = "Tubi — أفلام وقنوات مجانية",
-            description = "مكتبة أفلام وقنوات مجانية قانونية في الدول المدعومة مثل الولايات المتحدة وكندا والمكسيك والمملكة المتحدة وأستراليا؛ غير مدرج ضمن التغطية الرسمية لتركيا.",
-            url = "https://tubitv.com/",
-            category = OfficialDestinationCategory.MOVIES
-        ),
-        OfficialLiveDestination(
-            id = "internet-archive-movies",
-            name = "Internet Archive — أفلام كلاسيكية",
-            description = "أرشيف أفلام ومواد مرئية؛ يجب التأكد من حالة الحقوق لكل عنوان ونسخة على حدة قبل اعتباره متاحاً للمشاهدة أو إعادة الاستخدام.",
-            url = "https://archive.org/details/movies",
-            category = OfficialDestinationCategory.MOVIES
-        ),
-        OfficialLiveDestination(
-            id = "plex-live-tv",
-            name = "Plex — أفلام وقنوات مباشرة",
-            description = "خدمة مجانية مدعومة بالإعلانات للأفلام والقنوات، لكن Plex يذكر أن Live TV غير متاح حالياً في تركيا؛ أدرجناه كخيار للدول المدعومة فقط.",
-            url = "https://www.plex.tv/watch-free/",
-            category = OfficialDestinationCategory.MOVIES
-        ),
-        OfficialLiveDestination(
-            id = "aljazeera-ar",
-            name = "الجزيرة — البث الحي",
-            description = "صفحة البث الرسمية، وقد تعرض أكثر من قناة حسب التوفر.",
-            url = "https://www.aljazeera.net/video/live"
-        ),
-        OfficialLiveDestination(
-            id = "aljazeera-en",
-            name = "Al Jazeera English",
-            description = "مشاهدة البث من صفحة القناة الرسمية.",
-            url = "https://www.aljazeera.com/video/live/"
-        ),
-        OfficialLiveDestination(
-            id = "cgtn",
-            name = "CGTN — قنوات متعددة",
-            description = "صفحة CGTN الرسمية لقنواتها الإنجليزية والعربية والإسبانية والفرنسية والوثائقية.",
-            url = "https://www.cgtn.com/tv"
-        ),
-        OfficialLiveDestination(
-            id = "euronews",
-            name = "Euronews Live",
-            description = "البث التلفزيوني المباشر عبر الموقع الرسمي؛ قد تختلف الإتاحة حسب المنطقة.",
-            url = "https://www.euronews.com/live"
-        ),
-        OfficialLiveDestination(
-            id = "nasa",
-            name = "NASA+",
-            description = "خدمة ناسا الرسمية المجانية لمحتوى مباشر وعند الطلب؛ يتطلب التشغيل استخدام خدمة ناسا الرسمية.",
-            url = "https://plus.nasa.gov/"
-        )
+
+    private val arabCountryCodes = setOf(
+        "AE", "BH", "DJ", "DZ", "EG", "IQ", "JO", "KM", "KW", "LB", "LY",
+        "MA", "MR", "OM", "PS", "QA", "SA", "SD", "SO", "SY", "TN", "YE"
     )
+
+    private val arabCountryNames = mapOf(
+        "AE" to "الإمارات العربية المتحدة",
+        "BH" to "البحرين",
+        "DJ" to "جيبوتي",
+        "DZ" to "الجزائر",
+        "EG" to "مصر",
+        "IQ" to "العراق",
+        "JO" to "الأردن",
+        "KM" to "جزر القمر",
+        "KW" to "الكويت",
+        "LB" to "لبنان",
+        "LY" to "ليبيا",
+        "MA" to "المغرب",
+        "MR" to "موريتانيا",
+        "OM" to "عُمان",
+        "PS" to "فلسطين",
+        "QA" to "قطر",
+        "SA" to "السعودية",
+        "SD" to "السودان",
+        "SO" to "الصومال",
+        "SY" to "سوريا",
+        "TN" to "تونس",
+        "YE" to "اليمن"
+    )
+
+    private val europeanCountryCodes = setOf(
+        "AD", "AL", "AT", "AX", "BA", "BE", "BG", "BY", "CH", "CY", "CZ", "DE",
+        "DK", "EE", "ES", "FI", "FO", "FR", "GB", "GE", "GG", "GI", "GR", "HR", "TR",
+        "HU", "IE", "IM", "IS", "IT", "JE", "LI", "LT", "LU", "LV", "MC", "MD",
+        "ME", "MK", "MT", "NL", "NO", "PL", "PT", "RO", "RS", "RU", "SE", "SI",
+        "SJ", "SK", "SM", "UA", "UK", "VA", "XK"
+    )
+
+    private val northAmericanCountryCodes = setOf("US", "CA", "GL", "BM")
+    private val eastAsianCountryCodes = setOf("CN", "HK", "JP", "KP", "KR", "MO", "MN", "TW")
+    private val latinAmericanCountryCodes = setOf(
+        "AG", "AI", "AR", "AW", "BB", "BL", "BO", "BQ", "BR", "BS", "BZ", "CL",
+        "CO", "CR", "CU", "CW", "DM", "DO", "EC", "FK", "GD", "GF", "GP", "GT",
+        "GY", "HN", "HT", "JM", "KN", "KY", "LC", "MF", "MQ", "MS", "MX", "NI",
+        "PA", "PE", "PM", "PR", "PY", "SR", "SV", "SX", "TC", "TT", "UY", "VC",
+        "VE", "VG", "VI"
+    )
+    private val africanCountryCodes = setOf(
+        "AO", "BF", "BI", "BJ", "BW", "CD", "CF", "CG", "CI", "CM", "CV", "EH",
+        "ER", "ET", "GA", "GH", "GM", "GN", "GQ", "GW", "KE", "LR", "LS", "MG",
+        "ML", "MZ", "NA", "NE", "NG", "RW", "SC", "SL", "SN", "SS", "ST", "SZ",
+        "TD", "TG", "TZ", "UG", "ZA", "ZM", "ZW"
+    )
+    private val oceaniaCountryCodes = setOf(
+        "AS", "AU", "CK", "FJ", "FM", "GU", "KI", "MH", "MP", "NC", "NF", "NR",
+        "NU", "NZ", "PF", "PG", "PW", "SB", "TK", "TO", "TV", "VU", "WF", "WS"
+    )
+
+    fun countryPackages(countryCodes: Collection<String>): List<RemotePlaylistSource> {
+        val existingIds = playlists.mapTo(HashSet()) { it.id }
+        val existingUrls = playlists.mapTo(HashSet()) { it.playlistUrl }
+        return (countryCodes.map { it.trim().uppercase(Locale.ROOT) } + arabCountryCodes + setOf("FR", "BE"))
+            .filter { it.matches(Regex("[A-Z]{2}")) }
+            .distinct()
+            .filterNot { "iptv-org-${it.lowercase(Locale.ROOT)}" in existingIds }
+            .sortedWith(compareBy<String>({ countryGroupFor(it) }, { countryName(it) }))
+            .mapNotNull { code ->
+                val playlistCode = if (code == "GB") "uk" else code.lowercase(Locale.ROOT)
+                val id = "iptv-org-${playlistCode}"
+                val source = RemotePlaylistSource(
+                    id = id,
+                    name = "IPTV-org — ${countryName(code)}",
+                    description = "باقة قنوات ${countryName(code)} من فهرس IPTV-org. تُنزّل كقائمة IPTV فقط؛ عدد القنوات وتوفرها يتغيران حسب تحديث المصدر، ويجب مراجعة حقوق كل قناة قبل اعتبارها مرخصة.",
+                    playlistUrl = "https://iptv-org.github.io/iptv/countries/${playlistCode}.m3u",
+                    provider = "iptv-org/iptv"
+                )
+                source.takeUnless { it.playlistUrl in existingUrls }
+            }
+    }
+
+    private val douboCountryCodes = setOf(
+        "US",
+        "IN",
+        "DE",
+        "SE",
+        "GB",
+        "IT",
+        "ES",
+        "CA",
+        "NL",
+        "MX",
+        "FR",
+        "BR",
+        "KR",
+        "CL",
+        "ID",
+        "DO",
+        "PL",
+        "RO",
+        "AU",
+        "RU",
+        "TH",
+        "CO",
+        "CR",
+        "IQ",
+        "CN",
+        "TR",
+        "AR",
+        "HN",
+        "PR",
+        "AE",
+        "AT",
+        "BE",
+        "VE",
+        "VN",
+        "IR",
+        "MD",
+        "SG",
+        "DK",
+        "EE",
+        "GR",
+        "HK",
+        "IL",
+        "LU",
+        "MK",
+        "PE",
+        "PT",
+        "SA",
+        "UA",
+        "BO",
+        "JP",
+        "PH",
+        "PK",
+        "BH",
+        "CH",
+        "FI",
+        "HU",
+        "IE",
+        "LT",
+        "NG",
+        "NO",
+        "RW",
+        "SK",
+        "AL",
+        "BG",
+        "CZ",
+        "IS",
+        "KH",
+        "MN",
+        "MY",
+        "NZ",
+        "QA",
+        "SV",
+        "TW",
+        "UY",
+        "AZ",
+        "BA",
+        "GT",
+        "PY",
+        "AF",
+        "BJ",
+        "BQ",
+        "CM",
+        "CY",
+        "EC",
+        "EG",
+        "KW",
+        "KZ",
+        "LB",
+        "LK",
+        "MT",
+        "MZ",
+        "PS",
+        "RS",
+        "SD",
+        "SY",
+        "TN",
+        "TT",
+        "VG",
+        "ZA",
+        "AG",
+        "AM",
+        "AO",
+        "BI",
+        "BS",
+        "BY",
+        "CW",
+        "GE",
+        "GH",
+        "GM",
+        "GP",
+        "GQ",
+        "HR",
+        "HT",
+        "JO",
+        "LC",
+        "LV",
+        "LY",
+        "MA",
+        "MC",
+        "MM",
+        "MQ",
+        "MR",
+        "NA",
+        "NI",
+        "NP",
+        "OM",
+        "UG",
+        "XK"
+    )
+
+    fun douboCountryPackages(): List<RemotePlaylistSource> =
+        douboCountryCodes.sortedWith(compareBy({ countryGroupFor(it) }, { countryName(it) }))
+            .map { code ->
+                val playlistCode = if (code == "GB") "uk" else code.lowercase(Locale.ROOT)
+                RemotePlaylistSource(
+                    id = "doubo-country-${code.lowercase(Locale.ROOT)}",
+                    name = "Doubo — ${countryName(code)}",
+                    description = "باقة IPTV مستقلة لقنوات ${countryName(code)} من دليل Doubo اليومي. القنوات التي يدرجها الناشر مجانية ومعلنة للعامة، لكن المشاهدة قد تكون مقيدة جغرافياً وحقوق البث تبقى لأصحابها.",
+                    playlistUrl = "https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/${playlistCode}.m3u",
+                    provider = "Doubo Public Channel Directory",
+                    attribution = "إسناد مطلوب وفق CC BY 4.0: Doubo Public Channel Directory. ترخيص بيانات الدليل لا ينقل حقوق البرامج.",
+                    allowedHosts = setOf("cdn.jsdelivr.net", "fastly.jsdelivr.net", "gcore.jsdelivr.net", "testingcf.jsdelivr.net")
+                )
+            }
+
+    fun displayPackages(sources: List<RemotePlaylistSource>): List<RemotePlaylistPackage> {
+        val countrySources = linkedMapOf<String, MutableList<RemotePlaylistSource>>()
+        val otherPackages = mutableListOf<RemotePlaylistPackage>()
+
+        sources.distinctBy { it.id }.forEach { source ->
+            val countryCode = countryCodeForSourceId(source.id)
+            if (countryCode == null) {
+                otherPackages += RemotePlaylistPackage(
+                    id = source.id,
+                    name = source.name,
+                    description = source.description,
+                    packageGroup = source.packageGroup,
+                    sources = listOf(source)
+                )
+            } else {
+                countrySources.getOrPut(countryCode) { mutableListOf() } += source
+            }
+        }
+
+        val combinedCountryPackages = countrySources.map { (countryCode, countryEntries) ->
+            val uniqueSources = countryEntries.distinctBy { it.playlistUrl.trim().lowercase(Locale.ROOT) }
+            val displayCountryName = countryName(countryCode)
+            RemotePlaylistPackage(
+                id = "country-$countryCode",
+                name = displayCountryName,
+                description = if (uniqueSources.size > 1) {
+                    "باقة موحدة لقنوات ${displayCountryName} تجمع ${uniqueSources.size} مصادر IPTV. تُدمج القوائم مع إزالة روابط البث المتطابقة قبل عرض القنوات."
+                } else {
+                    "باقة قنوات ${displayCountryName} من مصدر IPTV متاح. تُزال روابط البث المتطابقة عند دمج المكتبة."
+                },
+                packageGroup = countryGroupFor(countryCode),
+                sources = uniqueSources
+            )
+        }.sortedWith(compareBy({ groupOrderForCountry(it.packageGroup) }, { it.name }))
+
+        return combinedCountryPackages + otherPackages
+    }
+
+    private fun countryCodeForSourceId(id: String): String? {
+        val code = when {
+            id == "doubo-turkey" || id == "iptv-org-turkey" -> "TR"
+            id.startsWith("iptv-org-") -> id.removePrefix("iptv-org-").uppercase(Locale.ROOT)
+            id.startsWith("doubo-country-") -> id.removePrefix("doubo-country-").uppercase(Locale.ROOT)
+            else -> return null
+        }
+        val normalizedCode = if (code == "UK") "GB" else code
+        return normalizedCode.takeIf { it.matches(Regex("[A-Z]{2}")) }
+    }
+
+    private fun groupOrderForCountry(group: String): Int = when (group) {
+        "الدول العربية" -> 0
+        "باقات تركيا" -> 1
+        "الدول الأوروبية" -> 2
+        "أمريكا الشمالية" -> 3
+        "أمريكا الجنوبية واللاتينية" -> 4
+        "شرق آسيا" -> 5
+        "آسيا وبقية العالم" -> 6
+        "الدول الإفريقية" -> 7
+        "أوقيانوسيا" -> 8
+        else -> 9
+    }
+
+    fun packageGroupFor(id: String): String {
+        val countryCode = when {
+            id.startsWith("iptv-org-") -> id.removePrefix("iptv-org-").uppercase(Locale.ROOT)
+            id.startsWith("doubo-country-") -> id.removePrefix("doubo-country-").uppercase(Locale.ROOT)
+            else -> ""
+        }
+        if (countryCode.matches(Regex("[A-Z]{2}"))) {
+            return countryGroupFor(countryCode)
+        }
+        return when {
+            id.contains("movie") -> "قنوات الأفلام"
+            id.contains("series") -> "قنوات المسلسلات"
+            id.contains("sports") -> "قنوات الرياضة"
+            id.contains("arab") -> "باقات عربية مجمعة"
+            id.contains("turkey") -> "باقات تركيا"
+            id in setOf("iptv-org-europe", "iptv-org-western-europe") -> "أوروبا"
+            id == "iptv-org-north-america" -> "أمريكا الشمالية"
+            id in setOf("iptv-org-south-america", "iptv-org-latin-america") -> "أمريكا الجنوبية واللاتينية"
+            id == "iptv-org-east-asia" -> "شرق آسيا"
+            else -> "فهارس IPTV الإضافية"
+        }
+    }
+
+    private fun countryGroupFor(code: String): String = when (code.uppercase(Locale.ROOT)) {
+        in arabCountryCodes -> "الدول العربية"
+        "TR" -> "باقات تركيا"
+        in europeanCountryCodes -> "الدول الأوروبية"
+        in northAmericanCountryCodes -> "أمريكا الشمالية"
+        in eastAsianCountryCodes -> "شرق آسيا"
+        in latinAmericanCountryCodes -> "أمريكا الجنوبية واللاتينية"
+        in africanCountryCodes -> "الدول الإفريقية"
+        in oceaniaCountryCodes -> "أوقيانوسيا"
+        else -> "آسيا وبقية العالم"
+    }
+
+    fun countryNameForPackageCode(code: String): String = countryName(code)
+
+    private fun countryName(code: String): String =
+        arabCountryNames[code.uppercase(Locale.ROOT)]
+            ?: run {
+                val localeCode = if (code.equals("UK", true)) "GB" else code
+                Locale("", localeCode).getDisplayCountry(Locale.forLanguageTag("ar"))
+                    .takeIf(String::isNotBlank)
+                    ?: code.uppercase(Locale.ROOT)
+            }
+
 }
 
 internal object RemotePlaylistDownloader {

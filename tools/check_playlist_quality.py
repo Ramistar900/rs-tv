@@ -64,6 +64,18 @@ SOURCES = [
     ("romaxa-world-auto-checked", "https://raw.githubusercontent.com/Romaxa55/world_ip_tv/master/output/index.m3u"),
 ]
 
+# Doubo publishes one separate M3U file per country/region. The country lists overlap
+# with its aggregate and category playlists; cross-source URLs are deduplicated in the audit.
+DOUBO_COUNTRY_CODES = ["US","IN","DE","SE","GB","IT","ES","CA","NL","MX","FR","BR","KR","CL","ID","DO","PL","RO","AU","RU","TH","CO","CR","IQ","CN","TR","AR","HN","PR","AE","AT","BE","VE","VN","IR","MD","SG","DK","EE","GR","HK","IL","LU","MK","PE","PT","SA","UA","BO","JP","PH","PK","BH","CH","FI","HU","IE","LT","NG","NO","RW","SK","AL","BG","CZ","IS","KH","MN","MY","NZ","QA","SV","TW","UY","AZ","BA","GT","PY","AF","BJ","BQ","CM","CY","EC","EG","KW","KZ","LB","LK","MT","MZ","PS","RS","SD","SY","TN","TT","VG","ZA","AG","AM","AO","BI","BS","BY","CW","GE","GH","GM","GP","GQ","HR","HT","JO","LC","LV","LY","MA","MC","MM","MQ","MR","NA","NI","NP","OM","UG","XK"]
+SOURCES.extend(
+    (
+        f"doubo-country-{code.lower()}",
+        f"https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/{'uk' if code == 'GB' else code.lower()}.m3u",
+    )
+    for code in DOUBO_COUNTRY_CODES
+)
+
+
 
 def canonical_url(value: str) -> str | None:
     try:

@@ -46,7 +46,7 @@ internal object RemotePlaylistMerger {
             parsed.channels.forEach { channel ->
                 val key = canonicalStreamKey(channel.streamUrl, channel.httpHeaders)
                 val incoming = channel.copy(
-                    country = channel.country?.takeIf(String::isNotBlank) ?: countryBySourceId[snapshot.id],
+                    country = channel.country?.takeIf(String::isNotBlank) ?: countryBySourceId[snapshot.id] ?: countryFromPackageId(snapshot.id),
                     sourceIds = setOf(snapshot.id),
                     sourceNames = setOf(snapshot.name),
                     sourceProviders = setOf(snapshot.provider)
@@ -75,6 +75,16 @@ internal object RemotePlaylistMerger {
             }
         }
         return merged.values.toList()
+    }
+
+    private fun countryFromPackageId(sourceId: String): String? {
+        val code = when {
+            sourceId.startsWith("iptv-org-") -> sourceId.removePrefix("iptv-org-").uppercase()
+            sourceId.startsWith("doubo-country-") -> sourceId.removePrefix("doubo-country-").uppercase()
+            else -> return null
+        }
+        if (!code.matches(Regex("[A-Z]{2}"))) return null
+        return RemotePlaylistSources.countryNameForPackageCode(code)
     }
 
     fun canonicalStreamKey(streamUrl: String, httpHeaders: Map<String, String> = emptyMap()): String {
