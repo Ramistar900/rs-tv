@@ -131,6 +131,19 @@ class RemotePlaylistSourcesTest {
     }
 
     @Test
+    fun turkeyAliasPackagesAlsoCollapseIntoOneCountryCard() {
+        val sources = RemotePlaylistSources.playlists +
+            RemotePlaylistSources.douboCountryPackages()
+        val packages = RemotePlaylistSources.displayPackages(sources)
+
+        val turkey = packages.single { it.id == "country-TR" }
+        assertEquals("تركيا", turkey.name)
+        assertTrue(turkey.sources.any { it.id == "iptv-org-turkey" })
+        assertTrue(turkey.sources.any { it.id == "doubo-turkey" })
+        assertTrue(turkey.sources.any { it.id == "doubo-country-tr" })
+    }
+
+    @Test
     fun arabicCountryNamesAlsoAppearOnlyOnceAcrossTwoProviders() {
         val sources = RemotePlaylistSources.playlists +
             RemotePlaylistSources.countryPackages(listOf("SY", "LB", "IQ")) +
