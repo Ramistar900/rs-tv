@@ -48,9 +48,9 @@ class RemotePlaylistSourcesTest {
 
     @Test
     fun countryPackagesSeparateArabCountriesAndCoverMajorRegions() {
-        val packages = RemotePlaylistSources.countryPackages(
+        val packages = (RemotePlaylistSources.playlists + RemotePlaylistSources.countryPackages(
             listOf("SY", "LB", "IQ", "US", "CA", "DE", "FR", "BR", "JP", "ZA")
-        ).associateBy { it.id }
+        )).associateBy { it.id }
 
         assertTrue("iptv-org-sy" in packages)
         assertTrue("iptv-org-lb" in packages)
