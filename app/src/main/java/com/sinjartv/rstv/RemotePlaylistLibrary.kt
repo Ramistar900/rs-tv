@@ -78,8 +78,12 @@ internal object RemotePlaylistMerger {
     }
 
     private fun countryFromPackageId(sourceId: String): String? {
-        val code = sourceId.removePrefix("iptv-org-").uppercase()
-        if (!sourceId.startsWith("iptv-org-") || !code.matches(Regex("[A-Z]{2}"))) return null
+        val code = when {
+            sourceId.startsWith("iptv-org-") -> sourceId.removePrefix("iptv-org-").uppercase()
+            sourceId.startsWith("doubo-country-") -> sourceId.removePrefix("doubo-country-").uppercase()
+            else -> return null
+        }
+        if (!code.matches(Regex("[A-Z]{2}"))) return null
         return RemotePlaylistSources.countryNameForPackageCode(code)
     }
 
