@@ -76,6 +76,8 @@ class RemotePlaylistSourcesTest {
         )
         assertEquals(packages.size, packages.map { it.id }.distinct().size)
         assertEquals(packages.size, packages.map { it.playlistUrl }.distinct().size)
+        val existingUrls = RemotePlaylistSources.playlists.map { it.playlistUrl }.toSet()
+        assertTrue(packages.none { it.playlistUrl in existingUrls })
         packages.forEach { source ->
             assertEquals("iptv-org/iptv", source.provider)
             assertTrue(source.playlistUrl.startsWith("https://iptv-org.github.io/iptv/countries/"))
@@ -100,6 +102,7 @@ class RemotePlaylistSourcesTest {
         assertEquals("أمريكا الشمالية", byId.getValue("doubo-country-us").packageGroup)
         assertEquals("أمريكا الشمالية", byId.getValue("doubo-country-ca").packageGroup)
         assertEquals("باقات تركيا", byId.getValue("doubo-country-tr").packageGroup)
+        assertTrue(byId.getValue("doubo-country-gb").playlistUrl.endsWith("/countries/uk.m3u"))
         packages.forEach { source ->
             assertEquals("Doubo Public Channel Directory", source.provider)
             assertTrue(source.playlistUrl.startsWith("https://cdn.jsdelivr.net/gh/streamline-iptv/iptv-playlists@dist/countries/"))
