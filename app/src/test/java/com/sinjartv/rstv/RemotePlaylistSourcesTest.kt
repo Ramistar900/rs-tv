@@ -140,7 +140,7 @@ class RemotePlaylistSourcesTest {
         assertEquals("تركيا", turkey.name)
         assertTrue(turkey.sources.any { it.id == "iptv-org-turkey" })
         assertTrue(turkey.sources.any { it.id == "doubo-turkey" })
-        assertTrue(turkey.sources.any { it.id == "doubo-country-tr" })
+        assertEquals(2, turkey.sources.size)
     }
 
     @Test
