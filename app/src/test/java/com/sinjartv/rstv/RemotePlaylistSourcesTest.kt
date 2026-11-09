@@ -63,7 +63,7 @@ class RemotePlaylistSourcesTest {
         assertEquals("أمريكا الشمالية", packages.getValue("iptv-org-ca").packageGroup)
         assertEquals("الدول الأوروبية", packages.getValue("iptv-org-de").packageGroup)
         assertEquals("شرق آسيا", packages.getValue("iptv-org-jp").packageGroup)
-        assertEquals("أفريقيا", packages.getValue("iptv-org-za").packageGroup)
+        assertEquals("الدول الإفريقية", packages.getValue("iptv-org-za").packageGroup)
         assertEquals("باقات عربية مجمعة", RemotePlaylistSources.packageGroupFor("iptv-org-arab"))
         assertEquals("باقات عربية مجمعة", RemotePlaylistSources.packageGroupFor("doubo-arabic"))
         assertEquals("باقات تركيا", RemotePlaylistSources.packageGroupFor("doubo-turkey"))
