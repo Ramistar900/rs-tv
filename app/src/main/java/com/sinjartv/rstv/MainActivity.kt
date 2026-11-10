@@ -367,6 +367,7 @@ private fun RSTVHome() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ERROR)
                 status = "تعذر تشغيل القناة: ${error.errorCodeName}"
             }
         }
@@ -1039,6 +1040,7 @@ private fun ScreenBody(
     onClear: (ClearAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     when (tab) {
         RSTVTab.HOME -> HomeContent(
             channelCount = channels.size,
@@ -1387,8 +1389,10 @@ private fun LiveContent(
 
     BackHandler(enabled = showChannelTable || (isFullscreenPlayer && selectedChannel != null)) {
         if (showChannelTable) {
+            RoyalUiSounds.play(context, RoyalUiSound.NAV_BACK)
             showChannelTable = false
         } else {
+            RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_EXIT)
             onExitFullscreen()
         }
     }
@@ -1436,7 +1440,10 @@ private fun LiveContent(
                             false
                         }
                     }
-                    .clickable { showChannelTable = true }
+                    .clickable {
+                        RoyalUiSounds.play(context, RoyalUiSound.NAV_OPEN_MENU)
+                        showChannelTable = true
+                    }
             )
         }
     } else {
@@ -1460,7 +1467,10 @@ private fun LiveContent(
                         }
                     }
                 }
-                TextButton(onClick = { showChannelTable = true }) {
+                TextButton(onClick = {
+                    RoyalUiSounds.play(context, RoyalUiSound.NAV_OPEN_MENU)
+                    showChannelTable = true
+                }) {
                     Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
                 }
             }
