@@ -87,6 +87,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -259,6 +260,10 @@ private fun RSTVHome() {
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
     var selectedTab by remember { mutableStateOf(RSTVTab.HOME) }
+    val backgroundPrefs = remember(context) { context.getSharedPreferences("sinjar_ui", Context.MODE_PRIVATE) }
+    var selectedBackground by remember {
+        mutableIntStateOf(backgroundPrefs.getInt("background_res", R.drawable.sinjar_bg_royal_waves))
+    }
     var searchQuery by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("مرحباً بك في RS TV") }
     var skippedUnsafeLinks by remember { mutableIntStateOf(0) }
@@ -638,14 +643,26 @@ private fun RSTVHome() {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = ScreenBlack,
+        color = Color.Transparent,
         contentColor = SoftWhite
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = selectedBackground),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.68f)))
             val wideLayout = maxWidth >= 840.dp
             if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
+                    backgroundRes = selectedBackground,
+                    onSelectBackground = { resourceId ->
+                        selectedBackground = resourceId
+                        backgroundPrefs.edit().putInt("background_res", resourceId).apply()
+                    },
                     playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
@@ -895,6 +912,8 @@ private fun TopHeader(
 @Composable
 private fun ScreenBody(
     tab: RSTVTab,
+    backgroundRes: Int,
+    onSelectBackground: (Int) -> Unit,
     playlistSources: List<RemotePlaylistSource>,
     remotePlaylistStatus: String,
     sourceLibraryStatus: String,
@@ -980,6 +999,8 @@ private fun ScreenBody(
         )
         RSTVTab.SETTINGS -> SettingsContent(
             status = status,
+            backgroundRes = backgroundRes,
+            onSelectBackground = onSelectBackground,
             onImportPlaylist = onImportPlaylist,
             onImportGuide = onImportGuide,
             onClear = onClear,
@@ -2021,6 +2042,8 @@ private fun ProgrammeCard(programme: GuideProgramme) {
 @Composable
 private fun SettingsContent(
     status: String,
+    backgroundRes: Int,
+    onSelectBackground: (Int) -> Unit,
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
     onClear: (ClearAction) -> Unit,
@@ -2033,6 +2056,22 @@ private fun SettingsContent(
         item {
             Text("الإعدادات", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text("إدارة مكتبتك المحلية وتجربة التشغيل", color = MutedText, fontSize = 12.sp)
+        }
+        item {
+            Text("خلفية التطبيق", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("اختر الخلفية التي تظهر خلف القوائم. يتم حفظ اختيارك على الجهاز.", color = MutedText, fontSize = 11.sp)
+        }
+        item {
+            SettingsAction("الموجات الملكية الزرقاء والذهبية", if (backgroundRes == R.drawable.sinjar_bg_royal_waves) "الخلفية الحالية" else "تطبيق الخلفية", { onSelectBackground(R.drawable.sinjar_bg_royal_waves) })
+        }
+        item {
+            SettingsAction("المدينة السينمائية الليلية", if (backgroundRes == R.drawable.sinjar_bg_night_city) "الخلفية الحالية" else "تطبيق الخلفية", { onSelectBackground(R.drawable.sinjar_bg_night_city) })
+        }
+        item {
+            SettingsAction("الجبال والبحيرة", if (backgroundRes == R.drawable.sinjar_bg_mountain_lake) "الخلفية الحالية" else "تطبيق الخلفية", { onSelectBackground(R.drawable.sinjar_bg_mountain_lake) })
+        }
+        item {
+            SettingsAction("الطبيعة الذهبية السينمائية", if (backgroundRes == R.drawable.sinjar_bg_golden_nature) "الخلفية الحالية" else "تطبيق الخلفية", { onSelectBackground(R.drawable.sinjar_bg_golden_nature) })
         }
         item {
             SettingsAction("استيراد / استبدال قائمة M3U", "يتم حفظ القائمة داخل مساحة التطبيق الخاصة", onImportPlaylist)
