@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -16,7 +18,7 @@ val generateV16BannerResource = tasks.register("generateV16BannerResource") {
         val encoded = v16BannerBase64File.asFile.readText().filterNot { it.isWhitespace() }
         val output = outputFile.get().asFile
         output.parentFile.mkdirs()
-        output.writeBytes(java.util.Base64.getDecoder().decode(encoded))
+        output.writeBytes(Base64.getDecoder().decode(encoded))
     }
 }
 
