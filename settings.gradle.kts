@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "RSTV"
 include(":app")
+include(":royal-ui-sounds")
