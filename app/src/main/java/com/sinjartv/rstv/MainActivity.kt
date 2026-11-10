@@ -1389,6 +1389,7 @@ private fun LiveContent(
     onShowUserPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var showChannelTable by remember { mutableStateOf(false) }
     val fullscreenFocusRequester = remember { FocusRequester() }
     var orderedGroups by remember { mutableStateOf(emptyList<Pair<String, List<RSTVChannel>>>()) }
