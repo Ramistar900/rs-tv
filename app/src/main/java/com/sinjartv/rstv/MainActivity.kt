@@ -222,7 +222,23 @@ private fun deriveChannelCollections(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        RoyalUiSounds.initialize(applicationContext)
+        RoyalUiSounds.initialize(applicationContext, setOf(
+            RoyalUiSound.NAV_BACK,
+            RoyalUiSound.NAV_SELECT,
+            RoyalUiSound.ACTION_ERROR,
+            RoyalUiSound.NAV_OPEN_MENU,
+            RoyalUiSound.ACTION_WARNING,
+            RoyalUiSound.TV_CHANNEL_CHANGE,
+            RoyalUiSound.ACTION_REMOVE,
+            RoyalUiSound.ACTION_FAVORITE,
+            RoyalUiSound.ACTION_DELETE,
+            RoyalUiSound.NAV_TV_FOCUS,
+            RoyalUiSound.NAV_FOCUS_MOVE,
+            RoyalUiSound.ACTION_DOWNLOAD,
+            RoyalUiSound.MEDIA_FULLSCREEN_EXIT,
+            RoyalUiSound.MEDIA_FULLSCREEN_ENTER,
+            RoyalUiSound.ACTION_ADD
+        ))
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
