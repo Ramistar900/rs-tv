@@ -658,6 +658,11 @@ private fun RSTVHome() {
             if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
+                            backgroundRes = selectedBackground,
+                            onSelectBackground = { resourceId ->
+                                selectedBackground = resourceId
+                                backgroundPrefs.edit().putInt("background_res", resourceId).apply()
+                            },
                     backgroundRes = selectedBackground,
                     onSelectBackground = { resourceId ->
                         selectedBackground = resourceId
@@ -736,6 +741,11 @@ private fun RSTVHome() {
                         )
                         ScreenBody(
                             tab = selectedTab,
+                            backgroundRes = selectedBackground,
+                            onSelectBackground = { resourceId ->
+                                selectedBackground = resourceId
+                                backgroundPrefs.edit().putInt("background_res", resourceId).apply()
+                            },
                             playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
@@ -788,6 +798,11 @@ private fun RSTVHome() {
                         )
                         ScreenBody(
                             tab = selectedTab,
+                            backgroundRes = selectedBackground,
+                            onSelectBackground = { resourceId ->
+                                selectedBackground = resourceId
+                                backgroundPrefs.edit().putInt("background_res", resourceId).apply()
+                            },
                             playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
