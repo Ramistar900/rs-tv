@@ -3,6 +3,7 @@ package com.sinjartv.rstv
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -241,6 +242,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RSTVHome() {
     val context = LocalContext.current
+    // Choose a dedicated presentation for Android TV, tablets, and phones.
+    val isTelevision = remember(context) {
+        context.packageManager.hasSystemFeature("android.software.leanback") ||
+            (context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
+            Configuration.UI_MODE_TYPE_TELEVISION
+    }
+    val isTablet = remember(context) {
+        context.resources.configuration.smallestScreenWidthDp >= 600
+    }
     val activity = remember(context) {
         var current: Context? = context
         while (current != null && current !is Activity) {
@@ -654,7 +664,7 @@ private fun RSTVHome() {
                 modifier = Modifier.fillMaxSize()
             )
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.68f)))
-            val wideLayout = maxWidth >= 840.dp
+            val wideLayout = isTelevision || isTablet || maxWidth >= 840.dp
             if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
@@ -705,15 +715,21 @@ private fun RSTVHome() {
             } else if (wideLayout) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     NavigationRail(
-                        containerColor = PanelBlack,
+                        modifier = Modifier.width(if (isTelevision) 112.dp else 84.dp),
+                        containerColor = if (isTelevision) Color(0xF20A0E18) else PanelBlack,
                         contentColor = SoftWhite,
                         header = {
                             Column(
-                                modifier = Modifier.padding(vertical = 18.dp),
+                                modifier = Modifier.padding(vertical = if (isTelevision) 30.dp else 18.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 BrandMark()
-                                Text("RS TV", color = SoftWhite, fontWeight = FontWeight.Black)
+                                Text(
+                                    "RS TV",
+                                    color = SoftWhite,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = if (isTelevision) 18.sp else 14.sp
+                                )
                             }
                         }
                     ) {
@@ -721,14 +737,22 @@ private fun RSTVHome() {
                             NavigationRailItem(
                                 selected = selectedTab == tab,
                                 onClick = { navigateToTab(tab) },
-                                icon = { Icon(tab.icon, contentDescription = tab.title) },
-                                label = { Text(tab.title, fontSize = 10.sp) },
+                                icon = {
+                                    Icon(
+                                        tab.icon,
+                                        contentDescription = tab.title,
+                                        modifier = Modifier.size(if (isTelevision) 28.dp else 22.dp)
+                                    )
+                                },
+                                label = {
+                                    Text(tab.title, fontSize = if (isTelevision) 12.sp else 10.sp)
+                                },
                                 alwaysShowLabel = true
                             )
                         }
                     }
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 18.dp)
+                        modifier = Modifier.fillMaxSize().padding(horizontal = if (isTelevision) 34.dp else 24.dp, vertical = if (isTelevision) 26.dp else 18.dp)
                     ) {
                         TopHeader(
                             onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },

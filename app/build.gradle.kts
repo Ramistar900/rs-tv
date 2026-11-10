@@ -1,7 +1,25 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val v16BannerBase64File = layout.projectDirectory.file("banner-assets/rs_tv_banner_v16.webp.base64")
+val generatedV16BannerResDir = layout.buildDirectory.dir("generated/res/v16Banner")
+val generateV16BannerResource = tasks.register("generateV16BannerResource") {
+    inputs.file(v16BannerBase64File)
+    val outputFile = generatedV16BannerResDir.map {
+        it.file("drawable-nodpi/rs_tv_banner_v16.webp")
+    }
+    outputs.file(outputFile)
+    doLast {
+        val encoded = v16BannerBase64File.asFile.readText().filterNot { it.isWhitespace() }
+        val output = outputFile.get().asFile
+        output.parentFile.mkdirs()
+        output.writeBytes(Base64.getDecoder().decode(encoded))
+    }
 }
 
 val releaseStoreFile = System.getenv("RS_TV_KEYSTORE_FILE")
@@ -52,12 +70,17 @@ android {
     buildFeatures { compose = true }
     sourceSets {
         getByName("main").assets.srcDir(rootProject.file("catalog/generated"))
+        getByName("main").res.srcDir(generatedV16BannerResDir)
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(generateV16BannerResource)
 }
 
 dependencies {
