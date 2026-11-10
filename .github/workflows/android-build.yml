@@ -3,9 +3,10 @@ name: RS TV Android Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/royal-ui-sounds-integration]
     paths:
       - "app/**"
+      - "royal-ui-sounds/**"
       - "catalog/generated/**"
       - "*.gradle.kts"
       - "gradle.properties"
