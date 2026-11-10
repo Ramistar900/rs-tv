@@ -79,7 +79,7 @@ jobs:
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 
       - name: Verify required release-signing secrets
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           RS_TV_KEYSTORE_BASE64: ${{ secrets.RS_TV_KEYSTORE_BASE64 }}
           RS_TV_KEYSTORE_PASSWORD: ${{ secrets.RS_TV_KEYSTORE_PASSWORD }}
@@ -96,7 +96,7 @@ jobs:
           done
 
       - name: Decode SINJAR TV release keystore
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           RS_TV_KEYSTORE_BASE64: ${{ secrets.RS_TV_KEYSTORE_BASE64 }}
         shell: bash
@@ -107,7 +107,7 @@ jobs:
           echo "RS_TV_KEYSTORE_FILE=$RUNNER_TEMP/rs-tv-release.jks" >> "$GITHUB_ENV"
 
       - name: Build signed release APK
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           RS_TV_KEYSTORE_PASSWORD: ${{ secrets.RS_TV_KEYSTORE_PASSWORD }}
           RS_TV_KEY_ALIAS: ${{ secrets.RS_TV_KEY_ALIAS }}
@@ -115,7 +115,7 @@ jobs:
         run: gradle --no-daemon :app:assembleRelease
 
       - name: Verify signed release APK
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
@@ -136,7 +136,7 @@ jobs:
           retention-days: 14
 
       - name: Upload SINJAR TV Signed Release APK for testing
-        if: github.event_name != 'pull_request'
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -147,6 +147,7 @@ jobs:
 
   publish-draft:
     if: >-
+      github.ref == 'refs/heads/main' &&
       github.event_name != 'pull_request' &&
       (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main') &&
       (github.event_name != 'workflow_run' ||
