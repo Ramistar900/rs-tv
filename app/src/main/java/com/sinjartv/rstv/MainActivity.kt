@@ -658,11 +658,6 @@ private fun RSTVHome() {
             if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
-                            backgroundRes = selectedBackground,
-                            onSelectBackground = { resourceId ->
-                                selectedBackground = resourceId
-                                backgroundPrefs.edit().putInt("background_res", resourceId).apply()
-                            },
                     backgroundRes = selectedBackground,
                     onSelectBackground = { resourceId ->
                         selectedBackground = resourceId
