@@ -1,5 +1,8 @@
 package com.sinjartv.rstv
 
+import com.sinjartv.rstv.royalsounds.RoyalUiSound
+import com.sinjartv.rstv.royalsounds.RoyalUiSounds
+
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -219,6 +222,23 @@ private fun deriveChannelCollections(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        RoyalUiSounds.initialize(applicationContext, setOf(
+            RoyalUiSound.NAV_BACK,
+            RoyalUiSound.NAV_SELECT,
+            RoyalUiSound.ACTION_ERROR,
+            RoyalUiSound.NAV_OPEN_MENU,
+            RoyalUiSound.ACTION_WARNING,
+            RoyalUiSound.TV_CHANNEL_CHANGE,
+            RoyalUiSound.ACTION_REMOVE,
+            RoyalUiSound.ACTION_FAVORITE,
+            RoyalUiSound.ACTION_DELETE,
+            RoyalUiSound.NAV_TV_FOCUS,
+            RoyalUiSound.NAV_FOCUS_MOVE,
+            RoyalUiSound.ACTION_DOWNLOAD,
+            RoyalUiSound.MEDIA_FULLSCREEN_EXIT,
+            RoyalUiSound.MEDIA_FULLSCREEN_ENTER,
+            RoyalUiSound.ACTION_ADD
+        ))
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
@@ -236,6 +256,20 @@ class MainActivity : ComponentActivity() {
                 RSTVHome()
             }
         }
+    }
+
+    override fun onDestroy() {
+        RoyalUiSounds.release()
+        super.onDestroy()
+    }
+
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0 &&
+            event.keyCode == android.view.KeyEvent.KEYCODE_BACK
+        ) {
+            RoyalUiSounds.play(RoyalUiSound.NAV_BACK)
+        }
+        return super.dispatchKeyEvent(event)
     }
 }
 
@@ -305,6 +339,9 @@ private fun RSTVHome() {
     val exoPlayer = player
 
     fun navigateToTab(tab: RSTVTab) {
+        if (selectedTab != tab) {
+            RoyalUiSounds.play(context, RoyalUiSound.NAV_SELECT)
+        }
         selectedTab = tab
     }
 
@@ -346,6 +383,7 @@ private fun RSTVHome() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ERROR)
                 status = "تعذر تشغيل القناة: ${error.errorCodeName}"
             }
         }
@@ -535,6 +573,7 @@ private fun RSTVHome() {
     }
 
     fun showSourceLibrary() {
+        RoyalUiSounds.play(context, RoyalUiSound.NAV_OPEN_MENU)
         showingSourceLibrary = true
         selectedChannel = null
         searchQuery = ""
@@ -547,9 +586,11 @@ private fun RSTVHome() {
 
     fun playChannel(channel: RSTVChannel) {
         if (isRestrictedAdultChannel(channel)) {
+            RoyalUiSounds.play(context, RoyalUiSound.ACTION_WARNING)
             status = "هذه القناة مصنّفة +18 وموقوفة حتى التحقق من ترخيص مصدرها. لا تُشغّل من القوائم العامة."
             return
         }
+        RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
         selectedChannel = channel
         selectedTab = RSTVTab.LIVE
         status = "جارٍ تجهيز قناة ${channel.name}..."
@@ -573,6 +614,11 @@ private fun RSTVHome() {
 
     fun toggleFavourite(channel: RSTVChannel) {
         if (isRestrictedAdultChannel(channel)) return
+        RoyalUiSounds.play(
+            context,
+            if (channel.streamUrl in favoriteUrls) RoyalUiSound.ACTION_REMOVE
+            else RoyalUiSound.ACTION_FAVORITE
+        )
         scope.launch {
             libraryWriteMutex.withLock {
                 withContext(Dispatchers.IO) {
@@ -597,6 +643,7 @@ private fun RSTVHome() {
             text = { Text(action.message) },
             confirmButton = {
                 TextButton(onClick = {
+                    RoyalUiSounds.play(context, RoyalUiSound.ACTION_DELETE)
                     pendingClear = null
                     scope.launch {
                         runCatching {
@@ -656,7 +703,19 @@ private fun RSTVHome() {
         color = Color.Transparent,
         contentColor = SoftWhite
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    event.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
+                ) {
+                    RoyalUiSounds.play(
+                        context,
+                        if (isTelevision) RoyalUiSound.NAV_TV_FOCUS else RoyalUiSound.NAV_FOCUS_MOVE
+                    )
+                }
+                false
+            }
+        ) {
             Image(
                 painter = painterResource(id = selectedBackground),
                 contentDescription = null,
@@ -678,7 +737,10 @@ private fun RSTVHome() {
                     sourceLibraryStatus = sourceLibraryStatus,
                     sourceLibraryCount = sourceLibraryCount,
                     sourceLibraryChannelCount = sourceLibraryChannels.size,
-                    onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
+                    onAddSourceToLibrary = { playlistPackage ->
+                        RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
+                        addRemotePlaylistPackageToLibrary(playlistPackage)
+                    },
                     onShowSourceLibrary = ::showSourceLibrary,
                     channels = when {
                         selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -689,8 +751,14 @@ private fun RSTVHome() {
                     programmes = programmes.toList(),
                     selectedChannel = selectedChannel,
                     isFullscreenPlayer = isFullscreenPlayer,
-                    onExitFullscreen = { isFullscreenPlayer = false },
-                    onEnterFullscreen = { isFullscreenPlayer = true },
+                    onExitFullscreen = {
+                        RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_EXIT)
+                        isFullscreenPlayer = false
+                    },
+                    onEnterFullscreen = {
+                        RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_ENTER)
+                        isFullscreenPlayer = true
+                    },
                     searchQuery = searchQuery,
                     onSearchChange = { searchQuery = it },
                     onPlay = ::playChannel,
@@ -701,14 +769,21 @@ private fun RSTVHome() {
                     skippedUnsafeLinks = skippedUnsafeLinks,
                     showingSourceLibrary = showingSourceLibrary,
                     onShowUserPlaylist = {
+                        RoyalUiSounds.play(context, RoyalUiSound.NAV_BACK)
                         showingSourceLibrary = false
                         selectedChannel = null
                         searchQuery = ""
                         status = "تمت العودة إلى قائمة المستخدم المحلية"
                     },
                     onNavigate = ::navigateToTab,
-                    onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
-                    onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
+                    onImportPlaylist = {
+                        RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
+                        playlistPicker.launch(arrayOf("*/*"))
+                    },
+                    onImportGuide = {
+                        RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
+                        guidePicker.launch(arrayOf("*/*"))
+                    },
                     onClear = { pendingClear = it },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -755,7 +830,10 @@ private fun RSTVHome() {
                         modifier = Modifier.fillMaxSize().padding(horizontal = if (isTelevision) 34.dp else 24.dp, vertical = if (isTelevision) 26.dp else 18.dp)
                     ) {
                         TopHeader(
-                            onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
+                            onImportPlaylist = {
+                                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
+                                playlistPicker.launch(arrayOf("*/*"))
+                            },
                             channelCount = regularChannels.size
                         )
                         ScreenBody(
@@ -770,7 +848,10 @@ private fun RSTVHome() {
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
                             sourceLibraryChannelCount = sourceLibraryChannels.size,
-                            onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
+                            onAddSourceToLibrary = { playlistPackage ->
+                        RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
+                        addRemotePlaylistPackageToLibrary(playlistPackage)
+                    },
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -781,8 +862,14 @@ private fun RSTVHome() {
                             programmes = programmes.toList(),
                             selectedChannel = selectedChannel,
                             isFullscreenPlayer = isFullscreenPlayer,
-                            onExitFullscreen = { isFullscreenPlayer = false },
-                            onEnterFullscreen = { isFullscreenPlayer = true },
+                            onExitFullscreen = {
+                                RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_EXIT)
+                                isFullscreenPlayer = false
+                            },
+                            onEnterFullscreen = {
+                                RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_ENTER)
+                                isFullscreenPlayer = true
+                            },
                             searchQuery = searchQuery,
                             onSearchChange = { searchQuery = it },
                             onPlay = ::playChannel,
@@ -793,14 +880,21 @@ private fun RSTVHome() {
                             skippedUnsafeLinks = skippedUnsafeLinks,
                             showingSourceLibrary = showingSourceLibrary,
                             onShowUserPlaylist = {
+                                RoyalUiSounds.play(context, RoyalUiSound.NAV_BACK)
                                 showingSourceLibrary = false
                                 selectedChannel = null
                                 searchQuery = ""
                                 status = "تمت العودة إلى قائمة المستخدم المحلية"
                             },
                             onNavigate = ::navigateToTab,
-                            onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
-                            onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
+                            onImportPlaylist = {
+                                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
+                                playlistPicker.launch(arrayOf("*/*"))
+                            },
+                            onImportGuide = {
+                                RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
+                                guidePicker.launch(arrayOf("*/*"))
+                            },
                             onClear = { pendingClear = it },
                             modifier = Modifier.weight(1f)
                         )
@@ -812,7 +906,10 @@ private fun RSTVHome() {
                         modifier = Modifier.weight(1f).padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         TopHeader(
-                            onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
+                            onImportPlaylist = {
+                                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
+                                playlistPicker.launch(arrayOf("*/*"))
+                            },
                             channelCount = regularChannels.size
                         )
                         ScreenBody(
@@ -827,7 +924,10 @@ private fun RSTVHome() {
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
                             sourceLibraryChannelCount = sourceLibraryChannels.size,
-                            onAddSourceToLibrary = ::addRemotePlaylistPackageToLibrary,
+                            onAddSourceToLibrary = { playlistPackage ->
+                        RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
+                        addRemotePlaylistPackageToLibrary(playlistPackage)
+                    },
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
@@ -838,8 +938,14 @@ private fun RSTVHome() {
                             programmes = programmes.toList(),
                             selectedChannel = selectedChannel,
                             isFullscreenPlayer = isFullscreenPlayer,
-                            onExitFullscreen = { isFullscreenPlayer = false },
-                            onEnterFullscreen = { isFullscreenPlayer = true },
+                            onExitFullscreen = {
+                                RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_EXIT)
+                                isFullscreenPlayer = false
+                            },
+                            onEnterFullscreen = {
+                                RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_ENTER)
+                                isFullscreenPlayer = true
+                            },
                             searchQuery = searchQuery,
                             onSearchChange = { searchQuery = it },
                             onPlay = ::playChannel,
@@ -850,14 +956,21 @@ private fun RSTVHome() {
                             skippedUnsafeLinks = skippedUnsafeLinks,
                             showingSourceLibrary = showingSourceLibrary,
                             onShowUserPlaylist = {
+                                RoyalUiSounds.play(context, RoyalUiSound.NAV_BACK)
                                 showingSourceLibrary = false
                                 selectedChannel = null
                                 searchQuery = ""
                                 status = "تمت العودة إلى قائمة المستخدم المحلية"
                             },
                             onNavigate = ::navigateToTab,
-                            onImportPlaylist = { playlistPicker.launch(arrayOf("*/*")) },
-                            onImportGuide = { guidePicker.launch(arrayOf("*/*")) },
+                            onImportPlaylist = {
+                                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
+                                playlistPicker.launch(arrayOf("*/*"))
+                            },
+                            onImportGuide = {
+                                RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
+                                guidePicker.launch(arrayOf("*/*"))
+                            },
                             onClear = { pendingClear = it },
                             modifier = Modifier.weight(1f)
                         )
@@ -978,6 +1091,7 @@ private fun ScreenBody(
     onClear: (ClearAction) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     when (tab) {
         RSTVTab.HOME -> HomeContent(
             channelCount = channels.size,
@@ -1291,6 +1405,7 @@ private fun LiveContent(
     onShowUserPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var showChannelTable by remember { mutableStateOf(false) }
     val fullscreenFocusRequester = remember { FocusRequester() }
     var orderedGroups by remember { mutableStateOf(emptyList<Pair<String, List<RSTVChannel>>>()) }
@@ -1326,8 +1441,10 @@ private fun LiveContent(
 
     BackHandler(enabled = showChannelTable || (isFullscreenPlayer && selectedChannel != null)) {
         if (showChannelTable) {
+            RoyalUiSounds.play(context, RoyalUiSound.NAV_BACK)
             showChannelTable = false
         } else {
+            RoyalUiSounds.play(context, RoyalUiSound.MEDIA_FULLSCREEN_EXIT)
             onExitFullscreen()
         }
     }
@@ -1375,7 +1492,10 @@ private fun LiveContent(
                             false
                         }
                     }
-                    .clickable { showChannelTable = true }
+                    .clickable {
+                        RoyalUiSounds.play(context, RoyalUiSound.NAV_OPEN_MENU)
+                        showChannelTable = true
+                    }
             )
         }
     } else {
@@ -1399,7 +1519,10 @@ private fun LiveContent(
                         }
                     }
                 }
-                TextButton(onClick = { showChannelTable = true }) {
+                TextButton(onClick = {
+                    RoyalUiSounds.play(context, RoyalUiSound.NAV_OPEN_MENU)
+                    showChannelTable = true
+                }) {
                     Text("${channels.size} قناة", color = MutedText, fontSize = 11.sp)
                 }
             }
