@@ -790,12 +790,14 @@ private fun RSTVHome() {
             } else if (wideLayout) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     NavigationRail(
-                        modifier = Modifier.width(if (isTelevision) 112.dp else 84.dp),
+                        modifier = Modifier.width(
+                            adaptiveProfile.iconSize(84.dp).coerceIn(84.dp, 120.dp)
+                        ),
                         containerColor = if (isTelevision) Color(0xF20A0E18) else PanelBlack,
                         contentColor = SoftWhite,
                         header = {
                             Column(
-                                modifier = Modifier.padding(vertical = if (isTelevision) 30.dp else 18.dp),
+                                modifier = Modifier.padding(vertical = adaptiveProfile.sectionSpacing),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 BrandMark()
@@ -816,18 +818,28 @@ private fun RSTVHome() {
                                     Icon(
                                         tab.icon,
                                         contentDescription = tab.title,
-                                        modifier = Modifier.size(if (isTelevision) 28.dp else 22.dp)
+                                        modifier = Modifier.size(adaptiveProfile.iconSize(22.dp).coerceIn(22.dp, 36.dp))
                                     )
                                 },
                                 label = {
-                                    Text(tab.title, fontSize = if (isTelevision) 12.sp else 10.sp)
+                                    Text(
+                                        tab.title,
+                                        fontSize = when {
+                                            isTelevision -> 14.sp
+                                            isTablet -> 12.sp
+                                            else -> 10.sp
+                                        }
+                                    )
                                 },
                                 alwaysShowLabel = true
                             )
                         }
                     }
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = if (isTelevision) 34.dp else 24.dp, vertical = if (isTelevision) 26.dp else 18.dp)
+                        modifier = Modifier.fillMaxSize().padding(
+                            horizontal = adaptiveProfile.pageHorizontalPadding,
+                            vertical = adaptiveProfile.pageVerticalPadding
+                        )
                     ) {
                         TopHeader(
                             onImportPlaylist = {
@@ -1007,10 +1019,14 @@ private fun PlayerWatermark(modifier: Modifier = Modifier) {
 
 @Composable
 private fun BrandMark() {
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
     Image(
         painter = painterResource(id = R.drawable.sinjar_show_logo),
         contentDescription = "SINJAR SHOW",
-        modifier = Modifier.size(width = 88.dp, height = 34.dp)
+        modifier = Modifier.size(
+            width = adaptiveProfile.iconSize(88.dp).coerceIn(88.dp, 122.dp),
+            height = adaptiveProfile.iconSize(34.dp).coerceIn(34.dp, 48.dp)
+        )
     )
 }
 
