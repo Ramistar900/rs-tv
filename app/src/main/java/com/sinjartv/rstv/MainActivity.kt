@@ -1,5 +1,8 @@
 package com.sinjartv.rstv
 
+import com.royal.adaptive.LocalRoyalAdaptiveProfile
+import com.royal.adaptive.RoyalAdaptiveHost
+
 import com.sinjartv.rstv.royalsounds.RoyalUiSound
 import com.sinjartv.rstv.royalsounds.RoyalUiSounds
 
@@ -240,20 +243,22 @@ class MainActivity : ComponentActivity() {
             RoyalUiSound.ACTION_ADD
         ))
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    primary = AccentRed,
-                    secondary = Silver,
-                    background = ScreenBlack,
-                    surface = PanelBlack,
-                    surfaceVariant = PanelRaised,
-                    onPrimary = SoftWhite,
-                    onBackground = SoftWhite,
-                    onSurface = SoftWhite,
-                    onSurfaceVariant = MutedText
-                )
-            ) {
-                RSTVHome()
+            RoyalAdaptiveHost {
+                MaterialTheme(
+                    colorScheme = darkColorScheme(
+                        primary = AccentRed,
+                        secondary = Silver,
+                        background = ScreenBlack,
+                        surface = PanelBlack,
+                        surfaceVariant = PanelRaised,
+                        onPrimary = SoftWhite,
+                        onBackground = SoftWhite,
+                        onSurface = SoftWhite,
+                        onSurfaceVariant = MutedText
+                    )
+                ) {
+                    RSTVHome()
+                }
             }
         }
     }
@@ -276,15 +281,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RSTVHome() {
     val context = LocalContext.current
-    // Choose a dedicated presentation for Android TV, tablets, and phones.
-    val isTelevision = remember(context) {
-        context.packageManager.hasSystemFeature("android.software.leanback") ||
-            (context.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
-            Configuration.UI_MODE_TYPE_TELEVISION
-    }
-    val isTablet = remember(context) {
-        context.resources.configuration.smallestScreenWidthDp >= 600
-    }
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
+    // Shared detection uses Android TV capabilities and the current window size.
+    val isTelevision = adaptiveProfile.isTelevision
+    val isTablet = adaptiveProfile.isTablet
     val activity = remember(context) {
         var current: Context? = context
         while (current != null && current !is Activity) {
@@ -723,7 +723,7 @@ private fun RSTVHome() {
                 modifier = Modifier.fillMaxSize()
             )
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.68f)))
-            val wideLayout = isTelevision || isTablet || maxWidth >= 840.dp
+            val wideLayout = adaptiveProfile.prefersWideLayout || maxWidth >= 840.dp
             if (isFullscreenPlayer && selectedChannel != null) {
                 ScreenBody(
                     tab = selectedTab,
