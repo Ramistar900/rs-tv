@@ -232,8 +232,6 @@ class MainActivity : ComponentActivity() {
             RoyalUiSound.ACTION_REMOVE,
             RoyalUiSound.ACTION_FAVORITE,
             RoyalUiSound.ACTION_DELETE,
-            RoyalUiSound.NAV_TV_FOCUS,
-            RoyalUiSound.NAV_FOCUS_MOVE,
             RoyalUiSound.ACTION_DOWNLOAD,
             RoyalUiSound.MEDIA_FULLSCREEN_EXIT,
             RoyalUiSound.MEDIA_FULLSCREEN_ENTER,
@@ -705,14 +703,7 @@ private fun RSTVHome() {
     ) {
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    event.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
-                ) {
-                    RoyalUiSounds.play(
-                        context,
-                        if (isTelevision) RoyalUiSound.NAV_TV_FOCUS else RoyalUiSound.NAV_FOCUS_MOVE
-                    )
-                }
+
                 false
             }
         ) {
