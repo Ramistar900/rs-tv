@@ -1182,9 +1182,10 @@ private fun HomeContent(
     onImportPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(adaptiveProfile.sectionSpacing)
     ) {
         item {
             Card(
@@ -1194,27 +1195,44 @@ private fun HomeContent(
                 shape = RoundedCornerShape(24.dp)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(22.dp),
-                    verticalArrangement = Arrangement.spacedBy(13.dp)
+                    modifier = Modifier.fillMaxWidth().padding(
+                        horizontal = adaptiveProfile.pageHorizontalPadding.coerceIn(18.dp, 28.dp),
+                        vertical = adaptiveProfile.sectionSpacing
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(adaptiveProfile.itemSpacing)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Box(
-                            modifier = Modifier.size(62.dp)
+                            modifier = Modifier.size(
+                                adaptiveProfile.iconSize(62.dp).coerceIn(62.dp, 88.dp)
+                            )
                                 .background(Color(0xFF302714), RoundedCornerShape(18.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.sinjar_show_logo),
                                 contentDescription = "SINJAR SHOW",
-                                modifier = Modifier.size(width = 58.dp, height = 28.dp)
+                                modifier = Modifier.size(
+                                    width = adaptiveProfile.iconSize(58.dp).coerceIn(58.dp, 80.dp),
+                                    height = adaptiveProfile.iconSize(28.dp).coerceIn(28.dp, 40.dp)
+                                )
                             )
                         }
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("RS TV", color = AccentRed, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                            Text("عالم الترفيه بين يديك", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                            Text(
+                                "عالم الترفيه بين يديك",
+                                color = SoftWhite,
+                                fontSize = when {
+                                    adaptiveProfile.isTelevision -> 32.sp
+                                    adaptiveProfile.isTablet -> 28.sp
+                                    else -> 23.sp
+                                },
+                                fontWeight = FontWeight.Black
+                            )
                             Text("تجربة مشاهدة عالمية بتصميم ملكي", color = MutedText, fontSize = 11.sp)
                         }
                     }
@@ -1297,14 +1315,23 @@ private fun HomeContent(
 
 @Composable
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = PanelBlack),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(value, color = AccentRed, fontSize = 24.sp, fontWeight = FontWeight.Black)
-            Text(label, color = MutedText, fontSize = 12.sp)
+        Column(
+            Modifier.padding(adaptiveProfile.pageHorizontalPadding.coerceIn(16.dp, 24.dp)),
+            verticalArrangement = Arrangement.spacedBy(adaptiveProfile.itemSpacing.coerceAtMost(10.dp))
+        ) {
+            Text(
+                value,
+                color = AccentRed,
+                fontSize = if (adaptiveProfile.isTelevision) 32.sp else 24.sp,
+                fontWeight = FontWeight.Black
+            )
+            Text(label, color = MutedText, fontSize = if (adaptiveProfile.isTelevision) 16.sp else 12.sp)
         }
     }
 }
@@ -1318,19 +1345,29 @@ private fun FeatureCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
     Card(
-        modifier = modifier.heightIn(min = 132.dp)
+        modifier = modifier.heightIn(
+            min = when {
+                adaptiveProfile.isTelevision -> 176.dp
+                adaptiveProfile.isTablet -> 154.dp
+                else -> 132.dp
+            }
+        )
             .border(1.dp, AccentRed.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = PanelBlack),
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(13.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            modifier = Modifier.fillMaxWidth().padding(
+                horizontal = adaptiveProfile.pageHorizontalPadding.coerceIn(13.dp, 24.dp),
+                vertical = adaptiveProfile.itemSpacing.coerceAtMost(18.dp)
+            ),
+            verticalArrangement = Arrangement.spacedBy(adaptiveProfile.itemSpacing.coerceAtMost(12.dp))
         ) {
             Box(
-                modifier = Modifier.size(42.dp)
+                modifier = Modifier.size(adaptiveProfile.iconSize(42.dp).coerceIn(42.dp, 62.dp))
                     .background(Color(0xFF302714), RoundedCornerShape(13.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1338,7 +1375,7 @@ private fun FeatureCard(
                     painter = painterResource(iconRes),
                     contentDescription = title,
                     tint = AccentRed,
-                    modifier = Modifier.size(27.dp)
+                    modifier = Modifier.size(adaptiveProfile.iconSize(27.dp).coerceIn(27.dp, 42.dp))
                 )
             }
             Text(title, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
@@ -2054,6 +2091,7 @@ private fun ChannelCard(
     onPlay: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
     var focused by remember(channel.streamUrl) { mutableStateOf(false) }
     val focusScale by animateFloatAsState(
         targetValue = if (focused) 1.035f else 1f,
@@ -2063,6 +2101,7 @@ private fun ChannelCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = adaptiveProfile.minimumFocusTarget)
             .clickable(onClick = onPlay)
             .onFocusChanged { focused = it.isFocused }
             .graphicsLayer {
@@ -2079,19 +2118,39 @@ private fun ChannelCard(
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(
+                start = adaptiveProfile.pageHorizontalPadding.coerceIn(12.dp, 22.dp),
+                end = 6.dp,
+                top = if (adaptiveProfile.isTelevision) 12.dp else 8.dp,
+                bottom = if (adaptiveProfile.isTelevision) 12.dp else 8.dp
+            ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
-                modifier = Modifier.size(34.dp).background(AccentRed.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
+                modifier = Modifier.size(adaptiveProfile.iconSize(34.dp).coerceIn(34.dp, 48.dp))
+                    .background(AccentRed.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.Tv, contentDescription = null, tint = AccentRed)
+                Icon(
+                    Icons.Outlined.Tv,
+                    contentDescription = null,
+                    tint = AccentRed,
+                    modifier = Modifier.size(adaptiveProfile.iconSize(22.dp).coerceIn(22.dp, 32.dp))
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(channel.name, color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text(channel.group ?: "بدون تصنيف", color = MutedText, fontSize = 10.sp)
+                Text(
+                    channel.name,
+                    color = SoftWhite,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = if (adaptiveProfile.isTelevision) 18.sp else 14.sp
+                )
+                Text(
+                    channel.group ?: "بدون تصنيف",
+                    color = MutedText,
+                    fontSize = if (adaptiveProfile.isTelevision) 13.sp else 10.sp
+                )
                 if (channel.sourceNames.isNotEmpty()) {
                     Text(
                         "المصادر: ${channel.sourceNames.joinToString("، ")}",
@@ -2101,14 +2160,20 @@ private fun ChannelCard(
                     )
                 }
             }
-            IconButton(onClick = onToggleFavorite) {
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(adaptiveProfile.minimumFocusTarget)
+            ) {
                 Icon(
                     Icons.Outlined.Favorite,
                     contentDescription = if (favorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
                     tint = if (favorite) AccentRed else MutedText
                 )
             }
-            TextButton(onClick = onPlay) {
+            TextButton(
+                onClick = onPlay,
+                modifier = Modifier.heightIn(min = adaptiveProfile.minimumFocusTarget)
+            ) {
                 Text(if (active) "يعمل" else "تشغيل", color = AccentRed, fontWeight = FontWeight.Bold)
             }
         }
@@ -2117,16 +2182,25 @@ private fun ChannelCard(
 
 @Composable
 private fun CompactChannelCard(channel: RSTVChannel, onClick: () -> Unit) {
+    val adaptiveProfile = LocalRoyalAdaptiveProfile.current
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = PanelBlack),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(
+                horizontal = adaptiveProfile.pageHorizontalPadding.coerceIn(14.dp, 24.dp),
+                vertical = adaptiveProfile.itemSpacing.coerceAtMost(16.dp)
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.Tv, contentDescription = null, tint = AccentRed)
+            Icon(
+                Icons.Outlined.Tv,
+                contentDescription = null,
+                tint = AccentRed,
+                modifier = Modifier.size(adaptiveProfile.iconSize(22.dp).coerceIn(22.dp, 32.dp))
+            )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(channel.name, color = SoftWhite, fontWeight = FontWeight.SemiBold)
