@@ -84,6 +84,7 @@ tasks.named("preBuild").configure {
 }
 
 dependencies {
+    implementation(project(":royal-adaptive-ui"))
     implementation(project(":royal-ui-sounds"))
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
