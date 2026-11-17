@@ -4,7 +4,7 @@ import android.content.Context
 import java.io.File
 import org.json.JSONObject
 
-internal object LocalLibraryStore {
+object LocalLibraryStore {
     private const val PREFS = "rs_tv_library"
     private const val FAVORITES = "favorite_streams"
     private const val HISTORY = "recent_streams"
