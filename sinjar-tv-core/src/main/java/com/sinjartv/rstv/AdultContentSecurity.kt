@@ -7,12 +7,12 @@ import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
-internal enum class AdultContentType {
+enum class AdultContentType {
     AGE_RATED,
     EXPLICIT
 }
 
-internal object AdultContentPolicy {
+object AdultContentPolicy {
     private val explicitGroupPattern = Regex(
         """(?i)(?:^|[,;|/])\s*(?:xxx|porn|pornographic|erotic|adult|adults|adult\s+(?:content|channels|movies|entertainment)|sex\s*(?:tv|channel))(?:$|[,;|/])|للكبار فقط|محتوى صريح|إباحي|اباحي|إباحية|اباحية|قنوات جنسية"""
     )
@@ -41,7 +41,7 @@ internal object AdultContentPolicy {
     fun isAdult(channel: RSTVChannel): Boolean = classify(channel) != null
 }
 
-internal object AdultAccessStore {
+object AdultAccessStore {
     private const val PREFS = "rs_tv_parental_access"
     private const val SALT_KEY = "adult_pin_salt"
     private const val HASH_KEY = "adult_pin_hash"

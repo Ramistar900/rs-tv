@@ -15,3 +15,5 @@ dependencyResolutionManagement {
 rootProject.name = "RSTV"
 include(":app")
 include(":royal-ui-sounds")
+
+include(":sinjar-tv-core")
