@@ -131,7 +131,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: sinjar-tv-pr-${{ github.event.pull_request.number }}
-          name: SINJAR TV Test Build PR #${{ github.event.pull_request.number }}
+          name: "SINJAR TV Test Build PR #${{ github.event.pull_request.number }}"
           target_commitish: ${{ github.event.pull_request.head.sha }}
           draft: true
           prerelease: true
