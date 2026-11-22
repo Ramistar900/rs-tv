@@ -1578,6 +1578,38 @@ private fun LiveContent(
                     view.keepScreenOn = true
                 }
             )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .background(Color.Black.copy(alpha = 0.78f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = selectedChannel.name,
+                    color = SoftWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+                Text(
+                    text = status,
+                    color = if (status.contains("تعذر")) Color(0xFFFF8A80) else SoftWhite,
+                    fontSize = 10.sp,
+                    maxLines = 3
+                )
+                Text(
+                    text = "حالة المشغّل: " + when (player.playbackState) {
+                        Player.STATE_BUFFERING -> "تحميل"
+                        Player.STATE_READY -> "جاهز"
+                        Player.STATE_ENDED -> "انتهى"
+                        else -> "تهيئة"
+                    } + " • تشغيل: " + if (player.playWhenReady) "مفعّل" else "متوقف",
+                    color = Silver,
+                    fontSize = 9.sp,
+                    maxLines = 1
+                )
+            }
             if (showChannelInfo && !showChannelTable) {
                 ReceiverChannelInfoOverlay(
                     number = selectedChannelNumber,
