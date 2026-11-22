@@ -625,7 +625,7 @@ private fun RSTVHome() {
     }
 
 
-    suspend fun syncRamiNetworkChannel(channel: RSTVChannel) {
+    suspend fun syncRamiNetworkChannel(channel: RSTVChannel, forceReload: Boolean = false) {
         val channelId = channel.tvgId ?: throw IllegalStateException("معرّف قناة RAMİ غير متوفر.")
         val state = withContext(Dispatchers.IO) { RamiNetworkViewer.loadState(channelId) }
         val playbackStatus = state.optString("status")
@@ -659,11 +659,18 @@ private fun RSTVHome() {
         val mediaItem = mediaItemBuilder.build()
         val currentUrl = exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString()
         val needsVODSeek = !liveMode && kotlin.math.abs(exoPlayer.currentPosition - positionMs) > 4_000L
-        if (currentUrl != streamUrl || needsVODSeek) {
+        if (currentUrl != streamUrl || forceReload) {
+            // Load the remote file only when the media item changes or the user explicitly retries.
+            // Periodic state polling must not restart the same progressive WebM download.
             if (liveMode) exoPlayer.setMediaItem(mediaItem)
             else exoPlayer.setMediaItem(mediaItem, positionMs)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
+        } else if (!liveMode && exoPlayer.playbackState == Player.STATE_READY &&
+            kotlin.math.abs(exoPlayer.currentPosition - positionMs) > 30_000L
+        ) {
+            // Correct substantial drift without rebuilding the MediaItem or reopening its HTTP request.
+            exoPlayer.seekTo(positionMs)
         }
         status = "متصل ببث RAMİ TV • تزامن الخادم: " + state.optLong("sequence")
     }
@@ -686,7 +693,7 @@ private fun RSTVHome() {
             selectedTab = RSTVTab.RAMI
             status = "جارٍ الاتصال بقناة RAMİ TV..."
             scope.launch {
-                runCatching { syncRamiNetworkChannel(channel) }
+                runCatching { syncRamiNetworkChannel(channel, forceReload = true) }
                     .onFailure { status = it.message ?: "تعذر تشغيل قناة RAMİ TV." }
             }
             return
