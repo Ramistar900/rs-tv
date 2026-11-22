@@ -43,7 +43,7 @@ jobs:
       )
     name: Test and build SINJAR TV APKs
     permissions:
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -126,6 +126,22 @@ jobs:
           sha256sum "$APK"
 
       # Keep the Almalaki-style direct test downloads in Actions.
+      - name: Publish experimental SINJAR TV APK as a draft GitHub Release
+        if: github.event_name == 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: sinjar-tv-pr-${{ github.event.pull_request.number }}
+          name: SINJAR TV Test Build PR #${{ github.event.pull_request.number }}
+          target_commitish: ${{ github.event.pull_request.head.sha }}
+          draft: true
+          prerelease: true
+          overwrite_files: true
+          body: |
+            Experimental SINJAR TV debug build for owner testing.
+            This is not a production release.
+            Source commit: ${{ github.event.pull_request.head.sha }}
+          files: app/build/outputs/apk/debug/app-debug.apk
+
       - name: Upload SINJAR TV Debug APK for testing
         continue-on-error: true
         uses: actions/upload-artifact@v4
