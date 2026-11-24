@@ -10,7 +10,6 @@ import org.videolan.libvlc.util.VLCVideoLayout
 /**
  * Owns the embedded VideoLAN engine for streams that need broader codec/container support.
  *
- * Call attach() from the video view lifecycle and close() when the owning screen is disposed.
  * The supplied URL must already be a short-lived, authorized playback URL; never pass Google
  * refresh tokens or other long-lived credentials to the player.
  */
@@ -25,6 +24,22 @@ internal class EmbeddedVlcPlayer(context: Context) : AutoCloseable {
     private val mediaPlayer = MediaPlayer(libVlc)
     private var attachedLayout: VLCVideoLayout? = null
     private var released = false
+    private var playbackErrorListener: ((String) -> Unit)? = null
+    var currentUrl: String? = null
+        private set
+
+    init {
+        mediaPlayer.setEventListener { event ->
+            if (event.type == MediaPlayer.Event.EncounteredError) {
+                currentUrl = null
+                playbackErrorListener?.invoke("تعذر تشغيل الفيديو بواسطة VLC")
+            }
+        }
+    }
+
+    fun setOnPlaybackErrorListener(listener: ((String) -> Unit)?) {
+        playbackErrorListener = listener
+    }
 
     fun attach(layout: VLCVideoLayout) {
         check(!released) { "LibVLC player has already been released" }
@@ -34,10 +49,25 @@ internal class EmbeddedVlcPlayer(context: Context) : AutoCloseable {
         attachedLayout = layout
     }
 
+    fun detach(layout: VLCVideoLayout? = null) {
+        if (released) return
+        if (layout != null && attachedLayout !== layout) return
+        mediaPlayer.detachViews()
+        attachedLayout = null
+    }
+
     fun play(url: String, startPositionMs: Long = 0L) {
         check(!released) { "LibVLC player has already been released" }
         require(url.startsWith("https://", ignoreCase = true)) {
             "Only HTTPS playback URLs are allowed"
+        }
+        if (currentUrl == url && mediaPlayer.isPlaying) {
+            if (startPositionMs > 0L &&
+                kotlin.math.abs(mediaPlayer.time - startPositionMs) > 30_000L
+            ) {
+                mediaPlayer.setTime(startPositionMs)
+            }
+            return
         }
         val media = Media(libVlc, Uri.parse(url))
         try {
@@ -48,6 +78,7 @@ internal class EmbeddedVlcPlayer(context: Context) : AutoCloseable {
         } finally {
             media.release()
         }
+        currentUrl = url
         mediaPlayer.play()
         if (startPositionMs > 0L) {
             mediaPlayer.setTime(startPositionMs)
@@ -59,7 +90,10 @@ internal class EmbeddedVlcPlayer(context: Context) : AutoCloseable {
     }
 
     fun stop() {
-        if (!released) mediaPlayer.stop()
+        if (!released) {
+            mediaPlayer.stop()
+            currentUrl = null
+        }
     }
 
     fun seekTo(positionMs: Long) {
@@ -75,9 +109,12 @@ internal class EmbeddedVlcPlayer(context: Context) : AutoCloseable {
     override fun close() {
         if (released) return
         released = true
+        playbackErrorListener = null
         runCatching { mediaPlayer.stop() }
         runCatching { mediaPlayer.detachViews() }
         attachedLayout = null
+        currentUrl = null
+        mediaPlayer.setEventListener(null)
         mediaPlayer.release()
         libVlc.release()
     }
