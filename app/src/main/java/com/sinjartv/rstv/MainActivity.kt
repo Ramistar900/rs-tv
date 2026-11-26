@@ -389,6 +389,12 @@ private fun RSTVHome() {
         }
     }
     val exoPlayer = playbackController
+    var activePlaybackType by remember(context) {
+        mutableStateOf(
+            context.getSharedPreferences("rs_tv_playback_state", Context.MODE_PRIVATE)
+                .getString("active_media_type", "stopped") ?: "stopped"
+        )
+    }
 
     fun navigateToTab(tab: RSTVTab) {
         if (selectedTab != tab) {
@@ -666,6 +672,7 @@ private fun RSTVHome() {
                 "مشغل البث غير جاهز بعد."
             }
         }
+        activePlaybackType = "iptv"
         status = "متصل ببث RAMİ TV • تزامن الخادم: " + state.optLong("sequence")
     }
 
@@ -700,6 +707,7 @@ private fun RSTVHome() {
         RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
         selectedChannel = channel
         selectedTab = RSTVTab.LIVE
+        activePlaybackType = "iptv"
         status = "جارٍ تجهيز قناة ${channel.name}..."
         scope.launch {
             libraryWriteMutex.withLock {
@@ -939,7 +947,7 @@ private fun RSTVHome() {
                         context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
                             .edit().putBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, keepPlaybackInBackground).apply()
                     },
-                    onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false },
+                    onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false; activePlaybackType = "local" },
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (wideLayout) {
@@ -1059,7 +1067,7 @@ private fun RSTVHome() {
                                 context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
                                     .edit().putBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, keepPlaybackInBackground).apply()
                             },
-                            onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false },
+                            onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false; activePlaybackType = "local" },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1144,7 +1152,7 @@ private fun RSTVHome() {
                                 context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
                                     .edit().putBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, keepPlaybackInBackground).apply()
                             },
-                            onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false },
+                            onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false; activePlaybackType = "local" },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1638,7 +1646,8 @@ private fun LocalRamiLiveChannelsContent(
                             view.useController = false
                             view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                             view.keepScreenOn = true
-                        }
+                        },
+                        onRelease = { view -> view.player = null }
                     )
                 }
             }
@@ -1792,7 +1801,7 @@ private fun LiveContent(
     } else {
         Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (showLocalRamiPackage && localRamiChannels.isNotEmpty()) {
-                LocalRamiLiveChannelsContent(channels = localRamiChannels, onLocalChannelSelected = onLocalChannelSelected, showPlayerSurface = selectedChannel == null)
+                LocalRamiLiveChannelsContent(channels = localRamiChannels, onLocalChannelSelected = onLocalChannelSelected, showPlayerSurface = selectedChannel == null && activePlaybackType == "local")
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
