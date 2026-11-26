@@ -304,7 +304,6 @@ private fun RSTVHome() {
     val scope = rememberCoroutineScope()
     val libraryWriteMutex = remember { Mutex() }
     val channels = remember { mutableStateListOf<RSTVChannel>() }
-    val ramiNetworkChannels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
@@ -338,7 +337,20 @@ private fun RSTVHome() {
     var favoriteUrls by remember { mutableStateOf<Set<String>>(emptySet()) }
     LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery, remoteCatalogRevision) {
         val userSnapshot = channels.toList()
-        val sourceSnapshot = (sourceLibraryChannels.toList() + remoteCatalogChannels).distinctBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
+        val localRamiSnapshot = LocalRamiChannelStore.readyChannels(context).map { local ->
+            RSTVChannel(
+                name = local.name,
+                tvgId = "rami-local-${local.id}",
+                group = "قنوات متنوعة",
+                logoUrl = local.logoUri,
+                streamUrl = "https://local.rami.invalid/channel/${local.id}",
+                sourceIds = setOf("local-rami-tv"),
+                sourceNames = setOf("RAMİ TV"),
+                sourceProviders = setOf("RS TV")
+            )
+        }
+        val sourceSnapshot = (sourceLibraryChannels.toList() + remoteCatalogChannels + localRamiSnapshot)
+            .distinctBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
         val (favoriteSnapshot, historySnapshot) = withContext(Dispatchers.IO) {
             LocalLibraryStore.favoriteStreams(context) to LocalLibraryStore.history(context)
         }
@@ -353,31 +365,6 @@ private fun RSTVHome() {
             )
         }
     }
-    LaunchedEffect(Unit) {
-        while (true) {
-            runCatching {
-                withContext(Dispatchers.IO) { RamiNetworkViewer.loadChannels() }
-            }.onSuccess { remote ->
-                ramiNetworkChannels.clear()
-                ramiNetworkChannels.addAll(remote.map { item ->
-                    RSTVChannel(
-                        name = item.name,
-                        tvgId = item.id,
-                        group = "RAMI NETWORK",
-                        logoUrl = item.logoUrl,
-                        streamUrl = "https://rami-network.invalid/channel/" + item.id,
-                        sourceNames = setOf("RAMI NETWORK")
-                    )
-                })
-            }.onFailure {
-                if (ramiNetworkChannels.isEmpty()) {
-                    status = "تعذر تحميل قنوات RAMİ TV: " + (it.message ?: "خطأ اتصال")
-                }
-            }
-            delay(60_000)
-        }
-    }
-
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
     var showAdminPin by remember { mutableStateOf(false) }
     var adminPin by remember { mutableStateOf("") }
@@ -728,65 +715,27 @@ private fun RSTVHome() {
         searchQuery = ""
         exoPlayer?.stop()
         exoPlayer?.clearMediaItems()
-        status = "تعرض الآن مكتبة المصادر المجمّعة. قائمتك المحلية محفوظة دون تغيير."
+        status = "تعرض الآن مكتبة القنوات المجمّعة، بما فيها قنوات RAMİ TV المحلية."
+        libraryRevision++
         selectedTab = RSTVTab.LIVE
     }
 
 
-    suspend fun syncRamiNetworkChannel(channel: RSTVChannel) {
-        val channelId = channel.tvgId ?: throw IllegalStateException("معرّف قناة RAMİ غير متوفر.")
-        val state = withContext(Dispatchers.IO) { RamiNetworkViewer.loadState(channelId) }
-        val playbackStatus = state.optString("status")
-        if (playbackStatus != "playing") {
-            exoPlayer?.stop()
-            exoPlayer?.clearMediaItems()
-            status = when (playbackStatus) {
-                "waiting_for_stream" -> "القناة بانتظار مصدر HLS."
-                "waiting_for_playlist" -> "القناة بانتظار قائمة تشغيل معتمدة."
-                "stopped" -> "البث متوقف حالياً."
-                else -> "حالة القناة: $playbackStatus"
-            }
-            return
-        }
-        val streamUrl = state.optJSONObject("stream")?.optString("url")
-            ?.takeIf { it.startsWith("https://") }
-            ?: state.optJSONObject("currentItem")?.optString("mediaUrl")
-                ?.takeIf { it.startsWith("https://") }
-            ?: throw IllegalStateException("لم يحدد الخادم رابط تشغيل صالحاً.")
-        val liveMode = state.optString("playbackMode") == "live"
-        val positionMs = state.optLong("positionMs", 0L).coerceAtLeast(0L)
-        val currentUrl = exoPlayer?.currentMediaItem?.localConfiguration?.uri?.toString()
-        val currentPosition = exoPlayer?.currentPosition ?: 0L
-        val needsVODSeek = !liveMode && kotlin.math.abs(currentPosition - positionMs) > 4_000L
-        if (currentUrl != streamUrl || needsVODSeek) {
-            check(RamiPlaybackCommands.playIptv(exoPlayer, streamUrl, liveMode = liveMode, positionMs = positionMs)) {
-                "مشغل البث غير جاهز بعد."
-            }
-        }
-        activePlaybackType = "iptv"
-        status = "متصل ببث RAMİ TV • تزامن الخادم: " + state.optLong("sequence")
-    }
-
-    LaunchedEffect(selectedChannel?.group, selectedChannel?.tvgId) {
-        val current = selectedChannel
-        if (current?.group == "RAMI NETWORK") {
-            while (true) {
-                delay(20_000)
-                runCatching { syncRamiNetworkChannel(current) }
-                    .onFailure { status = it.message ?: "تعذرت مزامنة بث RAMİ TV." }
-            }
-        }
-    }
-
     fun playChannel(channel: RSTVChannel) {
-        if (channel.group == "RAMI NETWORK") {
+        if ("local-rami-tv" in channel.sourceIds) {
+            val channelId = channel.tvgId?.removePrefix("rami-local-")?.toIntOrNull()
+            val local = channelId?.let { LocalRamiChannelStore.load(context, it) }
+            if (channelId == null || local == null || !local.isReady) {
+                status = "قناة RAMİ TV غير جاهزة أو لا تحتوي فيديوهات صالحة."
+                return
+            }
             RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
             selectedChannel = channel
-            selectedTab = RSTVTab.RAMI
-            status = "جارٍ الاتصال بقناة RAMİ TV..."
-            scope.launch {
-                runCatching { syncRamiNetworkChannel(channel) }
-                    .onFailure { status = it.message ?: "تعذر تشغيل قناة RAMİ TV." }
+            selectedTab = RSTVTab.LIVE
+            activePlaybackType = "local"
+            status = "جارٍ تشغيل ${local.name}..."
+            if (!RamiPlaybackCommands.playLocal(exoPlayer, channelId, local.videoUris)) {
+                status = "مشغل القنوات المحلية غير جاهز بعد. حاول بعد لحظة."
             }
             return
         }
@@ -877,7 +826,7 @@ private fun RSTVHome() {
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = ScreenBlack) {
-                LocalRamiAdminContent(onClose = { showLocalRamiAdmin = false })
+                LocalRamiAdminContent(onClose = { showLocalRamiAdmin = false; libraryRevision++ })
             }
         }
     }
@@ -1111,7 +1060,7 @@ private fun RSTVHome() {
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
-                                selectedTab == RSTVTab.RAMI -> ramiNetworkChannels
+                                selectedTab == RSTVTab.RAMI -> visibleSourceLibraryChannels
                                 selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                                 else -> visibleChannels
                             },
@@ -1197,7 +1146,7 @@ private fun RSTVHome() {
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
-                                selectedTab == RSTVTab.RAMI -> ramiNetworkChannels
+                                selectedTab == RSTVTab.RAMI -> visibleSourceLibraryChannels
                                 selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                                 else -> visibleChannels
                             },
@@ -1385,7 +1334,7 @@ private fun ScreenBody(
             onAddRamiPackage = {
                 context.getSharedPreferences("rami_tv_live_package", Context.MODE_PRIVATE)
                     .edit().putBoolean("added", true).apply()
-                onNavigate(RSTVTab.LIVE)
+                onShowSourceLibrary()
             },
             status = remotePlaylistStatus,
             sourceLibraryStatus = sourceLibraryStatus,
@@ -1897,9 +1846,6 @@ private fun LiveContent(
         }
     } else {
         Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (showLocalRamiPackage && localRamiChannels.isNotEmpty()) {
-                LocalRamiLiveChannelsContent(channels = localRamiChannels, onLocalChannelSelected = onLocalChannelSelected, showPlayerSurface = selectedChannel == null && activePlaybackType == "local")
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
