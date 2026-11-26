@@ -1822,12 +1822,12 @@ private fun LiveContent(
             )
             if (selectedChannel.tvgId.startsWith("rami-local-")) {
                 val localId = selectedChannel.tvgId.substringAfterLast("-").toIntOrNull()
-                val localConfig = localRamiChannels.firstOrNull { it.id == localId }
-                    ?: remember(selectedChannel.tvgId) { LocalRamiChannelStore.load(context, localId ?: -1) }
-                LocalRamiBroadcastOverlay(
-                    config = localConfig,
-                    modifier = Modifier.fillMaxSize()
-                )
+                localRamiChannels.firstOrNull { it.id == localId }?.let { localConfig ->
+                    LocalRamiBroadcastOverlay(
+                        config = localConfig,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
             if (showChannelInfo && !showChannelTable) {
                 ReceiverChannelInfoOverlay(
