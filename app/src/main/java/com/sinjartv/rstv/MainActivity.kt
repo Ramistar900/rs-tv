@@ -6,6 +6,8 @@ import com.sinjartv.rstv.royalsounds.RoyalUiSounds
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.BitmapFactory
+import android.content.ComponentName
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
@@ -18,6 +20,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +40,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -102,6 +110,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -112,8 +121,11 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.google.common.util.concurrent.MoreExecutors
 import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -141,6 +153,7 @@ private enum class RSTVTab(
     HOME("الرئيسية", Icons.Outlined.Home),
     LIVE("البث المباشر", Icons.Outlined.Tv),
     RAMI("RAMİ TV", Icons.Outlined.Tv),
+    RAMI_ONE("RAMİ TV 1", Icons.Outlined.Tv),
     SOURCES("مصادر IPTV", Icons.Outlined.CloudDownload),
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
@@ -149,7 +162,7 @@ private enum class RSTVTab(
 }
 
 private val primaryNavigationTabs = listOf(
-    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.RAMI, RSTVTab.FAVORITES, RSTVTab.SOURCES
+    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES
 )
 
 private enum class ClearAction(val title: String, val message: String) {
@@ -296,12 +309,21 @@ private fun RSTVHome() {
     val scope = rememberCoroutineScope()
     val libraryWriteMutex = remember { Mutex() }
     val channels = remember { mutableStateListOf<RSTVChannel>() }
-    val ramiNetworkChannels = remember { mutableStateListOf<RSTVChannel>() }
     val sourceLibraryChannels = remember { mutableStateListOf<RSTVChannel>() }
     var sourceLibraryStatus by remember { mutableStateOf("لم تتم إضافة مصادر بعد") }
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
     var showingSourceLibrary by remember { mutableStateOf(false) }
     var countryPackageSources by remember { mutableStateOf(RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()) }
+    var remoteCatalogSources by remember { mutableStateOf<List<RemoteCatalogSourceDefinition>>(emptyList()) }
+    var remoteCatalogChannels by remember { mutableStateOf<List<RSTVChannel>>(emptyList()) }
+    var remoteCatalogRevision by remember { mutableIntStateOf(0) }
+    var remoteCatalogRefreshMinutes by remember { mutableIntStateOf(15) }
+    val availablePlaylistSources = remember(countryPackageSources, remoteCatalogSources) {
+        val byId = linkedMapOf<String, RemotePlaylistSource>()
+        (RemotePlaylistSources.playlists + countryPackageSources + remoteCatalogSources.map { it.source })
+            .forEach { byId[it.id] = it }
+        byId.values.toList()
+    }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
@@ -318,9 +340,22 @@ private fun RSTVHome() {
     var historyRevision by remember { mutableIntStateOf(0) }
     var derivedCollections by remember { mutableStateOf(DerivedChannelCollections()) }
     var favoriteUrls by remember { mutableStateOf<Set<String>>(emptySet()) }
-    LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery) {
+    LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery, remoteCatalogRevision) {
         val userSnapshot = channels.toList()
-        val sourceSnapshot = sourceLibraryChannels.toList()
+        val localRamiSnapshot = LocalRamiChannelStore.readyChannels(context).map { local ->
+            RSTVChannel(
+                name = local.name,
+                tvgId = "rami-local-${local.id}",
+                group = "قنوات متنوعة",
+                logoUrl = local.logoUri,
+                streamUrl = "https://local.rami.invalid/channel/${local.id}",
+                sourceIds = setOf("local-rami-tv"),
+                sourceNames = setOf("RAMİ TV"),
+                sourceProviders = setOf("RS TV")
+            )
+        }
+        val sourceSnapshot = (sourceLibraryChannels.toList() + remoteCatalogChannels + localRamiSnapshot)
+            .distinctBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
         val (favoriteSnapshot, historySnapshot) = withContext(Dispatchers.IO) {
             LocalLibraryStore.favoriteStreams(context) to LocalLibraryStore.history(context)
         }
@@ -335,35 +370,33 @@ private fun RSTVHome() {
             )
         }
     }
-    LaunchedEffect(Unit) {
-        while (true) {
-            runCatching {
-                withContext(Dispatchers.IO) { RamiNetworkViewer.loadChannels() }
-            }.onSuccess { remote ->
-                ramiNetworkChannels.clear()
-                ramiNetworkChannels.addAll(remote.map { item ->
-                    RSTVChannel(
-                        name = item.name,
-                        tvgId = item.id,
-                        group = "RAMI NETWORK",
-                        logoUrl = item.logoUrl,
-                        streamUrl = "https://rami-network.invalid/channel/" + item.id,
-                        sourceNames = setOf("RAMI NETWORK")
-                    )
-                })
-            }.onFailure {
-                if (ramiNetworkChannels.isEmpty()) {
-                    status = "تعذر تحميل قنوات RAMİ TV: " + (it.message ?: "خطأ اتصال")
-                }
-            }
-            delay(60_000)
+    var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
+    var showAdminPin by remember { mutableStateOf(false) }
+    var adminPin by remember { mutableStateOf("") }
+    var adminPinError by remember { mutableStateOf(false) }
+    var showLocalRamiAdmin by remember { mutableStateOf(false) }
+    var isFullscreenPlayer by remember { mutableStateOf(false) }
+    var keepPlaybackInBackground by remember(context) {
+        mutableStateOf(context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
+            .getBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, false))
+    }
+    var playbackController by remember { mutableStateOf<MediaController?>(null) }
+    DisposableEffect(context) {
+        val token = SessionToken(context, ComponentName(context, RamiTvOnePlaybackService::class.java))
+        val future = MediaController.Builder(context, token).buildAsync()
+        future.addListener({ playbackController = runCatching { future.get() }.getOrNull() }, MoreExecutors.directExecutor())
+        onDispose {
+            MediaController.releaseFuture(future)
+            playbackController = null
         }
     }
-
-    var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
-    var isFullscreenPlayer by remember { mutableStateOf(false) }
-    val player = remember(context) { ExoPlayer.Builder(context).build() }
-    val exoPlayer = player
+    val exoPlayer = playbackController
+    var activePlaybackType by remember(context) {
+        mutableStateOf(
+            context.getSharedPreferences("rs_tv_playback_state", Context.MODE_PRIVATE)
+                .getString("active_media_type", "stopped") ?: "stopped"
+        )
+    }
 
     fun navigateToTab(tab: RSTVTab) {
         if (selectedTab != tab) {
@@ -390,34 +423,34 @@ private fun RSTVHome() {
     }
 
     DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val currentUrl = mediaItem?.localConfiguration?.uri?.toString()
-                val currentChannel = currentUrl?.let { derivedCollections.channelByStreamUrl[it] }
-                if (currentChannel != null) {
-                    selectedChannel = currentChannel
-                    status = "القناة الحالية: ${currentChannel.name}"
+        val activePlayer = exoPlayer
+        if (activePlayer == null) {
+            onDispose { }
+        } else {
+            val listener = object : Player.Listener {
+                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                    val currentUrl = mediaItem?.localConfiguration?.uri?.toString()
+                    val currentChannel = currentUrl?.let { derivedCollections.channelByStreamUrl[it] }
+                    if (currentChannel != null) {
+                        selectedChannel = currentChannel
+                        status = "القناة الحالية: ${currentChannel.name}"
+                    }
+                }
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    status = when (playbackState) {
+                        Player.STATE_BUFFERING -> "جارٍ تحميل بث القناة..."
+                        Player.STATE_READY -> "القناة جاهزة للتشغيل"
+                        Player.STATE_ENDED -> "انتهى البث"
+                        else -> status
+                    }
+                }
+                override fun onPlayerError(error: PlaybackException) {
+                    RoyalUiSounds.play(context, RoyalUiSound.ACTION_ERROR)
+                    status = "تعذر تشغيل القناة: ${error.errorCodeName}"
                 }
             }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                status = when (playbackState) {
-                    Player.STATE_BUFFERING -> "جارٍ تحميل بث القناة..."
-                    Player.STATE_READY -> "القناة جاهزة للتشغيل"
-                    Player.STATE_ENDED -> "انتهى البث"
-                    else -> status
-                }
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                RoyalUiSounds.play(context, RoyalUiSound.ACTION_ERROR)
-                status = "تعذر تشغيل القناة: ${error.errorCodeName}"
-            }
-        }
-        exoPlayer.addListener(listener)
-        onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
+            activePlayer.addListener(listener)
+            onDispose { activePlayer.removeListener(listener) }
         }
     }
 
@@ -473,6 +506,87 @@ private fun RSTVHome() {
         }
     }
 
+    LaunchedEffect(Unit) {
+        val syncPreferences = context.getSharedPreferences("rs_tv_remote_iptv_sync", Context.MODE_PRIVATE)
+
+        suspend fun refreshCatalogAndSavedSources() {
+            val catalog = withContext(Dispatchers.IO) { RemoteIptvCatalog.loadOrCached(context) }
+            remoteCatalogSources = catalog.sources
+            remoteCatalogChannels = catalog.channels.filterNot(AdultContentPolicy::isAdult)
+            remoteCatalogRefreshMinutes = catalog.refreshMinutes
+            remoteCatalogRevision++
+
+            val savedSources = withContext(Dispatchers.IO) { LocalLibraryStore.loadRemoteSources(context) }
+            val definitions = (RemotePlaylistSources.playlists + countryPackageSources + catalog.sources.map { it.source })
+                .associateBy { it.id }
+            val catalogDefinitions = catalog.sources.associateBy { it.source.id }
+            val candidates = linkedMapOf<String, Pair<RemotePlaylistSource, Int>>()
+
+            savedSources.forEach { saved ->
+                definitions[saved.id]?.let { source ->
+                    candidates[source.id] = source to (catalogDefinitions[source.id]?.refreshIntervalMinutes ?: 360)
+                }
+            }
+            catalog.sources.filter { it.autoSync }.forEach { definition ->
+                candidates[definition.source.id] = definition.source to definition.refreshIntervalMinutes
+            }
+
+            val now = System.currentTimeMillis()
+            var refreshedCount = 0
+            var failedCount = 0
+            candidates.values.forEach { (source, intervalMinutes) ->
+                val lastRefresh = syncPreferences.getLong("last_refresh_${source.id}", 0L)
+                if (now - lastRefresh < intervalMinutes * 60_000L) return@forEach
+                runCatching {
+                    val content = withContext(Dispatchers.IO) { RemotePlaylistDownloader.download(source) }
+                    val parsed = withContext(Dispatchers.Default) { M3uPlaylistParser.parse(content) }
+                    require(parsed.isValidPlaylist && parsed.channels.isNotEmpty()) {
+                        "لم يُرجع المصدر قائمة قنوات صالحة"
+                    }
+                    val snapshot = RemoteSourceSnapshot(
+                        id = source.id,
+                        name = source.name,
+                        provider = source.provider,
+                        attribution = source.attribution,
+                        content = content
+                    )
+                    withContext(Dispatchers.IO) { LocalLibraryStore.saveRemoteSource(context, snapshot) }
+                    syncPreferences.edit().putLong("last_refresh_${source.id}", now).apply()
+                }.onSuccess {
+                    refreshedCount++
+                }.onFailure {
+                    failedCount++
+                }
+            }
+
+            if (refreshedCount > 0 || savedSources.isEmpty()) {
+                val latestSources = withContext(Dispatchers.IO) { LocalLibraryStore.loadRemoteSources(context) }
+                val merged = withContext(Dispatchers.Default) { RemotePlaylistMerger.merge(latestSources) }
+                sourceLibraryChannels.clear()
+                sourceLibraryChannels.addAll(merged)
+                sourceLibraryCount = latestSources.size
+                libraryRevision++
+            }
+            if (channels.isEmpty() && (sourceLibraryChannels.isNotEmpty() || remoteCatalogChannels.isNotEmpty())) {
+                showingSourceLibrary = true
+            }
+            sourceLibraryStatus = buildString {
+                append("مصادر محفوظة: $sourceLibraryCount • قنوات القوائم: ${sourceLibraryChannels.size}")
+                append(" • قنوات الكتالوج المركزي: ${remoteCatalogChannels.size}")
+                if (refreshedCount > 0) append(" • تم تحديث $refreshedCount مصدر")
+                if (failedCount > 0) append(" • تعذّر تحديث $failedCount مصدر")
+            }
+        }
+
+        runCatching { refreshCatalogAndSavedSources() }
+            .onFailure { remotePlaylistStatus = "تعذر تحديث الكتالوج المركزي: ${it.message ?: "خطأ اتصال"}" }
+        while (true) {
+            delay(remoteCatalogRefreshMinutes * 60_000L)
+            runCatching { refreshCatalogAndSavedSources() }
+                .onFailure { remotePlaylistStatus = "تعذر تحديث الكتالوج المركزي: ${it.message ?: "خطأ اتصال"}" }
+        }
+    }
+
     val playlistPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -488,8 +602,8 @@ private fun RSTVHome() {
                     }
                     require(parsed.isValidPlaylist) { "الملف المحدد ليس قائمة M3U صالحة" }
                     withContext(Dispatchers.IO) { LocalLibraryStore.savePlaylist(context, text) }
-                    exoPlayer.stop()
-                    exoPlayer.clearMediaItems()
+                    exoPlayer?.stop()
+                    exoPlayer?.clearMediaItems()
                     selectedChannel = null
                     channels.clear()
                     channels.addAll(parsed.channels)
@@ -604,66 +718,29 @@ private fun RSTVHome() {
         showingSourceLibrary = true
         selectedChannel = null
         searchQuery = ""
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
-        status = "تعرض الآن مكتبة المصادر المجمّعة. قائمتك المحلية محفوظة دون تغيير."
+        exoPlayer?.stop()
+        exoPlayer?.clearMediaItems()
+        status = "تعرض الآن مكتبة القنوات المجمّعة، بما فيها قنوات RAMİ TV المحلية."
+        libraryRevision++
         selectedTab = RSTVTab.LIVE
     }
 
 
-    suspend fun syncRamiNetworkChannel(channel: RSTVChannel) {
-        val channelId = channel.tvgId ?: throw IllegalStateException("معرّف قناة RAMİ غير متوفر.")
-        val state = withContext(Dispatchers.IO) { RamiNetworkViewer.loadState(channelId) }
-        val playbackStatus = state.optString("status")
-        if (playbackStatus != "playing") {
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
-            status = when (playbackStatus) {
-                "waiting_for_stream" -> "القناة بانتظار مصدر HLS."
-                "waiting_for_playlist" -> "القناة بانتظار قائمة تشغيل معتمدة."
-                "stopped" -> "البث متوقف حالياً."
-                else -> "حالة القناة: $playbackStatus"
-            }
-            return
-        }
-        val streamUrl = state.optJSONObject("stream")?.optString("url")
-            ?.takeIf { it.startsWith("https://") }
-            ?: state.optJSONObject("currentItem")?.optString("mediaUrl")
-                ?.takeIf { it.startsWith("https://") }
-            ?: throw IllegalStateException("لم يحدد الخادم رابط تشغيل صالحاً.")
-        val liveMode = state.optString("playbackMode") == "live"
-        val positionMs = state.optLong("positionMs", 0L).coerceAtLeast(0L)
-        val currentUrl = exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString()
-        val needsVODSeek = !liveMode && kotlin.math.abs(exoPlayer.currentPosition - positionMs) > 4_000L
-        if (currentUrl != streamUrl || needsVODSeek) {
-            if (liveMode) exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
-            else exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl), positionMs)
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
-        }
-        status = "متصل ببث RAMİ TV • تزامن الخادم: " + state.optLong("sequence")
-    }
-
-    LaunchedEffect(selectedChannel?.group, selectedChannel?.tvgId) {
-        val current = selectedChannel
-        if (current?.group == "RAMI NETWORK") {
-            while (true) {
-                delay(20_000)
-                runCatching { syncRamiNetworkChannel(current) }
-                    .onFailure { status = it.message ?: "تعذرت مزامنة بث RAMİ TV." }
-            }
-        }
-    }
-
     fun playChannel(channel: RSTVChannel) {
-        if (channel.group == "RAMI NETWORK") {
+        if ("local-rami-tv" in channel.sourceIds) {
+            val channelId = channel.tvgId?.removePrefix("rami-local-")?.toIntOrNull()
+            val local = channelId?.let { LocalRamiChannelStore.load(context, it) }
+            if (channelId == null || local == null || !local.isReady) {
+                status = "قناة RAMİ TV غير جاهزة أو لا تحتوي فيديوهات صالحة."
+                return
+            }
             RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
             selectedChannel = channel
-            selectedTab = RSTVTab.RAMI
-            status = "جارٍ الاتصال بقناة RAMİ TV..."
-            scope.launch {
-                runCatching { syncRamiNetworkChannel(channel) }
-                    .onFailure { status = it.message ?: "تعذر تشغيل قناة RAMİ TV." }
+            selectedTab = RSTVTab.LIVE
+            activePlaybackType = "local"
+            status = "جارٍ تشغيل ${local.name}..."
+            if (!RamiPlaybackCommands.playLocal(exoPlayer, channelId, local.videoUris)) {
+                status = "مشغل القنوات المحلية غير جاهز بعد. حاول بعد لحظة."
             }
             return
         }
@@ -675,6 +752,7 @@ private fun RSTVHome() {
         RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
         selectedChannel = channel
         selectedTab = RSTVTab.LIVE
+        activePlaybackType = "iptv"
         status = "جارٍ تجهيز قناة ${channel.name}..."
         scope.launch {
             libraryWriteMutex.withLock {
@@ -684,14 +762,9 @@ private fun RSTVHome() {
             }
             historyRevision++
         }
-        val httpFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(channel.httpHeaders)
-        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
-        val mediaSource = DefaultMediaSourceFactory(dataSourceFactory)
-            .createMediaSource(MediaItem.fromUri(channel.streamUrl))
-        exoPlayer.setMediaSource(mediaSource)
-        exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
+        if (!RamiPlaybackCommands.playIptv(exoPlayer, channel.streamUrl, channel.httpHeaders)) {
+            status = "مشغل البث غير جاهز بعد. حاول بعد لحظة."
+        }
     }
 
     fun toggleFavourite(channel: RSTVChannel) {
@@ -717,6 +790,51 @@ private fun RSTVHome() {
     val recentChannels = derivedCollections.recentChannels
     val visibleChannels = derivedCollections.visibleChannels
     val visibleSourceLibraryChannels = derivedCollections.visibleSourceLibraryChannels
+
+    if (showAdminPin) {
+        AlertDialog(
+            onDismissRequest = { showAdminPin = false; adminPin = "" },
+            title = { Text("دخول الإدارة", color = SoftWhite) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("أدخل رمز الإدارة لفتح إعدادات قنوات RAMİ TV.", color = MutedText)
+                    OutlinedTextField(
+                        value = adminPin,
+                        onValueChange = { value -> adminPin = value.filter(Char::isDigit).take(6); adminPinError = false },
+                        label = { Text("رمز PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (adminPinError) Text("رمز PIN غير صحيح", color = AccentRed)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (adminPin == "247569") {
+                        showAdminPin = false
+                        showLocalRamiAdmin = true
+                        adminPin = ""
+                    } else adminPinError = true
+                }) { Text("دخول", color = AccentRed) }
+            },
+            dismissButton = { TextButton(onClick = { showAdminPin = false; adminPin = "" }) { Text("إلغاء") } },
+            containerColor = PanelRaised,
+            titleContentColor = SoftWhite,
+            textContentColor = MutedText
+        )
+    }
+
+    if (showLocalRamiAdmin) {
+        Dialog(
+            onDismissRequest = { showLocalRamiAdmin = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = ScreenBlack) {
+                LocalRamiAdminContent(onClose = { showLocalRamiAdmin = false; libraryRevision++ })
+            }
+        }
+    }
 
     pendingClear?.let { action ->
         AlertDialog(
@@ -744,8 +862,8 @@ private fun RSTVHome() {
                                 ClearAction.PLAYLIST -> {
                                     channels.clear()
                                     libraryRevision++
-                                    exoPlayer.stop()
-                                    exoPlayer.clearMediaItems()
+                                    exoPlayer?.stop()
+                                    exoPlayer?.clearMediaItems()
                                     selectedChannel = null
                                     status = "تم حذف القائمة المحلية"
                                 }
@@ -814,11 +932,11 @@ private fun RSTVHome() {
                         selectedBackground = resourceId
                         backgroundPrefs.edit().putInt("background_res", resourceId).apply()
                     },
-                    playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
+                    playlistSources = availablePlaylistSources,
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
                     sourceLibraryCount = sourceLibraryCount,
-                    sourceLibraryChannelCount = sourceLibraryChannels.size,
+                    sourceLibraryChannelCount = sourceLibraryChannels.size + remoteCatalogChannels.size,
                     onAddSourceToLibrary = { playlistPackage ->
                         RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
                         addRemotePlaylistPackageToLibrary(playlistPackage)
@@ -826,7 +944,7 @@ private fun RSTVHome() {
                     onShowSourceLibrary = ::showSourceLibrary,
                     channels = when {
                         selectedTab == RSTVTab.FAVORITES -> favoriteChannels
-                        selectedTab == RSTVTab.RAMI -> ramiNetworkChannels
+                        selectedTab == RSTVTab.RAMI -> visibleSourceLibraryChannels
                         selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                         else -> visibleChannels
                     },
@@ -868,6 +986,14 @@ private fun RSTVHome() {
                         guidePicker.launch(arrayOf("*/*"))
                     },
                     onClear = { pendingClear = it },
+                    keepPlaybackInBackground = keepPlaybackInBackground,
+                    activePlaybackType = activePlaybackType,
+                    onToggleBackgroundPlayback = {
+                        keepPlaybackInBackground = !keepPlaybackInBackground
+                        context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
+                            .edit().putBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, keepPlaybackInBackground).apply()
+                    },
+                    onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false; activePlaybackType = "local" },
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (wideLayout) {
@@ -913,6 +1039,7 @@ private fun RSTVHome() {
                         modifier = Modifier.fillMaxSize().padding(horizontal = if (isTelevision) 34.dp else 24.dp, vertical = if (isTelevision) 26.dp else 18.dp)
                     ) {
                         TopHeader(
+                            onAdminDoubleTap = { showAdminPin = true; adminPin = ""; adminPinError = false },
                             onImportPlaylist = {
                                 RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
                                 playlistPicker.launch(arrayOf("*/*"))
@@ -926,11 +1053,11 @@ private fun RSTVHome() {
                                 selectedBackground = resourceId
                                 backgroundPrefs.edit().putInt("background_res", resourceId).apply()
                             },
-                            playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
+                            playlistSources = availablePlaylistSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            sourceLibraryChannelCount = sourceLibraryChannels.size,
+                            sourceLibraryChannelCount = sourceLibraryChannels.size + remoteCatalogChannels.size,
                             onAddSourceToLibrary = { playlistPackage ->
                         RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
                         addRemotePlaylistPackageToLibrary(playlistPackage)
@@ -938,7 +1065,7 @@ private fun RSTVHome() {
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
-                                selectedTab == RSTVTab.RAMI -> ramiNetworkChannels
+                                selectedTab == RSTVTab.RAMI -> visibleSourceLibraryChannels
                                 selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                                 else -> visibleChannels
                             },
@@ -980,6 +1107,14 @@ private fun RSTVHome() {
                                 guidePicker.launch(arrayOf("*/*"))
                             },
                             onClear = { pendingClear = it },
+                            keepPlaybackInBackground = keepPlaybackInBackground,
+                            activePlaybackType = activePlaybackType,
+                            onToggleBackgroundPlayback = {
+                                keepPlaybackInBackground = !keepPlaybackInBackground
+                                context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
+                                    .edit().putBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, keepPlaybackInBackground).apply()
+                            },
+                            onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false; activePlaybackType = "local" },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -990,6 +1125,7 @@ private fun RSTVHome() {
                         modifier = Modifier.weight(1f).padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         TopHeader(
+                            onAdminDoubleTap = { showAdminPin = true; adminPin = ""; adminPinError = false },
                             onImportPlaylist = {
                                 RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
                                 playlistPicker.launch(arrayOf("*/*"))
@@ -1003,11 +1139,11 @@ private fun RSTVHome() {
                                 selectedBackground = resourceId
                                 backgroundPrefs.edit().putInt("background_res", resourceId).apply()
                             },
-                            playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
+                            playlistSources = availablePlaylistSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            sourceLibraryChannelCount = sourceLibraryChannels.size,
+                            sourceLibraryChannelCount = sourceLibraryChannels.size + remoteCatalogChannels.size,
                             onAddSourceToLibrary = { playlistPackage ->
                         RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
                         addRemotePlaylistPackageToLibrary(playlistPackage)
@@ -1015,7 +1151,7 @@ private fun RSTVHome() {
                             onShowSourceLibrary = ::showSourceLibrary,
                             channels = when {
                                 selectedTab == RSTVTab.FAVORITES -> favoriteChannels
-                                selectedTab == RSTVTab.RAMI -> ramiNetworkChannels
+                                selectedTab == RSTVTab.RAMI -> visibleSourceLibraryChannels
                                 selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                                 else -> visibleChannels
                             },
@@ -1057,6 +1193,14 @@ private fun RSTVHome() {
                                 guidePicker.launch(arrayOf("*/*"))
                             },
                             onClear = { pendingClear = it },
+                            keepPlaybackInBackground = keepPlaybackInBackground,
+                            activePlaybackType = activePlaybackType,
+                            onToggleBackgroundPlayback = {
+                                keepPlaybackInBackground = !keepPlaybackInBackground
+                                context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
+                                    .edit().putBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, keepPlaybackInBackground).apply()
+                            },
+                            onLocalChannelSelected = { selectedChannel = null; isFullscreenPlayer = false; activePlaybackType = "local" },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -1101,6 +1245,7 @@ private fun BrandMark() {
 
 @Composable
 private fun TopHeader(
+    onAdminDoubleTap: () -> Unit,
     onImportPlaylist: () -> Unit,
     channelCount: Int
 ) {
@@ -1114,7 +1259,7 @@ private fun TopHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("RS TV", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                Text("RS TV", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black, modifier = Modifier.pointerInput(Unit) { detectTapGestures(onDoubleTap = { onAdminDoubleTap() }) })
                 Text("SINJAR TV SHOW", color = MutedText, fontSize = 9.sp, letterSpacing = 2.sp)
             }
             Text(
@@ -1165,15 +1310,19 @@ private fun ScreenBody(
     onPlay: (RSTVChannel) -> Unit,
     onToggleFavorite: (RSTVChannel) -> Unit,
     isFavorite: (RSTVChannel) -> Boolean,
-    player: ExoPlayer,
+    player: MediaController?,
     status: String,
     skippedUnsafeLinks: Int,
     showingSourceLibrary: Boolean,
     onShowUserPlaylist: () -> Unit,
+    onLocalChannelSelected: () -> Unit,
     onNavigate: (RSTVTab) -> Unit,
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
     onClear: (ClearAction) -> Unit,
+    keepPlaybackInBackground: Boolean,
+    onToggleBackgroundPlayback: () -> Unit,
+    activePlaybackType: String,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1187,6 +1336,11 @@ private fun ScreenBody(
             modifier = modifier
         )
         RSTVTab.SOURCES -> OnlineSourcesContent(
+            onAddRamiPackage = {
+                context.getSharedPreferences("rami_tv_live_package", Context.MODE_PRIVATE)
+                    .edit().putBoolean("added", true).apply()
+                onShowSourceLibrary()
+            },
             status = remotePlaylistStatus,
             sourceLibraryStatus = sourceLibraryStatus,
             sourceLibraryCount = sourceLibraryCount,
@@ -1197,6 +1351,7 @@ private fun ScreenBody(
             modifier = modifier
         )
         RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
+        RSTVTab.RAMI_ONE -> RamiTvOneContent(modifier = modifier)
         RSTVTab.LIVE, RSTVTab.RAMI -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
@@ -1213,6 +1368,11 @@ private fun ScreenBody(
             skippedUnsafeLinks = skippedUnsafeLinks,
             showingSourceLibrary = showingSourceLibrary,
             onShowUserPlaylist = onShowUserPlaylist,
+            onLocalChannelSelected = onLocalChannelSelected,
+            activePlaybackType = activePlaybackType,
+            localRamiChannels = LocalRamiChannelStore.readyChannels(context),
+            showLocalRamiPackage = context.getSharedPreferences("rami_tv_live_package", Context.MODE_PRIVATE)
+                .getBoolean("added", false),
             modifier = modifier
         )
         RSTVTab.FAVORITES -> ChannelLibraryContent(
@@ -1237,6 +1397,8 @@ private fun ScreenBody(
             onImportPlaylist = onImportPlaylist,
             onImportGuide = onImportGuide,
             onClear = onClear,
+            keepPlaybackInBackground = keepPlaybackInBackground,
+            onToggleBackgroundPlayback = onToggleBackgroundPlayback,
             modifier = modifier
         )
     }
@@ -1472,8 +1634,110 @@ private fun orderedChannelGroups(channels: List<RSTVChannel>): List<Pair<String,
 }
 
 @Composable
+private fun LocalRamiLiveChannelsContent(
+    channels: List<LocalRamiChannelConfig>,
+    onLocalChannelSelected: () -> Unit,
+    showPlayerSurface: Boolean
+) {
+    val context = LocalContext.current
+    var mediaController by remember { mutableStateOf<MediaController?>(null) }
+    var controllerReady by remember { mutableStateOf(false) }
+    val playbackPreferences = remember(context) { context.getSharedPreferences("rs_tv_playback_state", Context.MODE_PRIVATE) }
+    var activeLocalChannelId by remember {
+        mutableIntStateOf(
+            if (playbackPreferences.getString("active_media_type", null) == "local")
+                playbackPreferences.getInt("active_local_channel_id", -1)
+            else -1
+        )
+    }
+
+    DisposableEffect(context) {
+        val token = SessionToken(
+            context,
+            ComponentName(context, RamiTvOnePlaybackService::class.java)
+        )
+        val future = MediaController.Builder(context, token).buildAsync()
+        future.addListener({
+            mediaController = runCatching { future.get() }.getOrNull()
+            controllerReady = mediaController != null
+        }, MoreExecutors.directExecutor())
+        onDispose {
+            MediaController.releaseFuture(future)
+            mediaController = null
+            controllerReady = false
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = PanelRaised),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("قنوات RAMİ TV المحلية", color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("القنوات المفعّلة التي تحتوي على فيديوهات صالحة فقط. يعمل مشغل واحد بالتناوب بين IPTV والقنوات المحلية.", color = MutedText, fontSize = 10.sp)
+            if (showPlayerSurface && activeLocalChannelId in channels.map { it.id } && controllerReady) {
+                Box(Modifier.fillMaxWidth().height(190.dp).background(Color.Black, RoundedCornerShape(12.dp))) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { viewContext ->
+                            PlayerView(viewContext).apply {
+                                player = mediaController
+                                useController = false
+                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                keepScreenOn = true
+                            }
+                        },
+                        update = { view ->
+                            view.player = mediaController
+                            view.useController = false
+                            view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            view.keepScreenOn = true
+                        },
+                        onRelease = { view -> view.player = null }
+                    )
+                }
+            }
+            channels.forEach { channel ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(channel.name, color = Color(channel.primaryColor), fontWeight = FontWeight.Bold)
+                        Text("${channel.videoUris.size} فيديو", color = MutedText, fontSize = 10.sp)
+                    }
+                    Button(
+                        enabled = controllerReady && channel.videoUris.isNotEmpty(),
+                        onClick = {
+                            onLocalChannelSelected()
+                            if (RamiPlaybackCommands.playLocal(mediaController, channel.id, channel.videoUris)) {
+                                activeLocalChannelId = channel.id
+                                RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                    ) {
+                        Text("تشغيل")
+                    }
+                }
+            }
+            if (!controllerReady) {
+                Text("جارٍ تجهيز مشغل القنوات المحلية…", color = MutedText, fontSize = 10.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun LiveContent(
     channels: List<RSTVChannel>,
+    localRamiChannels: List<LocalRamiChannelConfig>,
+    showLocalRamiPackage: Boolean,
     selectedChannel: RSTVChannel?,
     isFullscreenPlayer: Boolean,
     onExitFullscreen: () -> Unit,
@@ -1483,11 +1747,13 @@ private fun LiveContent(
     onPlay: (RSTVChannel) -> Unit,
     onToggleFavorite: (RSTVChannel) -> Unit,
     isFavorite: (RSTVChannel) -> Boolean,
-    player: ExoPlayer,
+    player: MediaController?,
     status: String,
     skippedUnsafeLinks: Int,
     showingSourceLibrary: Boolean,
     onShowUserPlaylist: () -> Unit,
+    onLocalChannelSelected: () -> Unit,
+    activePlaybackType: String,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1554,6 +1820,15 @@ private fun LiveContent(
                     view.keepScreenOn = true
                 }
             )
+            if (selectedChannel.tvgId?.startsWith("rami-local-") == true) {
+                val localId = selectedChannel.tvgId?.substringAfterLast("-")?.toIntOrNull()
+                localRamiChannels.firstOrNull { it.id == localId }?.let { localConfig ->
+                    LocalRamiBroadcastOverlay(
+                        config = localConfig,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
             if (showChannelInfo && !showChannelTable) {
                 ReceiverChannelInfoOverlay(
                     number = selectedChannelNumber,
@@ -1970,6 +2245,7 @@ private fun FullscreenChannelSelectorDialog(
 
 @Composable
 private fun OnlineSourcesContent(
+    onAddRamiPackage: () -> Unit,
     status: String,
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
@@ -2002,6 +2278,14 @@ private fun OnlineSourcesContent(
             color = MutedText,
             fontSize = 11.sp
         )
+        Button(
+            onClick = onAddRamiPackage,
+            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("إضافة باقة قنوات RAMİ TV إلى قسم البث المباشر", fontWeight = FontWeight.Bold)
+        }
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = PanelRaised),
@@ -2289,6 +2573,8 @@ private fun SettingsContent(
     onImportPlaylist: () -> Unit,
     onImportGuide: () -> Unit,
     onClear: (ClearAction) -> Unit,
+    keepPlaybackInBackground: Boolean,
+    onToggleBackgroundPlayback: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -2298,6 +2584,13 @@ private fun SettingsContent(
         item {
             Text("الإعدادات", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold)
             Text("إدارة مكتبتك المحلية وتجربة التشغيل", color = MutedText, fontSize = 12.sp)
+        }
+        item {
+            SettingsAction(
+                "تشغيل القنوات في الخلفية",
+                if (keepPlaybackInBackground) "مفعّل: يستمر البث عند إغلاق التطبيق من قائمة التطبيقات الأخيرة." else "متوقف: يتوقف البث عند إغلاق التطبيق نهائياً. الانتقال إلى تطبيق آخر لا يوقفه.",
+                onToggleBackgroundPlayback
+            )
         }
         item {
             Text("خلفية التطبيق", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -2408,6 +2701,474 @@ private fun readBoundedDocument(context: Context, uri: Uri): String {
         }
     }
     return output.toByteArray().toString(Charsets.UTF_8)
+}
+
+@Composable
+private fun LocalRamiAdminContent(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val channels = remember(context) {
+        mutableStateListOf<LocalRamiChannelConfig>().apply { addAll(LocalRamiChannelStore.loadAll(context)) }
+    }
+    var selectedId by remember { mutableIntStateOf(1) }
+    val selected = channels.firstOrNull { it.id == selectedId } ?: channels.first()
+    var nameDraft by remember(selected.id, selected.name) { mutableStateOf(selected.name) }
+
+    fun update(config: LocalRamiChannelConfig) {
+        val index = channels.indexOfFirst { it.id == config.id }
+        if (index >= 0) channels[index] = config
+        LocalRamiChannelStore.save(context, config)
+    }
+
+    val logoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            update(selected.copy(logoUri = uri.toString()))
+        }
+    }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { picked ->
+        if (picked.isNotEmpty()) {
+            picked.forEach { uri ->
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            }
+            update(selected.copy(videoUris = (selected.videoUris + picked.map(Uri::toString)).distinct()))
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("لوحة إدارة قنوات RAMİ TV", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                Text("عدد غير محدود من القنوات؛ إعدادات مستقلة لكل قناة", color = MutedText, fontSize = 11.sp)
+            }
+            TextButton(onClick = onClose) { Text("إغلاق", color = AccentRed) }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("اختر القناة", color = Silver, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            val created = LocalRamiChannelStore.createChannel(context)
+                            channels.add(created)
+                            selectedId = created.id
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                    ) { Text("إضافة قناة") }
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 58.dp),
+                    modifier = Modifier.fillMaxWidth().height(142.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    items(channels, key = { it.id }) { channel ->
+                        Button(
+                            onClick = { selectedId = channel.id },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 5.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedId == channel.id) AccentRed else PanelRaised,
+                                contentColor = if (selectedId == channel.id) ScreenBlack else SoftWhite
+                            )
+                        ) { Text(channel.id.toString()) }
+                    }
+                }
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = PanelBlack)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("إعدادات ${selected.name}", color = Silver, fontWeight = FontWeight.Bold)
+                        OutlinedTextField(
+                            value = nameDraft,
+                            onValueChange = { nameDraft = it.take(40) },
+                            label = { Text("اسم القناة") },
+                            placeholder = { Text("اكتب اسم القناة") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = {
+                                val finalName = nameDraft.trim().ifBlank { "RAMİ TV ${selected.id}" }
+                                nameDraft = finalName
+                                update(selected.copy(name = finalName))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                        ) { Text("حفظ الاسم") }
+                        Text("لون الهوية", color = MutedText, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0xFFE3D1A0L, 0xFF36B7A0L, 0xFF4C83D1L, 0xFFB65C65L, 0xFF9A72C7L).forEach { color ->
+                                Button(
+                                    onClick = { update(selected.copy(primaryColor = color)) },
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                    modifier = Modifier.size(34.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(color))
+                                ) { }
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (selected.active) "القناة مفعّلة" else "القناة متوقفة", color = SoftWhite, modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { update(selected.copy(active = !selected.active)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (selected.active) AccentRed else PanelRaised)
+                            ) { Text(if (selected.active) "إيقاف" else "تفعيل") }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("شعار القناة", color = Silver, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = { logoPicker.launch(arrayOf("image/*")) },
+                                colors = ButtonDefaults.buttonColors(containerColor = PanelRaised)
+                            ) { Text(if (selected.logoUri == null) "إضافة لوجو" else "تغيير اللوجو") }
+                        }
+                        selected.logoUri?.let { logo ->
+                            Text("تم حفظ شعار هذه القناة بشكل مستقل.", color = MutedText, fontSize = 10.sp)
+                            TextButton(onClick = { update(selected.copy(logoUri = null)) }) {
+                                Text("إزالة الشعار", color = AccentRed)
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("الساعة على الشاشة", color = SoftWhite, modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { update(selected.copy(clockEnabled = !selected.clockEnabled)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (selected.clockEnabled) AccentRed else PanelRaised)
+                            ) { Text(if (selected.clockEnabled) "مفعّلة" else "إضافة ساعة") }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("الشريط الإخباري", color = SoftWhite, modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { update(selected.copy(tickerEnabled = !selected.tickerEnabled)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (selected.tickerEnabled) AccentRed else PanelRaised)
+                            ) { Text(if (selected.tickerEnabled) "مفعّل" else "إضافة شريط") }
+                        }
+                        OutlinedTextField(
+                            value = selected.tickerText,
+                            onValueChange = { update(selected.copy(tickerText = it.take(240))) },
+                            label = { Text("نص الشريط الإخباري") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 1,
+                            maxLines = 2
+                        )
+                        Text("ملفات الفيديو: ${selected.videoUris.size}", color = Silver, fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = { videoPicker.launch(arrayOf("video/*")) },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                        ) { Text("إضافة فيديوهات") }
+                        if (selected.videoUris.isEmpty()) {
+                            Text("لم تتم إضافة فيديوهات بعد. لا تظهر القناة للمشاهدين قبل إضافة الفيديوهات وتفعيلها.", color = MutedText, fontSize = 11.sp)
+                        } else {
+                            selected.videoUris.forEachIndexed { index, uri ->
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("${index + 1}. ${Uri.parse(uri).lastPathSegment ?: "فيديو محلي"}", color = SoftWhite, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                                    TextButton(enabled = index > 0, onClick = {
+                                        val values = selected.videoUris.toMutableList()
+                                        val item = values.removeAt(index)
+                                        values.add(index - 1, item)
+                                        update(selected.copy(videoUris = values))
+                                    }) { Text("↑") }
+                                    TextButton(enabled = index < selected.videoUris.lastIndex, onClick = {
+                                        val values = selected.videoUris.toMutableList()
+                                        val item = values.removeAt(index)
+                                        values.add(index + 1, item)
+                                        update(selected.copy(videoUris = values))
+                                    }) { Text("↓") }
+                                    TextButton(onClick = {
+                                        update(selected.copy(videoUris = selected.videoUris.filterIndexed { i, _ -> i != index }))
+                                    }) { Text("حذف", color = AccentRed) }
+                                }
+                            }
+                        }
+                        Text("تُحفظ إعدادات الشعار والساعة والشريط لكل قناة على حدة.", color = MutedText, fontSize = 10.sp)
+                    }
+                }
+            }
+            item {
+                Text(
+                    "الحالة: " + when {
+                        selected.videoUris.isEmpty() -> "تحتاج إلى فيديوهات"
+                        !selected.active -> "الفيديوهات محفوظة لكن القناة متوقفة"
+                        else -> "مفعّلة؛ يجري التحقق من صلاحية الملفات عند عرض البث المباشر"
+                    },
+                    color = Silver,
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun LocalRamiBroadcastOverlay(
+    config: LocalRamiChannelConfig,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var currentTime by remember(config.id) { mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())) }
+    LaunchedEffect(config.id, config.clockEnabled) {
+        while (config.clockEnabled) {
+            currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            delay(1_000L)
+        }
+    }
+    val logo = remember(config.logoUri) {
+        config.logoUri?.let { raw ->
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(raw))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+            }.getOrNull()
+        }
+    }
+    Box(modifier = modifier) {
+        if (logo != null) {
+            Image(
+                bitmap = logo,
+                contentDescription = "شعار ${config.name}",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.align(Alignment.TopEnd).padding(22.dp).width(112.dp).height(72.dp)
+            )
+        }
+        if (config.clockEnabled) {
+            Text(
+                currentTime,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopStart).padding(22.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
+            )
+        }
+        if (config.tickerEnabled && config.tickerText.isNotBlank()) {
+            Text(
+                config.tickerText,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .background(Color(0xDD101010)).padding(horizontal = 18.dp, vertical = 9.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RamiTvOneContent(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("rami_tv_one_library", Context.MODE_PRIVATE)
+    }
+    val videoUris = remember(context) {
+        mutableStateListOf<String>().apply {
+            val ordered = preferences.getString("video_uris_ordered", null)
+            if (ordered != null) {
+                runCatching {
+                    val saved = org.json.JSONArray(ordered)
+                    for (index in 0 until saved.length()) add(saved.getString(index))
+                }
+            } else {
+                addAll(preferences.getStringSet("video_uris", emptySet()).orEmpty().sorted())
+            }
+        }
+    }
+    var isWatching by remember {
+        mutableStateOf(preferences.getBoolean("channel_active", false))
+    }
+    var mediaController by remember { mutableStateOf<MediaController?>(null) }
+
+    fun saveVideoUris() {
+        preferences.edit()
+            .putString("video_uris_ordered", org.json.JSONArray(videoUris.toList()).toString())
+            .putStringSet("video_uris", videoUris.toSet())
+            .apply()
+    }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { selectedUris ->
+        selectedUris.forEach { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            val value = uri.toString()
+            if (value !in videoUris) videoUris.add(value)
+        }
+        saveVideoUris()
+    }
+
+    DisposableEffect(context) {
+        val token = SessionToken(
+            context,
+            ComponentName(context, RamiTvOnePlaybackService::class.java)
+        )
+        val controllerFuture = MediaController.Builder(context, token).buildAsync()
+        controllerFuture.addListener(
+            {
+                mediaController = runCatching { controllerFuture.get() }.getOrNull()
+            },
+            MoreExecutors.directExecutor()
+        )
+        onDispose {
+            MediaController.releaseFuture(controllerFuture)
+            mediaController = null
+        }
+    }
+
+    BackHandler(enabled = isWatching) {
+        // Leaving the viewer must not stop the channel service.
+        isWatching = false
+    }
+
+    if (isWatching) {
+        Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { viewContext ->
+                    PlayerView(viewContext).apply {
+                        player = mediaController
+                        useController = false
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        keepScreenOn = true
+                    }
+                },
+                update = { view ->
+                    view.player = mediaController
+                    view.useController = false
+                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    view.keepScreenOn = true
+                }
+            )
+            Text(
+                text = "RAMİ TV 1",
+                color = Color(0xFFE3D1A0),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(22.dp)
+                    .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            )
+        }
+    } else {
+        Column(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("RAMİ TV 1", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+            Text(
+                "قائمة فيديوهات محلية مستقلة. ستعمل بالتتابع وتُعاد تلقائياً من البداية، حتى عند مغادرة شاشة القناة.",
+                color = MutedText,
+                fontSize = 13.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { videoPicker.launch(arrayOf("video/*")) },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                ) {
+                    Text("إضافة فيديوهات")
+                }
+                Button(
+                    onClick = {
+                        if (videoUris.isNotEmpty() && mediaController != null) {
+                            if (RamiPlaybackCommands.playLocal(mediaController, 1, videoUris.toList())) {
+                                preferences.edit().putBoolean("channel_active", true).apply()
+                                isWatching = true
+                            }
+                        }
+                    },
+                    enabled = videoUris.isNotEmpty() && mediaController != null,
+                    colors = ButtonDefaults.buttonColors(containerColor = PanelRaised, contentColor = SoftWhite)
+                ) {
+                    Text("تشغيل القناة")
+                }
+                if (preferences.getBoolean("channel_active", false)) {
+                    Button(
+                        onClick = {
+                            mediaController?.stop()
+                            mediaController?.clearMediaItems()
+                            preferences.edit().putBoolean("channel_active", false).apply()
+                            isWatching = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PanelBlack, contentColor = AccentRed)
+                    ) {
+                        Text("إيقاف القناة")
+                    }
+                }
+            }
+            Text("عدد الفيديوهات: ${videoUris.size}", color = Silver, fontSize = 13.sp)
+            if (videoUris.isEmpty()) {
+                EmptyState(
+                    title = "القناة جاهزة لإضافة الفيديوهات",
+                    description = "اختر فيديو واحداً أو عدة فيديوهات من ملفات جهازك للبدء."
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(videoUris.toList(), key = { it }) { uriString ->
+                        val uri = Uri.parse(uriString)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    uri.lastPathSegment?.substringAfterLast('/') ?: "فيديو محلي",
+                                    color = SoftWhite,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2
+                                )
+                                TextButton(onClick = {
+                                    videoUris.remove(uriString)
+                                    saveVideoUris()
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(
+                                            uri,
+                                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                        )
+                                    }
+                                }) {
+                                    Text("إزالة", color = AccentRed)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

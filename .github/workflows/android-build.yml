@@ -3,7 +3,7 @@ name: RS TV Android Build
 
 on:
   push:
-    branches: [main, feature/royal-ui-sounds-integration]
+    branches: [main, feature/royal-ui-sounds-integration, experiment/channel-position-resume]
     paths:
       - "app/**"
       - "royal-ui-sounds/**"
@@ -79,7 +79,8 @@ jobs:
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 
       - name: Verify required release-signing secrets
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        id: signing
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/experiment/channel-position-resume') && github.event_name != 'pull_request'
         env:
           RS_TV_KEYSTORE_BASE64: ${{ secrets.RS_TV_KEYSTORE_BASE64 }}
           RS_TV_KEYSTORE_PASSWORD: ${{ secrets.RS_TV_KEYSTORE_PASSWORD }}
@@ -88,15 +89,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          missing=0
           for name in RS_TV_KEYSTORE_BASE64 RS_TV_KEYSTORE_PASSWORD RS_TV_KEY_ALIAS RS_TV_KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::Missing required GitHub Actions secret: $name"
-              exit 1
+              echo "::warning::Missing optional experimental signing secret: $name"
+              missing=1
             fi
           done
+          if [ "$missing" -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+              echo "::error::Release signing secrets are required on main."
+              exit 1
+            fi
+          fi
 
       - name: Decode SINJAR TV release keystore
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: steps.signing.outputs.available == 'true'
         env:
           RS_TV_KEYSTORE_BASE64: ${{ secrets.RS_TV_KEYSTORE_BASE64 }}
         shell: bash
@@ -107,7 +118,7 @@ jobs:
           echo "RS_TV_KEYSTORE_FILE=$RUNNER_TEMP/rs-tv-release.jks" >> "$GITHUB_ENV"
 
       - name: Build signed release APK
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: steps.signing.outputs.available == 'true'
         env:
           RS_TV_KEYSTORE_PASSWORD: ${{ secrets.RS_TV_KEYSTORE_PASSWORD }}
           RS_TV_KEY_ALIAS: ${{ secrets.RS_TV_KEY_ALIAS }}
@@ -115,7 +126,7 @@ jobs:
         run: gradle --no-daemon :app:assembleRelease
 
       - name: Verify signed release APK
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: steps.signing.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -152,7 +163,7 @@ jobs:
           retention-days: 14
 
       - name: Upload SINJAR TV Signed Release APK for testing
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        if: steps.signing.outputs.available == 'true'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -160,6 +171,22 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish signed experimental SINJAR TV APK as a draft GitHub Release
+        if: github.ref == 'refs/heads/experiment/channel-position-resume' && steps.signing.outputs.available == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: sinjar-tv-experiment-${{ github.run_number }}
+          name: "SINJAR TV Experimental Test Build ${{ github.run_number }}"
+          target_commitish: ${{ github.sha }}
+          draft: true
+          prerelease: true
+          overwrite_files: true
+          body: |
+            Signed experimental SINJAR TV build for owner testing.
+            This is not a production release.
+            Source commit: ${{ github.sha }}
+          files: app/build/outputs/apk/release/app-release.apk
 
   publish-draft:
     if: >-
