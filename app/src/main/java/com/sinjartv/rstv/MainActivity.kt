@@ -575,6 +575,9 @@ private fun RSTVHome() {
                 sourceLibraryCount = latestSources.size
                 libraryRevision++
             }
+            if (channels.isEmpty() && (sourceLibraryChannels.isNotEmpty() || remoteCatalogChannels.isNotEmpty())) {
+                showingSourceLibrary = true
+            }
             sourceLibraryStatus = buildString {
                 append("مصادر محفوظة: $sourceLibraryCount • قنوات القوائم: ${sourceLibraryChannels.size}")
                 append(" • قنوات الكتالوج المركزي: ${remoteCatalogChannels.size}")
