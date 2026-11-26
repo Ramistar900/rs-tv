@@ -310,6 +310,15 @@ private fun RSTVHome() {
     var sourceLibraryCount by remember { mutableIntStateOf(0) }
     var showingSourceLibrary by remember { mutableStateOf(false) }
     var countryPackageSources by remember { mutableStateOf(RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()) }
+    var remoteCatalogSources by remember { mutableStateOf<List<RemoteCatalogSourceDefinition>>(emptyList()) }
+    var remoteCatalogChannels by remember { mutableStateOf<List<RSTVChannel>>(emptyList()) }
+    var remoteCatalogRevision by remember { mutableIntStateOf(0) }
+    val availablePlaylistSources = remember(countryPackageSources, remoteCatalogSources) {
+        val byId = linkedMapOf<String, RemotePlaylistSource>()
+        (RemotePlaylistSources.playlists + countryPackageSources + remoteCatalogSources.map { it.source })
+            .forEach { byId[it.id] = it }
+        byId.values.toList()
+    }
     var remotePlaylistStatus by remember { mutableStateOf("اختر قائمة من المصادر لتنزيل قنواتها إلى التطبيق.") }
     val programmes = remember { mutableStateListOf<GuideProgramme>() }
     var selectedChannel by remember { mutableStateOf<RSTVChannel?>(null) }
@@ -326,9 +335,9 @@ private fun RSTVHome() {
     var historyRevision by remember { mutableIntStateOf(0) }
     var derivedCollections by remember { mutableStateOf(DerivedChannelCollections()) }
     var favoriteUrls by remember { mutableStateOf<Set<String>>(emptySet()) }
-    LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery) {
+    LaunchedEffect(libraryRevision, favouriteRevision, historyRevision, searchQuery, remoteCatalogRevision) {
         val userSnapshot = channels.toList()
-        val sourceSnapshot = sourceLibraryChannels.toList()
+        val sourceSnapshot = (sourceLibraryChannels.toList() + remoteCatalogChannels).distinctBy { RemotePlaylistMerger.canonicalStreamKey(it.streamUrl, it.httpHeaders) }
         val (favoriteSnapshot, historySnapshot) = withContext(Dispatchers.IO) {
             LocalLibraryStore.favoriteStreams(context) to LocalLibraryStore.history(context)
         }
@@ -501,6 +510,84 @@ private fun RSTVHome() {
             countryPackageSources = RemotePlaylistSources.countryPackages(countryCodes) + RemotePlaylistSources.douboCountryPackages()
         }.onFailure {
             countryPackageSources = RemotePlaylistSources.countryPackages(emptyList()) + RemotePlaylistSources.douboCountryPackages()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val syncPreferences = context.getSharedPreferences("rs_tv_remote_iptv_sync", Context.MODE_PRIVATE)
+
+        suspend fun refreshCatalogAndSavedSources() {
+            val catalog = withContext(Dispatchers.IO) { RemoteIptvCatalog.loadOrCached(context) }
+            remoteCatalogSources = catalog.sources
+            remoteCatalogChannels = catalog.channels.filterNot(AdultContentPolicy::isAdult)
+            remoteCatalogRevision++
+
+            val savedSources = withContext(Dispatchers.IO) { LocalLibraryStore.loadRemoteSources(context) }
+            val definitions = (RemotePlaylistSources.playlists + countryPackageSources + catalog.sources.map { it.source })
+                .associateBy { it.id }
+            val catalogDefinitions = catalog.sources.associateBy { it.source.id }
+            val candidates = linkedMapOf<String, Pair<RemotePlaylistSource, Int>>()
+
+            savedSources.forEach { saved ->
+                definitions[saved.id]?.let { source ->
+                    candidates[source.id] = source to (catalogDefinitions[source.id]?.refreshIntervalMinutes ?: 360)
+                }
+            }
+            catalog.sources.filter { it.autoSync }.forEach { definition ->
+                candidates[definition.source.id] = definition.source to definition.refreshIntervalMinutes
+            }
+
+            val now = System.currentTimeMillis()
+            var refreshedCount = 0
+            var failedCount = 0
+            candidates.values.forEach { (source, intervalMinutes) ->
+                val lastRefresh = syncPreferences.getLong("last_refresh_${source.id}", 0L)
+                if (now - lastRefresh < intervalMinutes * 60_000L) return@forEach
+                runCatching {
+                    val content = withContext(Dispatchers.IO) { RemotePlaylistDownloader.download(source) }
+                    val parsed = withContext(Dispatchers.Default) { M3uPlaylistParser.parse(content) }
+                    require(parsed.isValidPlaylist && parsed.channels.isNotEmpty()) {
+                        "لم يُرجع المصدر قائمة قنوات صالحة"
+                    }
+                    val snapshot = RemoteSourceSnapshot(
+                        id = source.id,
+                        name = source.name,
+                        provider = source.provider,
+                        attribution = source.attribution,
+                        content = content
+                    )
+                    withContext(Dispatchers.IO) { LocalLibraryStore.saveRemoteSource(context, snapshot) }
+                    syncPreferences.edit().putLong("last_refresh_${source.id}", now).apply()
+                }.onSuccess {
+                    refreshedCount++
+                }.onFailure {
+                    failedCount++
+                }
+            }
+
+            if (refreshedCount > 0 || savedSources.isEmpty()) {
+                val latestSources = withContext(Dispatchers.IO) { LocalLibraryStore.loadRemoteSources(context) }
+                val merged = withContext(Dispatchers.Default) { RemotePlaylistMerger.merge(latestSources) }
+                sourceLibraryChannels.clear()
+                sourceLibraryChannels.addAll(merged)
+                sourceLibraryCount = latestSources.size
+                libraryRevision++
+            }
+            sourceLibraryStatus = buildString {
+                append("مصادر محفوظة: $sourceLibraryCount • قنوات القوائم: ${sourceLibraryChannels.size}")
+                append(" • قنوات الكتالوج المركزي: ${remoteCatalogChannels.size}")
+                if (refreshedCount > 0) append(" • تم تحديث $refreshedCount مصدر")
+                if (failedCount > 0) append(" • تعذّر تحديث $failedCount مصدر")
+            }
+        }
+
+        runCatching { refreshCatalogAndSavedSources() }
+            .onFailure { remotePlaylistStatus = "تعذر تحديث الكتالوج المركزي: ${it.message ?: "خطأ اتصال"}" }
+        while (true) {
+            val interval = remoteCatalogSources.firstOrNull()?.let { 15 } ?: 15
+            delay(interval * 60_000L)
+            runCatching { refreshCatalogAndSavedSources() }
+                .onFailure { remotePlaylistStatus = "تعذر تحديث الكتالوج المركزي: ${it.message ?: "خطأ اتصال"}" }
         }
     }
 
@@ -887,11 +974,11 @@ private fun RSTVHome() {
                         selectedBackground = resourceId
                         backgroundPrefs.edit().putInt("background_res", resourceId).apply()
                     },
-                    playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
+                    playlistSources = availablePlaylistSources,
                     remotePlaylistStatus = remotePlaylistStatus,
                     sourceLibraryStatus = sourceLibraryStatus,
                     sourceLibraryCount = sourceLibraryCount,
-                    sourceLibraryChannelCount = sourceLibraryChannels.size,
+                    sourceLibraryChannelCount = sourceLibraryChannels.size + remoteCatalogChannels.size,
                     onAddSourceToLibrary = { playlistPackage ->
                         RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
                         addRemotePlaylistPackageToLibrary(playlistPackage)
@@ -1008,11 +1095,11 @@ private fun RSTVHome() {
                                 selectedBackground = resourceId
                                 backgroundPrefs.edit().putInt("background_res", resourceId).apply()
                             },
-                            playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
+                            playlistSources = availablePlaylistSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            sourceLibraryChannelCount = sourceLibraryChannels.size,
+                            sourceLibraryChannelCount = sourceLibraryChannels.size + remoteCatalogChannels.size,
                             onAddSourceToLibrary = { playlistPackage ->
                         RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
                         addRemotePlaylistPackageToLibrary(playlistPackage)
@@ -1094,11 +1181,11 @@ private fun RSTVHome() {
                                 selectedBackground = resourceId
                                 backgroundPrefs.edit().putInt("background_res", resourceId).apply()
                             },
-                            playlistSources = RemotePlaylistSources.playlists + countryPackageSources,
+                            playlistSources = availablePlaylistSources,
                             remotePlaylistStatus = remotePlaylistStatus,
                             sourceLibraryStatus = sourceLibraryStatus,
                             sourceLibraryCount = sourceLibraryCount,
-                            sourceLibraryChannelCount = sourceLibraryChannels.size,
+                            sourceLibraryChannelCount = sourceLibraryChannels.size + remoteCatalogChannels.size,
                             onAddSourceToLibrary = { playlistPackage ->
                         RoyalUiSounds.play(context, RoyalUiSound.ACTION_DOWNLOAD)
                         addRemotePlaylistPackageToLibrary(playlistPackage)
