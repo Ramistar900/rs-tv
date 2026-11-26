@@ -6,6 +6,7 @@ import com.sinjartv.rstv.royalsounds.RoyalUiSounds
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.ComponentName
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
