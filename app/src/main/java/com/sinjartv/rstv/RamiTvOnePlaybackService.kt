@@ -52,7 +52,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
                         .add(RamiPlaybackCommands.PLAY_IPTV)
                         .add(RamiPlaybackCommands.PLAY_LOCAL)
                         .build()
-                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(commands)
                         .build()
                 }
