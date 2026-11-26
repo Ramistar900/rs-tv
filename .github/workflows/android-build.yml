@@ -3,7 +3,7 @@ name: RS TV Android Build
 
 on:
   push:
-    branches: [main, feature/royal-ui-sounds-integration]
+    branches: [main, feature/royal-ui-sounds-integration, experiment/channel-position-resume]
     paths:
       - "app/**"
       - "royal-ui-sounds/**"
