@@ -19,6 +19,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -103,6 +105,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -366,6 +369,14 @@ private fun RSTVHome() {
     }
 
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
+    var showAdminPin by remember { mutableStateOf(false) }
+    var adminPin by remember { mutableStateOf("") }
+    var adminPinError by remember { mutableStateOf(false) }
+    var showLocalRamiAdmin by remember { mutableStateOf(false) }
+    var showAdminPin by remember { mutableStateOf(false) }
+    var adminPin by remember { mutableStateOf("") }
+    var adminPinError by remember { mutableStateOf(false) }
+    var showLocalRamiAdmin by remember { mutableStateOf(false) }
     var isFullscreenPlayer by remember { mutableStateOf(false) }
     val player = remember(context) { ExoPlayer.Builder(context).build() }
     val exoPlayer = player
@@ -723,6 +734,51 @@ private fun RSTVHome() {
     val visibleChannels = derivedCollections.visibleChannels
     val visibleSourceLibraryChannels = derivedCollections.visibleSourceLibraryChannels
 
+    if (showAdminPin) {
+        AlertDialog(
+            onDismissRequest = { showAdminPin = false; adminPin = "" },
+            title = { Text("دخول الإدارة", color = SoftWhite) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("أدخل رمز الإدارة لفتح إعدادات قنوات RAMİ TV.", color = MutedText)
+                    OutlinedTextField(
+                        value = adminPin,
+                        onValueChange = { value -> adminPin = value.filter(Char::isDigit).take(6); adminPinError = false },
+                        label = { Text("رمز PIN") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+                    )
+                    if (adminPinError) Text("رمز PIN غير صحيح", color = AccentRed)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (adminPin == "247569") {
+                        showAdminPin = false
+                        showLocalRamiAdmin = true
+                        adminPin = ""
+                    } else adminPinError = true
+                }) { Text("دخول", color = AccentRed) }
+            },
+            dismissButton = { TextButton(onClick = { showAdminPin = false; adminPin = "" }) { Text("إلغاء") } },
+            containerColor = PanelRaised,
+            titleContentColor = SoftWhite,
+            textContentColor = MutedText
+        )
+    }
+
+    if (showLocalRamiAdmin) {
+        Dialog(
+            onDismissRequest = { showLocalRamiAdmin = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = ScreenBlack) {
+                LocalRamiAdminContent(onClose = { showLocalRamiAdmin = false })
+            }
+        }
+    }
+
     pendingClear?.let { action ->
         AlertDialog(
             onDismissRequest = { pendingClear = null },
@@ -918,6 +974,7 @@ private fun RSTVHome() {
                         modifier = Modifier.fillMaxSize().padding(horizontal = if (isTelevision) 34.dp else 24.dp, vertical = if (isTelevision) 26.dp else 18.dp)
                     ) {
                         TopHeader(
+                            onAdminDoubleTap = { showAdminPin = true; adminPin = ""; adminPinError = false },
                             onImportPlaylist = {
                                 RoyalUiSounds.play(context, RoyalUiSound.ACTION_ADD)
                                 playlistPicker.launch(arrayOf("*/*"))
@@ -1106,6 +1163,7 @@ private fun BrandMark() {
 
 @Composable
 private fun TopHeader(
+    onAdminDoubleTap: () -> Unit,
     onImportPlaylist: () -> Unit,
     channelCount: Int
 ) {
@@ -1119,7 +1177,7 @@ private fun TopHeader(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("RS TV", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                Text("RS TV", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black, modifier = Modifier.pointerInput(Unit) { detectTapGestures(onDoubleTap = { onAdminDoubleTap() }) })
                 Text("SINJAR TV SHOW", color = MutedText, fontSize = 9.sp, letterSpacing = 2.sp)
             }
             Text(
@@ -2414,6 +2472,143 @@ private fun readBoundedDocument(context: Context, uri: Uri): String {
         }
     }
     return output.toByteArray().toString(Charsets.UTF_8)
+}
+
+@Composable
+private fun LocalRamiAdminContent(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val channels = remember(context) {
+        mutableStateListOf<LocalRamiChannelConfig>().apply { addAll(LocalRamiChannelStore.loadAll(context)) }
+    }
+    var selectedId by remember { mutableIntStateOf(1) }
+    val selected = channels.first { it.id == selectedId }
+
+    fun update(config: LocalRamiChannelConfig) {
+        val index = channels.indexOfFirst { it.id == config.id }
+        if (index >= 0) channels[index] = config
+        LocalRamiChannelStore.save(context, config)
+    }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { picked ->
+        if (picked.isNotEmpty()) {
+            picked.forEach { uri ->
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+            }
+            update(selected.copy(videoUris = (selected.videoUris + picked.map(Uri::toString)).distinct()))
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("لوحة إدارة قنوات RAMİ TV", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Black)
+                Text("إدارة مستقلة لما يصل إلى 10 قنوات محلية", color = MutedText, fontSize = 11.sp)
+            }
+            TextButton(onClick = onClose) { Text("إغلاق", color = AccentRed) }
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            item {
+                Text("اختر القناة", color = Silver, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    (1..10).forEach { id ->
+                        Button(
+                            onClick = { selectedId = id },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 5.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedId == id) AccentRed else PanelRaised,
+                                contentColor = if (selectedId == id) ScreenBlack else SoftWhite
+                            )
+                        ) { Text(id.toString()) }
+                    }
+                }
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = PanelBlack)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("إعدادات \${selected.name}", color = Silver, fontWeight = FontWeight.Bold)
+                        OutlinedTextField(
+                            value = selected.name,
+                            onValueChange = { update(selected.copy(name = it.take(40))) },
+                            label = { Text("اسم القناة") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("لون الهوية", color = MutedText, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0xFFE3D1A0L, 0xFF36B7A0L, 0xFF4C83D1L, 0xFFB65C65L, 0xFF9A72C7L).forEach { color ->
+                                Button(
+                                    onClick = { update(selected.copy(primaryColor = color)) },
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                    modifier = Modifier.size(34.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(color))
+                                ) { }
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (selected.active) "القناة مفعّلة" else "القناة متوقفة", color = SoftWhite, modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { update(selected.copy(active = !selected.active)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (selected.active) AccentRed else PanelRaised)
+                            ) { Text(if (selected.active) "إيقاف" else "تفعيل") }
+                        }
+                        Text("ملفات الفيديو: \${selected.videoUris.size}", color = Silver, fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = { videoPicker.launch(arrayOf("video/*")) },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                        ) { Text("إضافة فيديوهات") }
+                        if (selected.videoUris.isEmpty()) {
+                            Text("لم تتم إضافة فيديوهات بعد. لا تظهر القناة للمشاهدين قبل إضافة الفيديوهات وتفعيلها.", color = MutedText, fontSize = 11.sp)
+                        } else {
+                            selected.videoUris.forEachIndexed { index, uri ->
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("\${index + 1}. \${Uri.parse(uri).lastPathSegment ?: "فيديو محلي"}", color = SoftWhite, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                                    TextButton(enabled = index > 0, onClick = {
+                                        val values = selected.videoUris.toMutableList()
+                                        val item = values.removeAt(index)
+                                        values.add(index - 1, item)
+                                        update(selected.copy(videoUris = values))
+                                    }) { Text("↑") }
+                                    TextButton(enabled = index < selected.videoUris.lastIndex, onClick = {
+                                        val values = selected.videoUris.toMutableList()
+                                        val item = values.removeAt(index)
+                                        values.add(index + 1, item)
+                                        update(selected.copy(videoUris = values))
+                                    }) { Text("↓") }
+                                    TextButton(onClick = {
+                                        update(selected.copy(videoUris = selected.videoUris.filterIndexed { i, _ -> i != index }))
+                                    }) { Text("حذف", color = AccentRed) }
+                                }
+                            }
+                        }
+                        Text("الشعار والخلفية: سيُضاف اختيار الصور بعد استلام ملفات الهوية الرسمية. المعروض حالياً عنصر مؤقت.", color = MutedText, fontSize = 10.sp)
+                    }
+                }
+            }
+            item {
+                Text(
+                    "الحالة: " + when {
+                        selected.videoUris.isEmpty() -> "تحتاج إلى فيديوهات"
+                        !selected.active -> "الفيديوهات محفوظة لكن القناة متوقفة"
+                        else -> "مفعّلة؛ يجري التحقق من صلاحية الملفات عند عرض البث المباشر"
+                    },
+                    color = Silver,
+                    fontSize = 11.sp
+                )
+            }
+        }
+    }
 }
 
 @Composable
