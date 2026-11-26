@@ -1,10 +1,12 @@
 package com.sinjartv.rstv
 
 import android.os.Bundle
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionCommand
 
 /** Commands that keep IPTV and local RAMİ TV playback on one service-owned player. */
+@OptIn(UnstableApi::class)
 internal object RamiPlaybackCommands {
     private const val ACTION_PLAY_IPTV = "com.sinjartv.rstv.action.PLAY_IPTV"
     private const val ACTION_PLAY_LOCAL = "com.sinjartv.rstv.action.PLAY_LOCAL"
