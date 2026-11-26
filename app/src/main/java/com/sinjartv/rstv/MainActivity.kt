@@ -1063,6 +1063,7 @@ private fun RSTVHome() {
                             },
                             onClear = { pendingClear = it },
                             keepPlaybackInBackground = keepPlaybackInBackground,
+                            activePlaybackType = activePlaybackType,
                             onToggleBackgroundPlayback = {
                                 keepPlaybackInBackground = !keepPlaybackInBackground
                                 context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
@@ -1148,6 +1149,7 @@ private fun RSTVHome() {
                             },
                             onClear = { pendingClear = it },
                             keepPlaybackInBackground = keepPlaybackInBackground,
+                            activePlaybackType = activePlaybackType,
                             onToggleBackgroundPlayback = {
                                 keepPlaybackInBackground = !keepPlaybackInBackground
                                 context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
