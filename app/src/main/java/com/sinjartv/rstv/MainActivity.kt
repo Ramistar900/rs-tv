@@ -141,6 +141,7 @@ private enum class RSTVTab(
     HOME("الرئيسية", Icons.Outlined.Home),
     LIVE("البث المباشر", Icons.Outlined.Tv),
     RAMI("RAMİ TV", Icons.Outlined.Tv),
+    RAMI_ONE("RAMİ TV 1", Icons.Outlined.Tv),
     SOURCES("مصادر IPTV", Icons.Outlined.CloudDownload),
     MOVIES("أفلام ومسلسلات", Icons.Outlined.VideoLibrary),
     FAVORITES("المفضلة", Icons.Outlined.Favorite),
@@ -149,7 +150,7 @@ private enum class RSTVTab(
 }
 
 private val primaryNavigationTabs = listOf(
-    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.RAMI, RSTVTab.FAVORITES, RSTVTab.SOURCES
+    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.RAMI, RSTVTab.RAMI_ONE, RSTVTab.FAVORITES, RSTVTab.SOURCES
 )
 
 private enum class ClearAction(val title: String, val message: String) {
@@ -1197,6 +1198,7 @@ private fun ScreenBody(
             modifier = modifier
         )
         RSTVTab.MOVIES -> MoviesLibraryContent(modifier = modifier)
+        RSTVTab.RAMI_ONE -> RamiTvOneContent(modifier = modifier)
         RSTVTab.LIVE, RSTVTab.RAMI -> LiveContent(
             channels = channels,
             selectedChannel = selectedChannel,
@@ -2408,6 +2410,169 @@ private fun readBoundedDocument(context: Context, uri: Uri): String {
         }
     }
     return output.toByteArray().toString(Charsets.UTF_8)
+}
+
+@Composable
+private fun RamiTvOneContent(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val preferences = remember(context) {
+        context.getSharedPreferences("rami_tv_one_library", Context.MODE_PRIVATE)
+    }
+    val videoUris = remember(context) {
+        mutableStateListOf<String>().apply {
+            addAll(preferences.getStringSet("video_uris", emptySet()).orEmpty())
+        }
+    }
+    var isWatching by remember { mutableStateOf(false) }
+    val player = remember(context) { ExoPlayer.Builder(context).build() }
+
+    fun saveVideoUris() {
+        preferences.edit().putStringSet("video_uris", videoUris.toSet()).apply()
+    }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { selectedUris ->
+        selectedUris.forEach { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            val value = uri.toString()
+            if (value !in videoUris) videoUris.add(value)
+        }
+        saveVideoUris()
+    }
+
+    DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+
+    LaunchedEffect(isWatching, videoUris.size) {
+        if (isWatching && videoUris.isNotEmpty()) {
+            player.setMediaItems(videoUris.map { MediaItem.fromUri(Uri.parse(it)) })
+            player.repeatMode = Player.REPEAT_MODE_ALL
+            player.prepare()
+            player.playWhenReady = true
+        } else {
+            player.playWhenReady = false
+            player.stop()
+            player.clearMediaItems()
+        }
+    }
+
+    BackHandler(enabled = isWatching) {
+        isWatching = false
+    }
+
+    if (isWatching) {
+        Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { viewContext ->
+                    PlayerView(viewContext).apply {
+                        this.player = player
+                        useController = false
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        keepScreenOn = true
+                    }
+                },
+                update = { view ->
+                    view.player = player
+                    view.useController = false
+                    view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    view.keepScreenOn = true
+                }
+            )
+            Text(
+                text = "RAMİ TV 1",
+                color = Color(0xFFE3D1A0),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(22.dp)
+                    .background(Color.Black.copy(alpha = 0.42f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            )
+        }
+    } else {
+        Column(
+            modifier = modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("RAMİ TV 1", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
+            Text(
+                "قائمة فيديوهات محلية مستقلة. ستعمل بالتتابع وتُعاد تلقائياً من البداية.",
+                color = MutedText,
+                fontSize = 13.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { videoPicker.launch(arrayOf("video/*")) },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                ) {
+                    Text("إضافة فيديوهات")
+                }
+                Button(
+                    onClick = { if (videoUris.isNotEmpty()) isWatching = true },
+                    enabled = videoUris.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PanelRaised, contentColor = SoftWhite)
+                ) {
+                    Text("مشاهدة القناة")
+                }
+            }
+            Text("عدد الفيديوهات: ${videoUris.size}", color = Silver, fontSize = 13.sp)
+            if (videoUris.isEmpty()) {
+                EmptyState(
+                    title = "القناة جاهزة لإضافة الفيديوهات",
+                    description = "اختر فيديو واحداً أو عدة فيديوهات من ملفات جهازك للبدء."
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(videoUris.toList(), key = { it }) { uriString ->
+                        val uri = Uri.parse(uriString)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = PanelBlack),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    uri.lastPathSegment?.substringAfterLast('/') ?: "فيديو محلي",
+                                    color = SoftWhite,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2
+                                )
+                                TextButton(onClick = {
+                                    videoUris.remove(uriString)
+                                    saveVideoUris()
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(
+                                            uri,
+                                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                        )
+                                    }
+                                }) {
+                                    Text("إزالة", color = AccentRed)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
