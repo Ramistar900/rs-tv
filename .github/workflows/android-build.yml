@@ -86,7 +86,6 @@ jobs:
           RS_TV_KEYSTORE_PASSWORD: ${{ secrets.RS_TV_KEYSTORE_PASSWORD }}
           RS_TV_KEY_ALIAS: ${{ secrets.RS_TV_KEY_ALIAS }}
           RS_TV_KEY_PASSWORD: ${{ secrets.RS_TV_KEY_PASSWORD }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
@@ -101,7 +100,7 @@ jobs:
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            if [ "$GITHUB_REF_NAME" = "main" ]; then
+            if [ "$GITHUB_REF" = "refs/heads/main" ]; then
               echo "::error::Release signing secrets are required on main."
               exit 1
             fi
