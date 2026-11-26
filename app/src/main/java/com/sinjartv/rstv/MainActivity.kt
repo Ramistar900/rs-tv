@@ -6,6 +6,8 @@ import com.sinjartv.rstv.royalsounds.RoyalUiSounds
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.ComponentName
+import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
@@ -103,6 +105,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
@@ -112,8 +115,11 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.google.common.util.concurrent.MoreExecutors
 import com.sinjartv.rstv.StreamPlaybackDiagnostic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2423,8 +2429,10 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
             addAll(preferences.getStringSet("video_uris", emptySet()).orEmpty())
         }
     }
-    var isWatching by remember { mutableStateOf(false) }
-    val player = remember(context) { ExoPlayer.Builder(context).build() }
+    var isWatching by remember {
+        mutableStateOf(preferences.getBoolean("channel_active", false))
+    }
+    var mediaController by remember { mutableStateOf<MediaController?>(null) }
 
     fun saveVideoUris() {
         preferences.edit().putStringSet("video_uris", videoUris.toSet()).apply()
@@ -2446,24 +2454,26 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
         saveVideoUris()
     }
 
-    DisposableEffect(player) {
-        onDispose { player.release() }
-    }
-
-    LaunchedEffect(isWatching, videoUris.size) {
-        if (isWatching && videoUris.isNotEmpty()) {
-            player.setMediaItems(videoUris.map { MediaItem.fromUri(Uri.parse(it)) })
-            player.repeatMode = Player.REPEAT_MODE_ALL
-            player.prepare()
-            player.playWhenReady = true
-        } else {
-            player.playWhenReady = false
-            player.stop()
-            player.clearMediaItems()
+    DisposableEffect(context) {
+        val token = SessionToken(
+            context,
+            ComponentName(context, RamiTvOnePlaybackService::class.java)
+        )
+        val controllerFuture = MediaController.Builder(context, token).buildAsync()
+        controllerFuture.addListener(
+            {
+                mediaController = runCatching { controllerFuture.get() }.getOrNull()
+            },
+            MoreExecutors.directExecutor()
+        )
+        onDispose {
+            MediaController.releaseFuture(controllerFuture)
+            mediaController = null
         }
     }
 
     BackHandler(enabled = isWatching) {
+        // Leaving the viewer must not stop the channel service.
         isWatching = false
     }
 
@@ -2473,7 +2483,7 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize(),
                 factory = { viewContext ->
                     PlayerView(viewContext).apply {
-                        this.player = player
+                        player = mediaController
                         useController = false
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                         setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
@@ -2481,7 +2491,7 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
                     }
                 },
                 update = { view ->
-                    view.player = player
+                    view.player = mediaController
                     view.useController = false
                     view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     view.keepScreenOn = true
@@ -2506,7 +2516,7 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
         ) {
             Text("RAMİ TV 1", color = SoftWhite, fontSize = 23.sp, fontWeight = FontWeight.Black)
             Text(
-                "قائمة فيديوهات محلية مستقلة. ستعمل بالتتابع وتُعاد تلقائياً من البداية.",
+                "قائمة فيديوهات محلية مستقلة. ستعمل بالتتابع وتُعاد تلقائياً من البداية، حتى عند مغادرة شاشة القناة.",
                 color = MutedText,
                 fontSize = 13.sp
             )
@@ -2518,11 +2528,40 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
                     Text("إضافة فيديوهات")
                 }
                 Button(
-                    onClick = { if (videoUris.isNotEmpty()) isWatching = true },
+                    onClick = {
+                        if (videoUris.isNotEmpty()) {
+                            val playIntent = Intent(context, RamiTvOnePlaybackService::class.java).apply {
+                                action = RamiTvOnePlaybackService.ACTION_PLAY_LIST
+                                putStringArrayListExtra(
+                                    RamiTvOnePlaybackService.EXTRA_VIDEO_URIS,
+                                    ArrayList(videoUris)
+                                )
+                            }
+                            preferences.edit().putBoolean("channel_active", true).apply()
+                            ContextCompat.startForegroundService(context, playIntent)
+                            isWatching = true
+                        }
+                    },
                     enabled = videoUris.isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(containerColor = PanelRaised, contentColor = SoftWhite)
                 ) {
-                    Text("مشاهدة القناة")
+                    Text("تشغيل القناة")
+                }
+                if (preferences.getBoolean("channel_active", false)) {
+                    Button(
+                        onClick = {
+                            context.startService(
+                                Intent(context, RamiTvOnePlaybackService::class.java).apply {
+                                    action = RamiTvOnePlaybackService.ACTION_STOP
+                                }
+                            )
+                            preferences.edit().putBoolean("channel_active", false).apply()
+                            isWatching = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PanelBlack, contentColor = AccentRed)
+                    ) {
+                        Text("إيقاف القناة")
+                    }
                 }
             }
             Text("عدد الفيديوهات: ${videoUris.size}", color = Silver, fontSize = 13.sp)
