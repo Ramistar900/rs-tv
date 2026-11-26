@@ -69,3 +69,68 @@ The health workflow must not relay, store, transcode or publish channel media. R
 ## Legacy private-section data
 
 The old «خاص»/PIN interface has been removed from app navigation. The change does not automatically erase any legacy files that may already exist in a user's separate private-package storage directory; unrelated local data is left untouched by the update.
+
+
+## Shared live catalog (RS TV + ROYAL+)
+
+The file `catalog/remote-sources.json` is read by **RS TV** and the **Sinjar TV section inside ROYAL+**. Updating that JSON changes the available source packages and direct IPTV channels without rebuilding either APK.
+
+### Refresh behavior
+
+- The catalog document is checked when the app opens and every 15 minutes by default.
+- Newly added playlist sources are auto-imported by default.
+- Saved playlist sources are refreshed every 6 hours by default.
+- Direct channels in `channels` appear in the live/source list after the next catalog refresh.
+- RAMİ TV channels published through RAMİ NETWORK are fetched separately from the RAMİ NETWORK viewer endpoint.
+
+### Add an IPTV playlist source
+
+Add an object to `sources`:
+
+```json
+{
+  "id": "provider-example",
+  "name": "Example TV package",
+  "description": "Authorized public playlist",
+  "playlistUrl": "https://provider.example/playlist.m3u",
+  "provider": "Example Provider",
+  "attribution": "Example Provider",
+  "allowedHosts": ["provider.example", "cdn.provider.example"],
+  "enabled": true,
+  "autoSync": true,
+  "refreshIntervalMinutes": 360
+}
+```
+
+- `id` must be unique and use lowercase letters, numbers, dots, underscores, or hyphens.
+- Use HTTPS only. Do not put usernames, passwords, private tokens, or personal credentials in the URL.
+- Include the playlist host and any authorized media/redirect hosts in `allowedHosts`.
+- `autoSync` defaults to `true`; set it to `false` to show the source in the source picker without importing it automatically.
+- `refreshIntervalMinutes` is clamped to 60–10080 minutes.
+
+### Add a direct IPTV channel
+
+Add an object to `channels`:
+
+```json
+{
+  "id": "example-news",
+  "name": "Example News",
+  "tvgId": "example.news",
+  "group": "News",
+  "streamUrl": "https://cdn.provider.example/live/index.m3u8",
+  "logoUrl": "https://cdn.provider.example/logos/example-news.png",
+  "country": "TR",
+  "provider": "Example Provider",
+  "contentRating": "general",
+  "enabled": true
+}
+```
+
+Direct stream URLs and logos must use HTTPS. Channels are filtered by the apps' content-safety policy.
+
+### RAMİ TV channels
+
+Publish shared RAMİ TV channels through **RAMİ NETWORK**. Device-local file URIs from the standalone RS TV admin panel are not shareable with ROYAL+ or other devices; upload/publish the media through the network service first.
+
+Only add channels and playlists that you own or are authorized to distribute.
