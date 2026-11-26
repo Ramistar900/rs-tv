@@ -1820,8 +1820,8 @@ private fun LiveContent(
                     view.keepScreenOn = true
                 }
             )
-            if (selectedChannel.tvgId.startsWith("rami-local-")) {
-                val localId = selectedChannel.tvgId.substringAfterLast("-").toIntOrNull()
+            if (selectedChannel.tvgId?.startsWith("rami-local-") == true) {
+                val localId = selectedChannel.tvgId?.substringAfterLast("-")?.toIntOrNull()
                 localRamiChannels.firstOrNull { it.id == localId }?.let { localConfig ->
                     LocalRamiBroadcastOverlay(
                         config = localConfig,
@@ -2711,6 +2711,7 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
     }
     var selectedId by remember { mutableIntStateOf(1) }
     val selected = channels.firstOrNull { it.id == selectedId } ?: channels.first()
+    var nameDraft by remember(selected.id, selected.name) { mutableStateOf(selected.name) }
 
     fun update(config: LocalRamiChannelConfig) {
         val index = channels.indexOfFirst { it.id == config.id }
@@ -2800,12 +2801,22 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Text("إعدادات ${selected.name}", color = Silver, fontWeight = FontWeight.Bold)
                         OutlinedTextField(
-                            value = selected.name,
-                            onValueChange = { update(selected.copy(name = it.take(40))) },
+                            value = nameDraft,
+                            onValueChange = { nameDraft = it.take(40) },
                             label = { Text("اسم القناة") },
+                            placeholder = { Text("اكتب اسم القناة") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Button(
+                            onClick = {
+                                val finalName = nameDraft.trim().ifBlank { "RAMİ TV ${selected.id}" }
+                                nameDraft = finalName
+                                update(selected.copy(name = finalName))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                        ) { Text("حفظ الاسم") }
                         Text("لون الهوية", color = MutedText, fontSize = 12.sp)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(0xFFE3D1A0L, 0xFF36B7A0L, 0xFF4C83D1L, 0xFFB65C65L, 0xFF9A72C7L).forEach { color ->
