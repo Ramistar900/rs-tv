@@ -1266,7 +1266,6 @@ private fun ScreenBody(
     onClear: (ClearAction) -> Unit,
     keepPlaybackInBackground: Boolean,
     onToggleBackgroundPlayback: () -> Unit,
-    onLocalChannelSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
