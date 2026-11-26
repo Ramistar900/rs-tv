@@ -5,8 +5,8 @@ import android.net.Uri
 import org.json.JSONArray
 
 /**
- * Device-local configuration for one of the ten independent RAMİ TV channels.
- * Branding images remain optional until the official channel assets are supplied.
+ * Device-local configuration for one independently branded RAMİ TV channel.
+ * Channel IDs are allocated sequentially and are not capped.
  */
 data class LocalRamiChannelConfig(
     val id: Int,
@@ -15,7 +15,10 @@ data class LocalRamiChannelConfig(
     val backgroundUri: String? = null,
     val primaryColor: Long = 0xFFE3D1A0,
     val videoUris: List<String> = emptyList(),
-    val active: Boolean = false
+    val active: Boolean = false,
+    val tickerEnabled: Boolean = false,
+    val tickerText: String = "",
+    val clockEnabled: Boolean = false
 ) {
     val isReady: Boolean
         get() = active && videoUris.isNotEmpty()
@@ -24,12 +27,54 @@ data class LocalRamiChannelConfig(
 object LocalRamiChannelStore {
     private const val LEGACY_PREFS = "rami_tv_one_library"
     private const val PREFIX = "rami_tv_channel_"
+    private const val INDEX_PREFS = "rami_tv_channels_index"
+    private const val IDS_KEY = "channel_ids"
+
+    /**
+     * The first install keeps the ten legacy slots visible. Existing installations
+     * therefore retain their current channel numbers and preferences; new channels
+     * are appended without an upper limit.
+     */
+    private fun channelIds(context: Context): List<Int> {
+        val index = context.getSharedPreferences(INDEX_PREFS, Context.MODE_PRIVATE)
+        val saved = index.getString("channel_ids_ordered", null)
+        val ids = if (saved == null) {
+            (1..10).toList()
+        } else {
+            runCatching {
+                val array = JSONArray(saved)
+                (0 until array.length()).mapNotNull { array.optInt(it).takeIf { id -> id > 0 } }
+            }.getOrDefault((1..10).toList())
+        }
+        val normalized = (ids + (1..10)).distinct().sorted()
+        if (saved == null || normalized != ids) {
+            index.edit().putString("channel_ids_ordered", JSONArray(normalized).toString())
+                .putInt("next_channel_id", (normalized.maxOrNull() ?: 0) + 1).apply()
+        }
+        return normalized
+    }
+
+    private fun registerChannel(context: Context, id: Int) {
+        val index = context.getSharedPreferences(INDEX_PREFS, Context.MODE_PRIVATE)
+        val ids = (channelIds(context) + id).distinct().sorted()
+        index.edit().putString("channel_ids_ordered", JSONArray(ids).toString())
+            .putInt("next_channel_id", (ids.maxOrNull() ?: 0) + 1).apply()
+    }
+
+    fun createChannel(context: Context): LocalRamiChannelConfig {
+        val index = context.getSharedPreferences(INDEX_PREFS, Context.MODE_PRIVATE)
+        val ids = channelIds(context)
+        val id = maxOf(index.getInt("next_channel_id", 1), (ids.maxOrNull() ?: 0) + 1)
+        val config = LocalRamiChannelConfig(id = id, name = "RAMİ TV $id")
+        save(context, config)
+        return config
+    }
 
     fun loadAll(context: Context): List<LocalRamiChannelConfig> =
-        (1..10).map { load(context, it) }
+        channelIds(context).map { load(context, it) }
 
     fun load(context: Context, id: Int): LocalRamiChannelConfig {
-        require(id in 1..10) { "RAMİ TV channel id must be between 1 and 10" }
+        require(id > 0) { "RAMİ TV channel id must be positive" }
         val prefs = context.getSharedPreferences(PREFIX + id, Context.MODE_PRIVATE)
 
         if (id == 1 && !prefs.contains("migrated_from_legacy")) {
@@ -55,12 +100,16 @@ object LocalRamiChannelStore {
             backgroundUri = prefs.getString("background_uri", null),
             primaryColor = prefs.getLong("primary_color", 0xFFE3D1A0),
             videoUris = videos,
-            active = prefs.getBoolean("channel_active", false)
+            active = prefs.getBoolean("channel_active", false),
+            tickerEnabled = prefs.getBoolean("ticker_enabled", false),
+            tickerText = prefs.getString("ticker_text", "") ?: "",
+            clockEnabled = prefs.getBoolean("clock_enabled", false)
         )
     }
 
     fun save(context: Context, config: LocalRamiChannelConfig) {
-        require(config.id in 1..10) { "RAMİ TV channel id must be between 1 and 10" }
+        require(config.id > 0) { "RAMİ TV channel id must be positive" }
+        registerChannel(context, config.id)
         context.getSharedPreferences(PREFIX + config.id, Context.MODE_PRIVATE)
             .edit()
             .putString("name", config.name.ifBlank { "RAMİ TV ${config.id}" })
@@ -70,6 +119,9 @@ object LocalRamiChannelStore {
             .putString("video_uris_ordered", JSONArray(config.videoUris).toString())
             .putStringSet("video_uris", config.videoUris.toSet())
             .putBoolean("channel_active", config.active)
+            .putBoolean("ticker_enabled", config.tickerEnabled)
+            .putString("ticker_text", config.tickerText)
+            .putBoolean("clock_enabled", config.clockEnabled)
             .putBoolean("migrated_from_legacy", true)
             .apply()
     }
