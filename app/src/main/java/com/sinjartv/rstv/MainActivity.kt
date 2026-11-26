@@ -939,7 +939,7 @@ private fun RSTVHome() {
                     onShowSourceLibrary = ::showSourceLibrary,
                     channels = when {
                         selectedTab == RSTVTab.FAVORITES -> favoriteChannels
-                        selectedTab == RSTVTab.RAMI -> ramiNetworkChannels
+                        selectedTab == RSTVTab.RAMI -> visibleSourceLibraryChannels
                         selectedTab == RSTVTab.LIVE && showingSourceLibrary -> visibleSourceLibraryChannels
                         else -> visibleChannels
                     },
