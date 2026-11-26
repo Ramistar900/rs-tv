@@ -154,10 +154,8 @@ class RamiTvOnePlaybackService : MediaSessionService() {
             return
         }
         saveCurrentLocalState()
-        player?.pause()
-        player?.stop()
-        player?.clearMediaItems()
-        stopSelf()
+        playbackPreferences().edit().putString(KEY_ACTIVE_TYPE, TYPE_STOPPED).apply()
+        pauseAllPlayersAndStopSelf()
     }
 
     override fun onDestroy() {
@@ -189,6 +187,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         private const val KEY_VIDEO_URIS = "video_uris"
         private const val TYPE_LOCAL = "local"
         private const val TYPE_IPTV = "iptv"
+        private const val TYPE_STOPPED = "stopped"
         private const val POSITION_SAVE_INTERVAL_MS = 5_000L
     }
 }
