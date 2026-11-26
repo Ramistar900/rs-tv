@@ -362,7 +362,17 @@ private fun RSTVHome() {
 
     var pendingClear by remember { mutableStateOf<ClearAction?>(null) }
     var isFullscreenPlayer by remember { mutableStateOf(false) }
-    val player = remember(context) { ExoPlayer.Builder(context).build() }
+    val player = remember(context) {
+        val ramiHttpFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("SINJAR-TV Android TV RAMI-NETWORK viewer")
+            .setConnectTimeoutMs(20_000)
+            .setReadTimeoutMs(30_000)
+            .setAllowCrossProtocolRedirects(true)
+        val ramiDataSourceFactory = DefaultDataSource.Factory(context, ramiHttpFactory)
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(ramiDataSourceFactory))
+            .build()
+    }
     val exoPlayer = player
 
     fun navigateToTab(tab: RSTVTab) {
@@ -411,7 +421,11 @@ private fun RSTVHome() {
 
             override fun onPlayerError(error: PlaybackException) {
                 RoyalUiSounds.play(context, RoyalUiSound.ACTION_ERROR)
-                status = "تعذر تشغيل القناة: ${error.errorCodeName}"
+                val detail = generateSequence(error.cause) { it.cause }
+                    .mapNotNull { it.message }
+                    .firstOrNull()
+                status = "تعذر تشغيل القناة: ${error.errorCodeName}" +
+                    (detail?.let { " • $it" } ?: "")
             }
         }
         exoPlayer.addListener(listener)
@@ -611,7 +625,7 @@ private fun RSTVHome() {
     }
 
 
-    suspend fun syncRamiNetworkChannel(channel: RSTVChannel) {
+    suspend fun syncRamiNetworkChannel(channel: RSTVChannel, forceReload: Boolean = false) {
         val channelId = channel.tvgId ?: throw IllegalStateException("معرّف قناة RAMİ غير متوفر.")
         val state = withContext(Dispatchers.IO) { RamiNetworkViewer.loadState(channelId) }
         val playbackStatus = state.optString("status")
@@ -626,20 +640,37 @@ private fun RSTVHome() {
             }
             return
         }
+        val currentItem = state.optJSONObject("currentItem")
         val streamUrl = state.optJSONObject("stream")?.optString("url")
             ?.takeIf { it.startsWith("https://") }
-            ?: state.optJSONObject("currentItem")?.optString("mediaUrl")
+            ?: currentItem?.optString("mediaUrl")
                 ?.takeIf { it.startsWith("https://") }
             ?: throw IllegalStateException("لم يحدد الخادم رابط تشغيل صالحاً.")
         val liveMode = state.optString("playbackMode") == "live"
-        val positionMs = state.optLong("positionMs", 0L).coerceAtLeast(0L)
+        val sourceType = if (liveMode) "hls" else currentItem?.optString("sourceType").orEmpty().lowercase()
+        val positionMs = if (liveMode) 0L else
+            (currentItem?.optLong("positionMs") ?: state.optLong("positionMs", 0L)).coerceAtLeast(0L)
+        val mediaItemBuilder = MediaItem.Builder().setUri(streamUrl)
+        when (sourceType) {
+            "webm" -> mediaItemBuilder.setMimeType("video/webm")
+            "mp4" -> mediaItemBuilder.setMimeType("video/mp4")
+            "hls" -> mediaItemBuilder.setMimeType("application/x-mpegURL")
+        }
+        val mediaItem = mediaItemBuilder.build()
         val currentUrl = exoPlayer.currentMediaItem?.localConfiguration?.uri?.toString()
         val needsVODSeek = !liveMode && kotlin.math.abs(exoPlayer.currentPosition - positionMs) > 4_000L
-        if (currentUrl != streamUrl || needsVODSeek) {
-            if (liveMode) exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
-            else exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl), positionMs)
+        if (currentUrl != streamUrl || forceReload) {
+            // Load the remote file only when the media item changes or the user explicitly retries.
+            // Periodic state polling must not restart the same progressive WebM download.
+            if (liveMode) exoPlayer.setMediaItem(mediaItem)
+            else exoPlayer.setMediaItem(mediaItem, positionMs)
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
+        } else if (!liveMode && exoPlayer.playbackState == Player.STATE_READY &&
+            kotlin.math.abs(exoPlayer.currentPosition - positionMs) > 30_000L
+        ) {
+            // Correct substantial drift without rebuilding the MediaItem or reopening its HTTP request.
+            exoPlayer.seekTo(positionMs)
         }
         status = "متصل ببث RAMİ TV • تزامن الخادم: " + state.optLong("sequence")
     }
@@ -662,7 +693,7 @@ private fun RSTVHome() {
             selectedTab = RSTVTab.RAMI
             status = "جارٍ الاتصال بقناة RAMİ TV..."
             scope.launch {
-                runCatching { syncRamiNetworkChannel(channel) }
+                runCatching { syncRamiNetworkChannel(channel, forceReload = true) }
                     .onFailure { status = it.message ?: "تعذر تشغيل قناة RAMİ TV." }
             }
             return
@@ -1554,6 +1585,38 @@ private fun LiveContent(
                     view.keepScreenOn = true
                 }
             )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .background(Color.Black.copy(alpha = 0.78f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = selectedChannel.name,
+                    color = SoftWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+                Text(
+                    text = status,
+                    color = if (status.contains("تعذر")) Color(0xFFFF8A80) else SoftWhite,
+                    fontSize = 10.sp,
+                    maxLines = 3
+                )
+                Text(
+                    text = "حالة المشغّل: " + when (player.playbackState) {
+                        Player.STATE_BUFFERING -> "تحميل"
+                        Player.STATE_READY -> "جاهز"
+                        Player.STATE_ENDED -> "انتهى"
+                        else -> "تهيئة"
+                    } + " • تشغيل: " + if (player.playWhenReady) "مفعّل" else "متوقف",
+                    color = Silver,
+                    fontSize = 9.sp,
+                    maxLines = 1
+                )
+            }
             if (showChannelInfo && !showChannelTable) {
                 ReceiverChannelInfoOverlay(
                     number = selectedChannelNumber,

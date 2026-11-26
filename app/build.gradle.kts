@@ -100,6 +100,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
+    // Stable VideoLAN LibVLC engine; keep Media3 available as the compatibility fallback.
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
