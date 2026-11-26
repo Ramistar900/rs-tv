@@ -942,6 +942,7 @@ private fun RSTVHome() {
                     },
                     onClear = { pendingClear = it },
                     keepPlaybackInBackground = keepPlaybackInBackground,
+                    activePlaybackType = activePlaybackType,
                     onToggleBackgroundPlayback = {
                         keepPlaybackInBackground = !keepPlaybackInBackground
                         context.getSharedPreferences(RamiTvOnePlaybackService.SETTINGS_PREFS, Context.MODE_PRIVATE)
@@ -1274,6 +1275,7 @@ private fun ScreenBody(
     onClear: (ClearAction) -> Unit,
     keepPlaybackInBackground: Boolean,
     onToggleBackgroundPlayback: () -> Unit,
+    activePlaybackType: String,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1320,6 +1322,7 @@ private fun ScreenBody(
             showingSourceLibrary = showingSourceLibrary,
             onShowUserPlaylist = onShowUserPlaylist,
             onLocalChannelSelected = onLocalChannelSelected,
+            activePlaybackType = activePlaybackType,
             localRamiChannels = LocalRamiChannelStore.readyChannels(context),
             showLocalRamiPackage = context.getSharedPreferences("rami_tv_live_package", Context.MODE_PRIVATE)
                 .getBoolean("added", false),
@@ -1703,6 +1706,7 @@ private fun LiveContent(
     showingSourceLibrary: Boolean,
     onShowUserPlaylist: () -> Unit,
     onLocalChannelSelected: () -> Unit,
+    activePlaybackType: String,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
