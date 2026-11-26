@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -22,6 +23,7 @@ import com.google.common.util.concurrent.ListenableFuture
  * Owns the single RS TV playback engine for IPTV and all local RAMİ TV channels.
  * Compose screens are controllers only; they do not create a competing playback engine.
  */
+@OptIn(UnstableApi::class)
 class RamiTvOnePlaybackService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
@@ -90,7 +92,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         val headers = buildMap {
             for (key in headersBundle.keySet()) {
                 val value = headersBundle.getString(key)
-                if (!key.isNullOrBlank() && !value.isNullOrBlank()) put(key, value)
+                if (!key.isNullOrBlank() && value != null && value.isNotBlank()) put(key, value)
             }
         }
         val httpFactory = DefaultHttpDataSource.Factory().setDefaultRequestProperties(headers)
