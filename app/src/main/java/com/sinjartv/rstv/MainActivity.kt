@@ -154,7 +154,7 @@ private enum class RSTVTab(
 }
 
 private val primaryNavigationTabs = listOf(
-    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.RAMI, RSTVTab.RAMI_ONE, RSTVTab.FAVORITES, RSTVTab.SOURCES
+    RSTVTab.HOME, RSTVTab.LIVE, RSTVTab.FAVORITES, RSTVTab.SOURCES
 )
 
 private enum class ClearAction(val title: String, val message: String) {
