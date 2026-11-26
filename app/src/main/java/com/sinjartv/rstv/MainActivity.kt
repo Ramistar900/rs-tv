@@ -6,6 +6,7 @@ import com.sinjartv.rstv.royalsounds.RoyalUiSounds
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.BitmapFactory
 import android.content.ComponentName
 import android.content.res.Configuration
 import android.net.Uri
@@ -39,6 +40,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -1815,6 +1820,15 @@ private fun LiveContent(
                     view.keepScreenOn = true
                 }
             )
+            if (selectedChannel.tvgId.startsWith("rami-local-")) {
+                val localId = selectedChannel.tvgId.substringAfterLast("-").toIntOrNull()
+                val localConfig = localRamiChannels.firstOrNull { it.id == localId }
+                    ?: remember(selectedChannel.tvgId) { LocalRamiChannelStore.load(context, localId ?: -1) }
+                LocalRamiBroadcastOverlay(
+                    config = localConfig,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             if (showChannelInfo && !showChannelTable) {
                 ReceiverChannelInfoOverlay(
                     number = selectedChannelNumber,
@@ -2696,12 +2710,25 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
         mutableStateListOf<LocalRamiChannelConfig>().apply { addAll(LocalRamiChannelStore.loadAll(context)) }
     }
     var selectedId by remember { mutableIntStateOf(1) }
-    val selected = channels.first { it.id == selectedId }
+    val selected = channels.firstOrNull { it.id == selectedId } ?: channels.first()
 
     fun update(config: LocalRamiChannelConfig) {
         val index = channels.indexOfFirst { it.id == config.id }
         if (index >= 0) channels[index] = config
         LocalRamiChannelStore.save(context, config)
+    }
+
+    val logoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            update(selected.copy(logoUri = uri.toString()))
+        }
     }
 
     val videoPicker = rememberLauncherForActivityResult(
@@ -2726,7 +2753,7 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("لوحة إدارة قنوات RAMİ TV", color = SoftWhite, fontSize = 21.sp, fontWeight = FontWeight.Black)
-                Text("إدارة مستقلة لما يصل إلى 10 قنوات محلية", color = MutedText, fontSize = 11.sp)
+                Text("عدد غير محدود من القنوات؛ إعدادات مستقلة لكل قناة", color = MutedText, fontSize = 11.sp)
             }
             TextButton(onClick = onClose) { Text("إغلاق", color = AccentRed) }
         }
@@ -2735,17 +2762,36 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             item {
-                Text("اختر القناة", color = Silver, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (1..10).forEach { id ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("اختر القناة", color = Silver, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            val created = LocalRamiChannelStore.createChannel(context)
+                            channels.add(created)
+                            selectedId = created.id
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                    ) { Text("إضافة قناة") }
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 58.dp),
+                    modifier = Modifier.fillMaxWidth().height(142.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    items(channels, key = { it.id }) { channel ->
                         Button(
-                            onClick = { selectedId = id },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 5.dp),
+                            onClick = { selectedId = channel.id },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 5.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedId == id) AccentRed else PanelRaised,
-                                contentColor = if (selectedId == id) ScreenBlack else SoftWhite
+                                containerColor = if (selectedId == channel.id) AccentRed else PanelRaised,
+                                contentColor = if (selectedId == channel.id) ScreenBlack else SoftWhite
                             )
-                        ) { Text(id.toString()) }
+                        ) { Text(channel.id.toString()) }
                     }
                 }
             }
@@ -2778,6 +2824,41 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                                 colors = ButtonDefaults.buttonColors(containerColor = if (selected.active) AccentRed else PanelRaised)
                             ) { Text(if (selected.active) "إيقاف" else "تفعيل") }
                         }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("شعار القناة", color = Silver, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                            Button(
+                                onClick = { logoPicker.launch(arrayOf("image/*")) },
+                                colors = ButtonDefaults.buttonColors(containerColor = PanelRaised)
+                            ) { Text(if (selected.logoUri == null) "إضافة لوجو" else "تغيير اللوجو") }
+                        }
+                        selected.logoUri?.let { logo ->
+                            Text("تم حفظ شعار هذه القناة بشكل مستقل.", color = MutedText, fontSize = 10.sp)
+                            TextButton(onClick = { update(selected.copy(logoUri = null)) }) {
+                                Text("إزالة الشعار", color = AccentRed)
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("الساعة على الشاشة", color = SoftWhite, modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { update(selected.copy(clockEnabled = !selected.clockEnabled)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (selected.clockEnabled) AccentRed else PanelRaised)
+                            ) { Text(if (selected.clockEnabled) "مفعّلة" else "إضافة ساعة") }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("الشريط الإخباري", color = SoftWhite, modifier = Modifier.weight(1f))
+                            Button(
+                                onClick = { update(selected.copy(tickerEnabled = !selected.tickerEnabled)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (selected.tickerEnabled) AccentRed else PanelRaised)
+                            ) { Text(if (selected.tickerEnabled) "مفعّل" else "إضافة شريط") }
+                        }
+                        OutlinedTextField(
+                            value = selected.tickerText,
+                            onValueChange = { update(selected.copy(tickerText = it.take(240))) },
+                            label = { Text("نص الشريط الإخباري") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 1,
+                            maxLines = 2
+                        )
                         Text("ملفات الفيديو: ${selected.videoUris.size}", color = Silver, fontWeight = FontWeight.Bold)
                         Button(
                             onClick = { videoPicker.launch(arrayOf("video/*")) },
@@ -2807,7 +2888,7 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                                 }
                             }
                         }
-                        Text("الشعار والخلفية: سيُضاف اختيار الصور بعد استلام ملفات الهوية الرسمية. المعروض حالياً عنصر مؤقت.", color = MutedText, fontSize = 10.sp)
+                        Text("تُحفظ إعدادات الشعار والساعة والشريط لكل قناة على حدة.", color = MutedText, fontSize = 10.sp)
                     }
                 }
             }
@@ -2822,6 +2903,61 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                     fontSize = 11.sp
                 )
             }
+        }
+    }
+}
+
+
+@Composable
+private fun LocalRamiBroadcastOverlay(
+    config: LocalRamiChannelConfig,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var currentTime by remember(config.id) { mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())) }
+    LaunchedEffect(config.id, config.clockEnabled) {
+        while (config.clockEnabled) {
+            currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            delay(1_000L)
+        }
+    }
+    val logo = remember(config.logoUri) {
+        config.logoUri?.let { raw ->
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(raw))?.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+            }.getOrNull()
+        }
+    }
+    Box(modifier = modifier) {
+        if (logo != null) {
+            Image(
+                bitmap = logo,
+                contentDescription = "شعار ${config.name}",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.align(Alignment.TopEnd).padding(22.dp).width(112.dp).height(72.dp)
+            )
+        }
+        if (config.clockEnabled) {
+            Text(
+                currentTime,
+                color = Color.White,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopStart).padding(22.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 7.dp)
+            )
+        }
+        if (config.tickerEnabled && config.tickerText.isNotBlank()) {
+            Text(
+                config.tickerText,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .background(Color(0xDD101010)).padding(horizontal = 18.dp, vertical = 9.dp)
+            )
         }
     }
 }
