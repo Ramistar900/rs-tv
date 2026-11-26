@@ -111,7 +111,7 @@ internal object RemoteIptvCatalog {
                 add(
                     RemoteCatalogSourceDefinition(
                         source = source,
-                        autoSync = item.optBoolean("autoSync", false),
+                        autoSync = item.optBoolean("autoSync", true),
                         refreshIntervalMinutes = item.optInt("refreshIntervalMinutes", 360).coerceIn(60, 10_080)
                     )
                 )
