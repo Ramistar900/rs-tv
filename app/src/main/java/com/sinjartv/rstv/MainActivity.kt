@@ -313,6 +313,7 @@ private fun RSTVHome() {
     var remoteCatalogSources by remember { mutableStateOf<List<RemoteCatalogSourceDefinition>>(emptyList()) }
     var remoteCatalogChannels by remember { mutableStateOf<List<RSTVChannel>>(emptyList()) }
     var remoteCatalogRevision by remember { mutableIntStateOf(0) }
+    var remoteCatalogRefreshMinutes by remember { mutableIntStateOf(15) }
     val availablePlaylistSources = remember(countryPackageSources, remoteCatalogSources) {
         val byId = linkedMapOf<String, RemotePlaylistSource>()
         (RemotePlaylistSources.playlists + countryPackageSources + remoteCatalogSources.map { it.source })
@@ -520,6 +521,7 @@ private fun RSTVHome() {
             val catalog = withContext(Dispatchers.IO) { RemoteIptvCatalog.loadOrCached(context) }
             remoteCatalogSources = catalog.sources
             remoteCatalogChannels = catalog.channels.filterNot(AdultContentPolicy::isAdult)
+            remoteCatalogRefreshMinutes = catalog.refreshMinutes
             remoteCatalogRevision++
 
             val savedSources = withContext(Dispatchers.IO) { LocalLibraryStore.loadRemoteSources(context) }
@@ -584,8 +586,7 @@ private fun RSTVHome() {
         runCatching { refreshCatalogAndSavedSources() }
             .onFailure { remotePlaylistStatus = "تعذر تحديث الكتالوج المركزي: ${it.message ?: "خطأ اتصال"}" }
         while (true) {
-            val interval = remoteCatalogSources.firstOrNull()?.let { 15 } ?: 15
-            delay(interval * 60_000L)
+            delay(remoteCatalogRefreshMinutes * 60_000L)
             runCatching { refreshCatalogAndSavedSources() }
                 .onFailure { remotePlaylistStatus = "تعذر تحديث الكتالوج المركزي: ${it.message ?: "خطأ اتصال"}" }
         }
