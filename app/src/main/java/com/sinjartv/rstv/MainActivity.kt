@@ -2426,7 +2426,15 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
     }
     val videoUris = remember(context) {
         mutableStateListOf<String>().apply {
-            addAll(preferences.getStringSet("video_uris", emptySet()).orEmpty())
+            val ordered = preferences.getString("video_uris_ordered", null)
+            if (ordered != null) {
+                runCatching {
+                    val saved = org.json.JSONArray(ordered)
+                    for (index in 0 until saved.length()) add(saved.getString(index))
+                }
+            } else {
+                addAll(preferences.getStringSet("video_uris", emptySet()).orEmpty().sorted())
+            }
         }
     }
     var isWatching by remember {
@@ -2435,7 +2443,10 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
 
     fun saveVideoUris() {
-        preferences.edit().putStringSet("video_uris", videoUris.toSet()).apply()
+        preferences.edit()
+            .putString("video_uris_ordered", org.json.JSONArray(videoUris.toList()).toString())
+            .putStringSet("video_uris", videoUris.toSet())
+            .apply()
     }
 
     val videoPicker = rememberLauncherForActivityResult(
