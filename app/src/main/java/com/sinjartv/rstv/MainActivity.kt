@@ -2537,7 +2537,7 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = PanelBlack)) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        Text("إعدادات \${selected.name}", color = Silver, fontWeight = FontWeight.Bold)
+                        Text("إعدادات ${'${'}selected.name}", color = Silver, fontWeight = FontWeight.Bold)
                         OutlinedTextField(
                             value = selected.name,
                             onValueChange = { update(selected.copy(name = it.take(40))) },
@@ -2563,7 +2563,7 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                                 colors = ButtonDefaults.buttonColors(containerColor = if (selected.active) AccentRed else PanelRaised)
                             ) { Text(if (selected.active) "إيقاف" else "تفعيل") }
                         }
-                        Text("ملفات الفيديو: \${selected.videoUris.size}", color = Silver, fontWeight = FontWeight.Bold)
+                        Text("ملفات الفيديو: ${'${'}selected.videoUris.size}", color = Silver, fontWeight = FontWeight.Bold)
                         Button(
                             onClick = { videoPicker.launch(arrayOf("video/*")) },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
@@ -2573,7 +2573,7 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                         } else {
                             selected.videoUris.forEachIndexed { index, uri ->
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("\${index + 1}. \${Uri.parse(uri).lastPathSegment ?: "فيديو محلي"}", color = SoftWhite, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                                    Text("${'${'}index + 1}. ${'${'}Uri.parse(uri).lastPathSegment ?: "فيديو محلي"}", color = SoftWhite, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 1)
                                     TextButton(enabled = index > 0, onClick = {
                                         val values = selected.videoUris.toMutableList()
                                         val item = values.removeAt(index)
