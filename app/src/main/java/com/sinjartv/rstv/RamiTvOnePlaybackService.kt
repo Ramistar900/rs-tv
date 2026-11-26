@@ -155,7 +155,10 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         }
         saveCurrentLocalState()
         playbackPreferences().edit().putString(KEY_ACTIVE_TYPE, TYPE_STOPPED).apply()
-        pauseAllPlayersAndStopSelf()
+        player?.pause()
+        player?.stop()
+        player?.clearMediaItems()
+        stopSelf()
     }
 
     override fun onDestroy() {
