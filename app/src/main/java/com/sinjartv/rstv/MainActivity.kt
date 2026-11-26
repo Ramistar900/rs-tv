@@ -6,8 +6,6 @@ import com.sinjartv.rstv.royalsounds.RoyalUiSounds
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.ComponentName
-import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
@@ -105,7 +103,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
@@ -2540,20 +2537,18 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
                 }
                 Button(
                     onClick = {
-                        if (videoUris.isNotEmpty()) {
-                            val playIntent = Intent(context, RamiTvOnePlaybackService::class.java).apply {
-                                action = RamiTvOnePlaybackService.ACTION_PLAY_LIST
-                                putStringArrayListExtra(
-                                    RamiTvOnePlaybackService.EXTRA_VIDEO_URIS,
-                                    ArrayList(videoUris)
-                                )
+                        if (videoUris.isNotEmpty() && mediaController != null) {
+                            mediaController?.apply {
+                                setMediaItems(videoUris.map { MediaItem.fromUri(Uri.parse(it)) })
+                                repeatMode = Player.REPEAT_MODE_ALL
+                                prepare()
+                                play()
                             }
                             preferences.edit().putBoolean("channel_active", true).apply()
-                            ContextCompat.startForegroundService(context, playIntent)
                             isWatching = true
                         }
                     },
-                    enabled = videoUris.isNotEmpty(),
+                    enabled = videoUris.isNotEmpty() && mediaController != null,
                     colors = ButtonDefaults.buttonColors(containerColor = PanelRaised, contentColor = SoftWhite)
                 ) {
                     Text("تشغيل القناة")
@@ -2561,11 +2556,8 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
                 if (preferences.getBoolean("channel_active", false)) {
                     Button(
                         onClick = {
-                            context.startService(
-                                Intent(context, RamiTvOnePlaybackService::class.java).apply {
-                                    action = RamiTvOnePlaybackService.ACTION_STOP
-                                }
-                            )
+                            mediaController?.stop()
+                            mediaController?.clearMediaItems()
                             preferences.edit().putBoolean("channel_active", false).apply()
                             isWatching = false
                         },
