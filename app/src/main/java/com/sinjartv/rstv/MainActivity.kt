@@ -1247,6 +1247,11 @@ private fun ScreenBody(
             modifier = modifier
         )
         RSTVTab.SOURCES -> OnlineSourcesContent(
+            onAddRamiPackage = {
+                context.getSharedPreferences("rami_tv_live_package", Context.MODE_PRIVATE)
+                    .edit().putBoolean("added", true).apply()
+                onNavigate(RSTVTab.LIVE)
+            },
             status = remotePlaylistStatus,
             sourceLibraryStatus = sourceLibraryStatus,
             sourceLibraryCount = sourceLibraryCount,
@@ -1274,6 +1279,9 @@ private fun ScreenBody(
             skippedUnsafeLinks = skippedUnsafeLinks,
             showingSourceLibrary = showingSourceLibrary,
             onShowUserPlaylist = onShowUserPlaylist,
+            localRamiChannels = LocalRamiChannelStore.readyChannels(context),
+            showLocalRamiPackage = context.getSharedPreferences("rami_tv_live_package", Context.MODE_PRIVATE)
+                .getBoolean("added", false),
             modifier = modifier
         )
         RSTVTab.FAVORITES -> ChannelLibraryContent(
@@ -1533,8 +1541,78 @@ private fun orderedChannelGroups(channels: List<RSTVChannel>): List<Pair<String,
 }
 
 @Composable
+private fun LocalRamiLiveChannelsContent(channels: List<LocalRamiChannelConfig>) {
+    val context = LocalContext.current
+    var mediaController by remember { mutableStateOf<MediaController?>(null) }
+    var controllerReady by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val token = SessionToken(
+            context,
+            ComponentName(context, RamiTvOnePlaybackService::class.java)
+        )
+        val future = MediaController.Builder(context, token).buildAsync()
+        future.addListener({
+            mediaController = runCatching { future.get() }.getOrNull()
+            controllerReady = mediaController != null
+        }, MoreExecutors.directExecutor())
+        onDispose {
+            MediaController.releaseFuture(future)
+            mediaController = null
+            controllerReady = false
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = PanelRaised),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("قنوات RAMİ TV المحلية", color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("القنوات المفعّلة التي تحتوي على فيديوهات صالحة فقط. يعمل مشغل محلي واحد في كل مرة.", color = MutedText, fontSize = 10.sp)
+            channels.forEach { channel ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(channel.name, color = Color(channel.primaryColor), fontWeight = FontWeight.Bold)
+                        Text("${channel.videoUris.size} فيديو", color = MutedText, fontSize = 10.sp)
+                    }
+                    Button(
+                        enabled = controllerReady && channel.videoUris.isNotEmpty(),
+                        onClick = {
+                            mediaController?.apply {
+                                setMediaItems(channel.videoUris.map { MediaItem.fromUri(Uri.parse(it)) })
+                                repeatMode = Player.REPEAT_MODE_ALL
+                                prepare()
+                                play()
+                            }
+                            RoyalUiSounds.play(context, RoyalUiSound.TV_CHANNEL_CHANGE)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                    ) {
+                        Text("تشغيل")
+                    }
+                }
+            }
+            if (!controllerReady) {
+                Text("جارٍ تجهيز مشغل القنوات المحلية…", color = MutedText, fontSize = 10.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun LiveContent(
     channels: List<RSTVChannel>,
+    localRamiChannels: List<LocalRamiChannelConfig>,
+    showLocalRamiPackage: Boolean,
     selectedChannel: RSTVChannel?,
     isFullscreenPlayer: Boolean,
     onExitFullscreen: () -> Unit,
@@ -1646,6 +1724,9 @@ private fun LiveContent(
         }
     } else {
         Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (showLocalRamiPackage && localRamiChannels.isNotEmpty()) {
+                LocalRamiLiveChannelsContent(channels = localRamiChannels)
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -2031,6 +2112,7 @@ private fun FullscreenChannelSelectorDialog(
 
 @Composable
 private fun OnlineSourcesContent(
+    onAddRamiPackage: () -> Unit,
     status: String,
     sourceLibraryStatus: String,
     sourceLibraryCount: Int,
@@ -2063,6 +2145,14 @@ private fun OnlineSourcesContent(
             color = MutedText,
             fontSize = 11.sp
         )
+        Button(
+            onClick = onAddRamiPackage,
+            colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("إضافة باقة قنوات RAMİ TV إلى قسم البث المباشر", fontWeight = FontWeight.Bold)
+        }
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = PanelRaised),
