@@ -11,8 +11,8 @@ internal object RamiPlaybackCommands {
     private const val ACTION_PLAY_IPTV = "com.sinjartv.rstv.action.PLAY_IPTV"
     private const val ACTION_PLAY_LOCAL = "com.sinjartv.rstv.action.PLAY_LOCAL"
 
-    val PLAY_IPTV = SessionCommand(ACTION_PLAY_IPTV, SessionCommand.COMMAND_CODE_CUSTOM)
-    val PLAY_LOCAL = SessionCommand(ACTION_PLAY_LOCAL, SessionCommand.COMMAND_CODE_CUSTOM)
+    val PLAY_IPTV = SessionCommand(ACTION_PLAY_IPTV, Bundle.EMPTY)
+    val PLAY_LOCAL = SessionCommand(ACTION_PLAY_LOCAL, Bundle.EMPTY)
 
     fun playIptv(
         controller: MediaController?,
