@@ -123,6 +123,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.MoreExecutors
@@ -381,14 +384,40 @@ private fun RSTVHome() {
             .getBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, false))
     }
     var playbackController by remember { mutableStateOf<MediaController?>(null) }
+    var localPlaybackController by remember { mutableStateOf<MediaController?>(null) }
     DisposableEffect(context) {
         val token = SessionToken(context, ComponentName(context, RamiTvOnePlaybackService::class.java))
-        val future = MediaController.Builder(context, token).buildAsync()
-        future.addListener({ playbackController = runCatching { future.get() }.getOrNull() }, MoreExecutors.directExecutor())
+        val iptvFuture = MediaController.Builder(context, token).buildAsync()
+        val localFuture = MediaController.Builder(context, token)
+            .setConnectionHints(RamiPlaybackCommands.localSessionHints())
+            .buildAsync()
+        iptvFuture.addListener({
+            playbackController = runCatching { iptvFuture.get() }.getOrNull()
+            RamiPlaybackCommands.restoreForegroundAudio(playbackController)
+        }, MoreExecutors.directExecutor())
+        localFuture.addListener({
+            localPlaybackController = runCatching { localFuture.get() }.getOrNull()
+        }, MoreExecutors.directExecutor())
         onDispose {
-            MediaController.releaseFuture(future)
+            MediaController.releaseFuture(iptvFuture)
+            MediaController.releaseFuture(localFuture)
             playbackController = null
+            localPlaybackController = null
         }
+    }
+    DisposableEffect(context, playbackController) {
+        val owner = context as? LifecycleOwner
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP ->
+                    RamiPlaybackCommands.muteBackgroundAudio(playbackController)
+                Lifecycle.Event.ON_START ->
+                    RamiPlaybackCommands.restoreForegroundAudio(playbackController)
+                else -> Unit
+            }
+        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
     }
     val exoPlayer = playbackController
     var activePlaybackType by remember(context) {
@@ -739,7 +768,7 @@ private fun RSTVHome() {
             selectedTab = RSTVTab.LIVE
             activePlaybackType = "local"
             status = "جارٍ تشغيل ${local.name}..."
-            if (!RamiPlaybackCommands.playLocal(exoPlayer, channelId, local.videoUris)) {
+            if (!RamiPlaybackCommands.playLocal(localPlaybackController, channelId, local.videoUris)) {
                 status = "مشغل القنوات المحلية غير جاهز بعد. حاول بعد لحظة."
             }
             return
@@ -965,7 +994,7 @@ private fun RSTVHome() {
                     onPlay = ::playChannel,
                     onToggleFavorite = ::toggleFavourite,
                     isFavorite = { it.streamUrl in favoriteUrls },
-                    player = exoPlayer,
+                    player = if (activePlaybackType == "local") localPlaybackController else exoPlayer,
                     status = status,
                     skippedUnsafeLinks = skippedUnsafeLinks,
                     showingSourceLibrary = showingSourceLibrary,
@@ -1086,7 +1115,7 @@ private fun RSTVHome() {
                             onPlay = ::playChannel,
                             onToggleFavorite = ::toggleFavourite,
                             isFavorite = { it.streamUrl in favoriteUrls },
-                            player = exoPlayer,
+                            player = if (activePlaybackType == "local") localPlaybackController else exoPlayer,
                             status = status,
                             skippedUnsafeLinks = skippedUnsafeLinks,
                             showingSourceLibrary = showingSourceLibrary,
@@ -1172,7 +1201,7 @@ private fun RSTVHome() {
                             onPlay = ::playChannel,
                             onToggleFavorite = ::toggleFavourite,
                             isFavorite = { it.streamUrl in favoriteUrls },
-                            player = exoPlayer,
+                            player = if (activePlaybackType == "local") localPlaybackController else exoPlayer,
                             status = status,
                             skippedUnsafeLinks = skippedUnsafeLinks,
                             showingSourceLibrary = showingSourceLibrary,
@@ -1656,7 +1685,9 @@ private fun LocalRamiLiveChannelsContent(
             context,
             ComponentName(context, RamiTvOnePlaybackService::class.java)
         )
-        val future = MediaController.Builder(context, token).buildAsync()
+        val future = MediaController.Builder(context, token)
+            .setConnectionHints(RamiPlaybackCommands.localSessionHints())
+            .buildAsync()
         future.addListener({
             mediaController = runCatching { future.get() }.getOrNull()
             controllerReady = mediaController != null
@@ -1678,7 +1709,7 @@ private fun LocalRamiLiveChannelsContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("قنوات RAMİ TV المحلية", color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Text("القنوات المفعّلة التي تحتوي على فيديوهات صالحة فقط. يعمل مشغل واحد بالتناوب بين IPTV والقنوات المحلية.", color = MutedText, fontSize = 10.sp)
+            Text("القنوات المفعّلة التي تحتوي على فيديوهات صالحة فقط. يعمل مشغل RAMİ بشكل مستقل ويواصل الفيديو أثناء مشاهدة IPTV.", color = MutedText, fontSize = 10.sp)
             if (showPlayerSurface && activeLocalChannelId in channels.map { it.id } && controllerReady) {
                 Box(Modifier.fillMaxWidth().height(190.dp).background(Color.Black, RoundedCornerShape(12.dp))) {
                     AndroidView(
@@ -3025,7 +3056,9 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
             context,
             ComponentName(context, RamiTvOnePlaybackService::class.java)
         )
-        val controllerFuture = MediaController.Builder(context, token).buildAsync()
+        val controllerFuture = MediaController.Builder(context, token)
+            .setConnectionHints(RamiPlaybackCommands.localSessionHints())
+            .buildAsync()
         controllerFuture.addListener(
             {
                 mediaController = runCatching { controllerFuture.get() }.getOrNull()
