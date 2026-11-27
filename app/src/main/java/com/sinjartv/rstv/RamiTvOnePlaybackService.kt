@@ -83,6 +83,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
                     val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS
                         .buildUpon()
                         .add(allowedCommand)
+                        .add(RamiPlaybackCommands.RESTORE_FOREGROUND_AUDIO)
                         .build()
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(commands)
@@ -95,13 +96,15 @@ class RamiTvOnePlaybackService : MediaSessionService() {
                     customCommand: SessionCommand,
                     args: Bundle
                 ): ListenableFuture<SessionResult> {
-                    if (customCommand.customAction != allowedCommand.customAction) {
-                        return Futures.immediateFuture(
-                            SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED)
-                        )
-                    }
                     return try {
-                        executeCommand(args)
+                        when (customCommand.customAction) {
+                            allowedCommand.customAction -> executeCommand(args)
+                            RamiPlaybackCommands.RESTORE_FOREGROUND_AUDIO.customAction ->
+                                restoreForegroundAudio()
+                            else -> return Futures.immediateFuture(
+                                SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED)
+                            )
+                        }
                         Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                     } catch (_: Throwable) {
                         Futures.immediateFuture(
@@ -197,6 +200,23 @@ class RamiTvOnePlaybackService : MediaSessionService() {
             .apply()
         playbackPlayer.prepare()
         playbackPlayer.play()
+    }
+
+    private fun restoreForegroundAudio() {
+        when (playbackPreferences().getString(KEY_ACTIVE_TYPE, null)) {
+            TYPE_LOCAL -> {
+                iptvPlayer?.volume = 0f
+                localPlayer?.volume = 1f
+            }
+            TYPE_IPTV -> {
+                localPlayer?.volume = 0f
+                iptvPlayer?.volume = 1f
+            }
+            else -> {
+                iptvPlayer?.volume = 0f
+                localPlayer?.volume = 0f
+            }
+        }
     }
 
     private fun saveCurrentLocalState() {
