@@ -123,6 +123,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.MoreExecutors
@@ -401,6 +404,20 @@ private fun RSTVHome() {
             playbackController = null
             localPlaybackController = null
         }
+    }
+    DisposableEffect(context, playbackController) {
+        val owner = context as? LifecycleOwner
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP ->
+                    RamiPlaybackCommands.muteBackgroundAudio(playbackController)
+                Lifecycle.Event.ON_START ->
+                    RamiPlaybackCommands.restoreForegroundAudio(playbackController)
+                else -> Unit
+            }
+        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
     }
     val exoPlayer = playbackController
     var activePlaybackType by remember(context) {
