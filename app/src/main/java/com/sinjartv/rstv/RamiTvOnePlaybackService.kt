@@ -101,6 +101,8 @@ class RamiTvOnePlaybackService : MediaSessionService() {
                             allowedCommand.customAction -> executeCommand(args)
                             RamiPlaybackCommands.RESTORE_FOREGROUND_AUDIO.customAction ->
                                 restoreForegroundAudio()
+                            RamiPlaybackCommands.MUTE_BACKGROUND_AUDIO.customAction ->
+                                muteBackgroundAudio()
                             else -> return Futures.immediateFuture(
                                 SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED)
                             )
@@ -202,6 +204,11 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         playbackPlayer.play()
     }
 
+    private fun muteBackgroundAudio() {
+        iptvPlayer?.volume = 0f
+        localPlayer?.volume = 0f
+    }
+
     private fun restoreForegroundAudio() {
         when (playbackPreferences().getString(KEY_ACTIVE_TYPE, null)) {
             TYPE_LOCAL -> {
@@ -234,8 +241,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         // Closing the app task must not end the TV channel. Keep the active playback
         // session(s) alive in the MediaSessionService, but silence all audio in background.
         saveCurrentLocalState()
-        iptvPlayer?.volume = 0f
-        localPlayer?.volume = 0f
+        muteBackgroundAudio()
 
         // MediaSessionService keeps an actively playing media session in its foreground
         // playback service lifecycle after the task is removed.
