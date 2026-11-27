@@ -59,7 +59,7 @@ internal object RamiPlaybackCommands {
     }
 
     fun playLocal(controller: MediaController?, channelId: Int, videoUris: List<String>): Boolean {
-        if (controller == null || channelId !in 1..10 || videoUris.isEmpty()) return false
+        if (controller == null || channelId <= 0 || videoUris.isEmpty()) return false
         val args = Bundle().apply {
             putInt("channel_id", channelId)
             putStringArrayList("video_uris", ArrayList(videoUris))
