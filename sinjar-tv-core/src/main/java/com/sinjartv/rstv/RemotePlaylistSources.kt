@@ -7,7 +7,7 @@ import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
-internal data class RemotePlaylistSource(
+data class RemotePlaylistSource(
     val id: String,
     val name: String,
     val description: String,
@@ -20,7 +20,7 @@ internal data class RemotePlaylistSource(
         get() = RemotePlaylistSources.packageGroupFor(id)
 }
 
-internal data class RemotePlaylistPackage(
+data class RemotePlaylistPackage(
     val id: String,
     val name: String,
     val description: String,
@@ -28,13 +28,13 @@ internal data class RemotePlaylistPackage(
     val sources: List<RemotePlaylistSource>
 )
 
-internal enum class OfficialDestinationCategory(val title: String) {
+enum class OfficialDestinationCategory(val title: String) {
     SPORTS("قنوات ومنصات الرياضة"),
     MOVIES("الأفلام والمسلسلات"),
     GENERAL("قنوات البث الرسمية")
 }
 
-internal data class OfficialLiveDestination(
+data class OfficialLiveDestination(
     val id: String,
     val name: String,
     val description: String,
@@ -42,7 +42,7 @@ internal data class OfficialLiveDestination(
     val category: OfficialDestinationCategory = OfficialDestinationCategory.GENERAL
 )
 
-internal object RemotePlaylistSources {
+object RemotePlaylistSources {
     val playlists = listOf(
         RemotePlaylistSource(
             id = "doubo-world",
@@ -883,7 +883,7 @@ internal object RemotePlaylistSources {
 
 }
 
-internal object RemotePlaylistDownloader {
+object RemotePlaylistDownloader {
     private const val MAX_BYTES = 12 * 1024 * 1024
     private const val CONNECT_TIMEOUT_MS = 15_000
     private const val READ_TIMEOUT_MS = 30_000

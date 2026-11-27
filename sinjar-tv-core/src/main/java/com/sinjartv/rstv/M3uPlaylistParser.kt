@@ -3,7 +3,7 @@ package com.sinjartv.rstv
 import org.json.JSONObject
 import java.net.URI
 
-internal data class RSTVChannel(
+data class RSTVChannel(
     val name: String,
     val tvgId: String?,
     val group: String?,
@@ -17,14 +17,14 @@ internal data class RSTVChannel(
     val sourceProviders: Set<String> = emptySet()
 )
 
-internal data class M3uParseResult(
+data class M3uParseResult(
     val channels: List<RSTVChannel>,
     val skippedUnsafeLinks: Int,
     val invalidEntries: Int,
     val isValidPlaylist: Boolean
 )
 
-internal object M3uPlaylistParser {
+object M3uPlaylistParser {
     private val attributePattern =
         Regex("""([A-Za-z0-9_-]+)[ ]*=[ ]*("([^"]*)"|'([^']*)'|([^ ,]+))""")
     private val pageOnlyPlatformHosts = setOf(

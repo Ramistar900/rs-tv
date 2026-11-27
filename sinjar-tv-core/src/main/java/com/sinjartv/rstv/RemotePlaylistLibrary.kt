@@ -2,7 +2,7 @@ package com.sinjartv.rstv
 
 import java.net.URI
 
-internal data class RemoteSourceSnapshot(
+data class RemoteSourceSnapshot(
     val id: String,
     val name: String,
     val provider: String,
@@ -10,7 +10,7 @@ internal data class RemoteSourceSnapshot(
     val content: String
 )
 
-internal object RemotePlaylistMerger {
+object RemotePlaylistMerger {
     private val countryBySourceId = mapOf(
         "doubo-turkey" to "تركيا",
         "iptv-org-us" to "الولايات المتحدة الأمريكية",
