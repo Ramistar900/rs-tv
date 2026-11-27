@@ -205,24 +205,18 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     }
 
     private fun muteBackgroundAudio() {
-        iptvPlayer?.volume = 0f
-        localPlayer?.volume = 0f
+        // The silent background-continuation rule applies only to local RAMİ channels.
+        // IPTV keeps its existing audio/background policy unchanged.
+        if (playbackPreferences().getString(KEY_ACTIVE_TYPE, null) == TYPE_LOCAL) {
+            localPlayer?.volume = 0f
+        }
     }
 
     private fun restoreForegroundAudio() {
-        when (playbackPreferences().getString(KEY_ACTIVE_TYPE, null)) {
-            TYPE_LOCAL -> {
-                iptvPlayer?.volume = 0f
-                localPlayer?.volume = 1f
-            }
-            TYPE_IPTV -> {
-                localPlayer?.volume = 0f
-                iptvPlayer?.volume = 1f
-            }
-            else -> {
-                iptvPlayer?.volume = 0f
-                localPlayer?.volume = 0f
-            }
+        // Restore only RAMİ audio. Do not alter IPTV volume or playback behaviour.
+        if (playbackPreferences().getString(KEY_ACTIVE_TYPE, null) == TYPE_LOCAL) {
+            localPlayer?.volume = 1f
+            iptvPlayer?.volume = 0f
         }
     }
 
@@ -238,14 +232,33 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Closing the app task must not end the TV channel. Keep the active playback
-        // session(s) alive in the MediaSessionService, but silence all audio in background.
-        saveCurrentLocalState()
-        muteBackgroundAudio()
+        val activeType = playbackPreferences().getString(KEY_ACTIVE_TYPE, null)
 
-        // MediaSessionService keeps an actively playing media session in its foreground
-        // playback service lifecycle after the task is removed.
-        super.onTaskRemoved(rootIntent)
+        if (activeType == TYPE_LOCAL) {
+            // Only RAMİ channels get the new always-continue-silently behaviour.
+            saveCurrentLocalState()
+            localPlayer?.volume = 0f
+            super.onTaskRemoved(rootIntent)
+            return
+        }
+
+        // IPTV keeps its previous behaviour and the user's existing background setting.
+        val keepInBackground = getSharedPreferences(SETTINGS_PREFS, MODE_PRIVATE)
+            .getBoolean(KEY_KEEP_BACKGROUND, false)
+        if (keepInBackground) {
+            super.onTaskRemoved(rootIntent)
+            return
+        }
+
+        saveCurrentLocalState()
+        playbackPreferences().edit().putString(KEY_ACTIVE_TYPE, TYPE_STOPPED).apply()
+        iptvPlayer?.pause()
+        localPlayer?.pause()
+        iptvPlayer?.stop()
+        localPlayer?.stop()
+        iptvPlayer?.clearMediaItems()
+        localPlayer?.clearMediaItems()
+        stopSelf()
     }
 
     override fun onDestroy() {
