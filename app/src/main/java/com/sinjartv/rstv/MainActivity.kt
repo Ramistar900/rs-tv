@@ -390,6 +390,7 @@ private fun RSTVHome() {
             .buildAsync()
         iptvFuture.addListener({
             playbackController = runCatching { iptvFuture.get() }.getOrNull()
+            RamiPlaybackCommands.restoreForegroundAudio(playbackController)
         }, MoreExecutors.directExecutor())
         localFuture.addListener({
             localPlaybackController = runCatching { localFuture.get() }.getOrNull()
