@@ -2698,6 +2698,24 @@ private fun LocalRamiScheduleSection(channel: LocalRamiChannelConfig) {
     var editorError by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
 
+    val scheduleVideoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }.onSuccess {
+                selectedVideoUri = uri.toString()
+                editorError = ""
+            }.onFailure {
+                editorError = "تعذر حفظ صلاحية الوصول للفيديو. اختر الملف من جديد."
+            }
+        }
+    }
+
     fun persist(entries: List<RamiProgrammeSchedule>) {
         RamiProgrammeScheduleStore.save(
             context,
@@ -2785,6 +2803,23 @@ private fun LocalRamiScheduleSection(channel: LocalRamiChannelConfig) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text("اختر الفيديو", color = Silver, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = { scheduleVideoPicker.launch(arrayOf("video/*")) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccentRed,
+                            contentColor = ScreenBlack
+                        )
+                    ) {
+                        Text("إضافة فيديو من المعرض")
+                    }
+                    if (selectedVideoUri.isNotBlank() && selectedVideoUri !in channel.videoUris) {
+                        Text(
+                            "الفيديو المختار: ${Uri.parse(selectedVideoUri).lastPathSegment ?: "فيديو محلي"}",
+                            color = SoftWhite,
+                            fontSize = 10.sp,
+                            maxLines = 1
+                        )
+                    }
                     channel.videoUris.forEach { uri ->
                         val chosen = selectedVideoUri == uri
                         TextButton(
