@@ -16,9 +16,17 @@ internal object RamiPlaybackCommands {
 
     val PLAY_IPTV = SessionCommand(ACTION_PLAY_IPTV, Bundle.EMPTY)
     val PLAY_LOCAL = SessionCommand(ACTION_PLAY_LOCAL, Bundle.EMPTY)
+    val RESTORE_FOREGROUND_AUDIO = SessionCommand(
+        "com.sinjartv.rstv.action.RESTORE_FOREGROUND_AUDIO",
+        Bundle.EMPTY
+    )
 
     fun localSessionHints(): Bundle = Bundle().apply {
         putString(KEY_SESSION_ROLE, ROLE_LOCAL)
+    }
+
+    fun restoreForegroundAudio(controller: MediaController?) {
+        controller?.sendCustomCommand(RESTORE_FOREGROUND_AUDIO, Bundle.EMPTY)
     }
 
     fun playIptv(
