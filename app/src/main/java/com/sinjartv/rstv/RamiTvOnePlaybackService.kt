@@ -132,6 +132,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     }
 
     private fun playLocal(args: Bundle) {
+        val wasScheduledPlayback = scheduledPlaybackChannelId != null
         scheduledPlaybackChannelId = null
         val channelId = args.getInt(KEY_CHANNEL_ID, -1)
         require(channelId > 0) { "Invalid local RAMİ TV channel" }
@@ -140,7 +141,9 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         require(videoUris.isNotEmpty()) { "The local channel has no valid videos" }
 
         val preferences = playbackPreferences()
-        if (preferences.getString(KEY_ACTIVE_TYPE, null) == TYPE_LOCAL) saveCurrentLocalState()
+        if (!wasScheduledPlayback && preferences.getString(KEY_ACTIVE_TYPE, null) == TYPE_LOCAL) {
+            saveCurrentLocalState()
+        }
 
         val startIndex = preferences.getInt(channelIndexKey(channelId), 0).coerceIn(0, videoUris.lastIndex)
         val startPosition = preferences.getLong(channelPositionKey(channelId), 0L).coerceAtLeast(0L)
