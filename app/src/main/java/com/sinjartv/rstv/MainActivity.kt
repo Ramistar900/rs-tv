@@ -10,6 +10,7 @@ import android.graphics.BitmapFactory
 import android.content.ComponentName
 import android.content.res.Configuration
 import android.net.Uri
+import android.media.MediaMetadataRetriever
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -123,6 +124,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.google.common.util.concurrent.MoreExecutors
@@ -381,14 +385,40 @@ private fun RSTVHome() {
             .getBoolean(RamiTvOnePlaybackService.KEY_KEEP_BACKGROUND, false))
     }
     var playbackController by remember { mutableStateOf<MediaController?>(null) }
+    var localPlaybackController by remember { mutableStateOf<MediaController?>(null) }
     DisposableEffect(context) {
         val token = SessionToken(context, ComponentName(context, RamiTvOnePlaybackService::class.java))
-        val future = MediaController.Builder(context, token).buildAsync()
-        future.addListener({ playbackController = runCatching { future.get() }.getOrNull() }, MoreExecutors.directExecutor())
+        val iptvFuture = MediaController.Builder(context, token).buildAsync()
+        val localFuture = MediaController.Builder(context, token)
+            .setConnectionHints(RamiPlaybackCommands.localSessionHints())
+            .buildAsync()
+        iptvFuture.addListener({
+            playbackController = runCatching { iptvFuture.get() }.getOrNull()
+            RamiPlaybackCommands.restoreForegroundAudio(playbackController)
+        }, MoreExecutors.directExecutor())
+        localFuture.addListener({
+            localPlaybackController = runCatching { localFuture.get() }.getOrNull()
+        }, MoreExecutors.directExecutor())
         onDispose {
-            MediaController.releaseFuture(future)
+            MediaController.releaseFuture(iptvFuture)
+            MediaController.releaseFuture(localFuture)
             playbackController = null
+            localPlaybackController = null
         }
+    }
+    DisposableEffect(context, playbackController) {
+        val owner = context as? LifecycleOwner
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP ->
+                    RamiPlaybackCommands.muteBackgroundAudio(playbackController)
+                Lifecycle.Event.ON_START ->
+                    RamiPlaybackCommands.restoreForegroundAudio(playbackController)
+                else -> Unit
+            }
+        }
+        owner?.lifecycle?.addObserver(observer)
+        onDispose { owner?.lifecycle?.removeObserver(observer) }
     }
     val exoPlayer = playbackController
     var activePlaybackType by remember(context) {
@@ -739,7 +769,7 @@ private fun RSTVHome() {
             selectedTab = RSTVTab.LIVE
             activePlaybackType = "local"
             status = "جارٍ تشغيل ${local.name}..."
-            if (!RamiPlaybackCommands.playLocal(exoPlayer, channelId, local.videoUris)) {
+            if (!RamiPlaybackCommands.playLocal(localPlaybackController, channelId, local.videoUris)) {
                 status = "مشغل القنوات المحلية غير جاهز بعد. حاول بعد لحظة."
             }
             return
@@ -965,7 +995,7 @@ private fun RSTVHome() {
                     onPlay = ::playChannel,
                     onToggleFavorite = ::toggleFavourite,
                     isFavorite = { it.streamUrl in favoriteUrls },
-                    player = exoPlayer,
+                    player = if (activePlaybackType == "local") localPlaybackController else exoPlayer,
                     status = status,
                     skippedUnsafeLinks = skippedUnsafeLinks,
                     showingSourceLibrary = showingSourceLibrary,
@@ -1086,7 +1116,7 @@ private fun RSTVHome() {
                             onPlay = ::playChannel,
                             onToggleFavorite = ::toggleFavourite,
                             isFavorite = { it.streamUrl in favoriteUrls },
-                            player = exoPlayer,
+                            player = if (activePlaybackType == "local") localPlaybackController else exoPlayer,
                             status = status,
                             skippedUnsafeLinks = skippedUnsafeLinks,
                             showingSourceLibrary = showingSourceLibrary,
@@ -1172,7 +1202,7 @@ private fun RSTVHome() {
                             onPlay = ::playChannel,
                             onToggleFavorite = ::toggleFavourite,
                             isFavorite = { it.streamUrl in favoriteUrls },
-                            player = exoPlayer,
+                            player = if (activePlaybackType == "local") localPlaybackController else exoPlayer,
                             status = status,
                             skippedUnsafeLinks = skippedUnsafeLinks,
                             showingSourceLibrary = showingSourceLibrary,
@@ -1656,7 +1686,9 @@ private fun LocalRamiLiveChannelsContent(
             context,
             ComponentName(context, RamiTvOnePlaybackService::class.java)
         )
-        val future = MediaController.Builder(context, token).buildAsync()
+        val future = MediaController.Builder(context, token)
+            .setConnectionHints(RamiPlaybackCommands.localSessionHints())
+            .buildAsync()
         future.addListener({
             mediaController = runCatching { future.get() }.getOrNull()
             controllerReady = mediaController != null
@@ -1678,7 +1710,7 @@ private fun LocalRamiLiveChannelsContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("قنوات RAMİ TV المحلية", color = SoftWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Text("القنوات المفعّلة التي تحتوي على فيديوهات صالحة فقط. يعمل مشغل واحد بالتناوب بين IPTV والقنوات المحلية.", color = MutedText, fontSize = 10.sp)
+            Text("القنوات المفعّلة التي تحتوي على فيديوهات صالحة فقط. يعمل مشغل RAMİ بشكل مستقل ويواصل الفيديو أثناء مشاهدة IPTV.", color = MutedText, fontSize = 10.sp)
             if (showPlayerSurface && activeLocalChannelId in channels.map { it.id } && controllerReady) {
                 Box(Modifier.fillMaxWidth().height(190.dp).background(Color.Black, RoundedCornerShape(12.dp))) {
                     AndroidView(
@@ -2646,6 +2678,235 @@ private fun SettingsContent(
     }
 }
 
+
+@Composable
+private fun LocalRamiScheduleSection(channel: LocalRamiChannelConfig) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val schedules = remember(channel.id) {
+        mutableStateListOf<RamiProgrammeSchedule>().apply {
+            addAll(RamiProgrammeScheduleStore.load(context, channel.id))
+        }
+    }
+    var showEditor by remember { mutableStateOf(false) }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var selectedVideoUri by remember(channel.id, channel.videoUris) {
+        mutableStateOf(channel.videoUris.firstOrNull().orEmpty())
+    }
+    var startTime by remember { mutableStateOf("18:00") }
+    val selectedDays = remember(channel.id) { mutableStateListOf<Int>() }
+    var editorError by remember { mutableStateOf("") }
+    var saving by remember { mutableStateOf(false) }
+
+    fun persist(entries: List<RamiProgrammeSchedule>) {
+        RamiProgrammeScheduleStore.save(
+            context,
+            RamiProgrammeScheduleStore.loadAll(context)
+                .filterNot { it.channelId == channel.id } + entries
+        )
+        schedules.clear()
+        schedules.addAll(entries.sortedBy { it.startMinute })
+    }
+
+    fun editEntry(entry: RamiProgrammeSchedule) {
+        editingId = entry.id
+        selectedVideoUri = entry.videoUri
+        startTime = "%02d:%02d".format(entry.startMinute / 60, entry.startMinute % 60)
+        selectedDays.clear()
+        selectedDays.addAll(entry.weekdays)
+        editorError = ""
+        showEditor = true
+    }
+
+    Card(colors = CardDefaults.cardColors(containerColor = PanelBlack)) {
+        Column(
+            Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("برامج القناة", color = Silver, fontWeight = FontWeight.Bold)
+                    Text("جدولة أسبوعية؛ نهاية البرنامج تُحدَّد تلقائياً بنهاية الفيديو.", color = MutedText, fontSize = 10.sp)
+                }
+                Button(
+                    enabled = channel.videoUris.isNotEmpty(),
+                    onClick = {
+                        editingId = null
+                        selectedVideoUri = channel.videoUris.firstOrNull().orEmpty()
+                        startTime = "18:00"
+                        selectedDays.clear()
+                        editorError = ""
+                        showEditor = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentRed, contentColor = ScreenBlack)
+                ) { Text("+ إضافة برنامج") }
+            }
+            if (channel.videoUris.isEmpty()) {
+                Text("أضف فيديوهات إلى مكتبة هذه القناة أولاً.", color = MutedText, fontSize = 11.sp)
+            } else if (schedules.isEmpty()) {
+                Text("لا توجد برامج مجدولة لهذه القناة بعد.", color = MutedText, fontSize = 11.sp)
+            } else {
+                schedules.sortedBy { it.startMinute }.forEach { entry ->
+                    val videoName = Uri.parse(entry.videoUri).lastPathSegment ?: "فيديو محلي"
+                    val dayNames = entry.weekdays.sorted().joinToString("، ") {
+                        listOf("الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت")[it - 1]
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().background(PanelRaised, RoundedCornerShape(10.dp)).padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("%02d:%02d  •  %s".format(entry.startMinute / 60, entry.startMinute % 60, videoName),
+                                color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, maxLines = 1)
+                            Text(dayNames + if (entry.enabled) " • مفعّل" else " • متوقف مؤقتاً",
+                                color = MutedText, fontSize = 10.sp)
+                        }
+                        TextButton(onClick = { editEntry(entry) }) { Text("تعديل", color = Silver) }
+                        TextButton(onClick = {
+                            persist(schedules.map { if (it.id == entry.id) it.copy(enabled = !it.enabled) else it })
+                        }) { Text(if (entry.enabled) "إيقاف" else "تفعيل", color = Silver) }
+                        TextButton(onClick = {
+                            persist(schedules.filterNot { it.id == entry.id })
+                        }) { Text("حذف", color = AccentRed) }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showEditor) {
+        AlertDialog(
+            onDismissRequest = { if (!saving) showEditor = false },
+            title = { Text(if (editingId == null) "إضافة برنامج" else "تعديل البرنامج", color = SoftWhite) },
+            text = {
+                Column(
+                    Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("اختر الفيديو", color = Silver, fontWeight = FontWeight.Bold)
+                    channel.videoUris.forEach { uri ->
+                        val chosen = selectedVideoUri == uri
+                        TextButton(
+                            onClick = { selectedVideoUri = uri },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                (if (chosen) "● " else "○ ") + (Uri.parse(uri).lastPathSegment ?: "فيديو محلي"),
+                                color = if (chosen) AccentRed else SoftWhite,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = startTime,
+                        onValueChange = { value ->
+                            startTime = value.filter { it.isDigit() || it == ':' }.take(5)
+                        },
+                        label = { Text("وقت البداية (24 ساعة)") },
+                        placeholder = { Text("18:30") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text("أيام التكرار الأسبوعي", color = Silver, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        listOf(
+                            1 to "أحد", 2 to "اثن", 3 to "ثلا", 4 to "أرب",
+                            5 to "خمي", 6 to "جمع", 7 to "سبت"
+                        ).forEach { (day, label) ->
+                            Button(
+                                onClick = {
+                                    if (day in selectedDays) selectedDays.remove(day) else selectedDays.add(day)
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 1.dp, vertical = 5.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (day in selectedDays) AccentRed else PanelRaised,
+                                    contentColor = if (day in selectedDays) ScreenBlack else SoftWhite
+                                )
+                            ) { Text(label, fontSize = 9.sp) }
+                        }
+                    }
+                    Text("لا يوجد وقت نهاية؛ مدة الفيديو تحدد نهاية البرنامج.", color = MutedText, fontSize = 10.sp)
+                    if (editorError.isNotBlank()) Text(editorError, color = AccentRed, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !saving,
+                    onClick = {
+                        val parts = startTime.split(":")
+                        val hour = parts.getOrNull(0)?.toIntOrNull()
+                        val minute = parts.getOrNull(1)?.toIntOrNull()
+                        if (selectedVideoUri.isBlank() || hour == null || minute == null ||
+                            hour !in 0..23 || minute !in 0..59 || selectedDays.isEmpty()
+                        ) {
+                            editorError = "اختر فيديو ووقتاً صحيحاً ويومًا واحداً على الأقل."
+                            return@TextButton
+                        }
+                        saving = true
+                        editorError = ""
+                        scope.launch {
+                            val durationMs = withContext(Dispatchers.IO) {
+                                val retriever = MediaMetadataRetriever()
+                                try {
+                                    retriever.setDataSource(context, Uri.parse(selectedVideoUri))
+                                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                        ?.toLongOrNull() ?: 0L
+                                } catch (_: Throwable) {
+                                    0L
+                                } finally {
+                                    runCatching { retriever.release() }
+                                }
+                            }
+                            if (durationMs <= 0L) {
+                                editorError = "تعذر قراءة مدة الفيديو. تأكد أن الملف متاح وصالح."
+                                saving = false
+                                return@launch
+                            }
+                            val candidate = runCatching {
+                                RamiProgrammeSchedule(
+                                    id = editingId ?: java.util.UUID.randomUUID().toString(),
+                                    channelId = channel.id,
+                                    videoUri = selectedVideoUri,
+                                    startMinute = hour * 60 + minute,
+                                    weekdays = selectedDays.toSet(),
+                                    durationMs = durationMs,
+                                    enabled = true
+                                )
+                            }.getOrNull()
+                            if (candidate == null) {
+                                editorError = "بيانات الجدولة غير صالحة."
+                                saving = false
+                                return@launch
+                            }
+                            val existing = RamiProgrammeScheduleStore.loadAll(context)
+                            if (RamiProgrammeScheduleStore.hasConflict(candidate, existing, editingId)) {
+                                editorError = "هذا الموعد يتداخل مع برنامج آخر في القناة نفسها حسب مدة الفيديو."
+                                saving = false
+                                return@launch
+                            }
+                            persist(
+                                (schedules.filterNot { it.id == editingId } + candidate)
+                                    .sortedBy { it.startMinute }
+                            )
+                            saving = false
+                            showEditor = false
+                        }
+                    }
+                ) { Text(if (saving) "جارٍ الحفظ…" else "حفظ", color = AccentRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { if (!saving) showEditor = false }) {
+                    Text("إلغاء", color = MutedText)
+                }
+            },
+            containerColor = PanelRaised
+        )
+    }
+}
+
+
 @Composable
 private fun SettingsAction(title: String, description: String, onClick: () -> Unit) {
     Card(
@@ -2904,6 +3165,9 @@ private fun LocalRamiAdminContent(onClose: () -> Unit) {
                 }
             }
             item {
+                LocalRamiScheduleSection(channel = selected)
+            }
+            item {
                 Text(
                     "الحالة: " + when {
                         selected.videoUris.isEmpty() -> "تحتاج إلى فيديوهات"
@@ -3025,7 +3289,9 @@ private fun RamiTvOneContent(modifier: Modifier = Modifier) {
             context,
             ComponentName(context, RamiTvOnePlaybackService::class.java)
         )
-        val controllerFuture = MediaController.Builder(context, token).buildAsync()
+        val controllerFuture = MediaController.Builder(context, token)
+            .setConnectionHints(RamiPlaybackCommands.localSessionHints())
+            .buildAsync()
         controllerFuture.addListener(
             {
                 mediaController = runCatching { controllerFuture.get() }.getOrNull()
