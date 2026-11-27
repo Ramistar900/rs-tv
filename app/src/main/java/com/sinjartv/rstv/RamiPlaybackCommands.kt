@@ -20,9 +20,17 @@ internal object RamiPlaybackCommands {
         "com.sinjartv.rstv.action.RESTORE_FOREGROUND_AUDIO",
         Bundle.EMPTY
     )
+    val MUTE_BACKGROUND_AUDIO = SessionCommand(
+        "com.sinjartv.rstv.action.MUTE_BACKGROUND_AUDIO",
+        Bundle.EMPTY
+    )
 
     fun localSessionHints(): Bundle = Bundle().apply {
         putString(KEY_SESSION_ROLE, ROLE_LOCAL)
+    }
+
+    fun muteBackgroundAudio(controller: MediaController?) {
+        controller?.sendCustomCommand(MUTE_BACKGROUND_AUDIO, Bundle.EMPTY)
     }
 
     fun restoreForegroundAudio(controller: MediaController?) {
