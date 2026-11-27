@@ -211,21 +211,15 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val keepInBackground = getSharedPreferences(SETTINGS_PREFS, MODE_PRIVATE)
-            .getBoolean(KEY_KEEP_BACKGROUND, false)
-        if (keepInBackground) {
-            super.onTaskRemoved(rootIntent)
-            return
-        }
+        // Closing the app task must not end the TV channel. Keep the active playback
+        // session(s) alive in the MediaSessionService, but silence all audio in background.
         saveCurrentLocalState()
-        playbackPreferences().edit().putString(KEY_ACTIVE_TYPE, TYPE_STOPPED).apply()
-        iptvPlayer?.pause()
-        localPlayer?.pause()
-        iptvPlayer?.stop()
-        localPlayer?.stop()
-        iptvPlayer?.clearMediaItems()
-        localPlayer?.clearMediaItems()
-        stopSelf()
+        iptvPlayer?.volume = 0f
+        localPlayer?.volume = 0f
+
+        // MediaSessionService keeps an actively playing media session in its foreground
+        // playback service lifecycle after the task is removed.
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {
