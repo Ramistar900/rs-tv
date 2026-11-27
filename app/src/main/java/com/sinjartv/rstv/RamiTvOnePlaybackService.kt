@@ -105,6 +105,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
 
     private fun playIptv(args: Bundle) {
         saveCurrentLocalState()
+        scheduledPlaybackChannelId = null
         val streamUrl = args.getString(KEY_STREAM_URL)
             ?.takeIf { it.startsWith("https://") }
             ?: throw IllegalArgumentException("Invalid IPTV stream URL")
@@ -131,6 +132,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     }
 
     private fun playLocal(args: Bundle) {
+        scheduledPlaybackChannelId = null
         val channelId = args.getInt(KEY_CHANNEL_ID, -1)
         require(channelId > 0) { "Invalid local RAMİ TV channel" }
         val videoUris = args.getStringArrayList(KEY_VIDEO_URIS).orEmpty()
