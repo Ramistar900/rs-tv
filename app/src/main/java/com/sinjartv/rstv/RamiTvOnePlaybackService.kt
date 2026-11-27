@@ -120,6 +120,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     }
 
     private fun playIptv(args: Bundle) {
+        saveCurrentLocalState()
         val streamUrl = args.getString(KEY_STREAM_URL)
             ?.takeIf { it.startsWith("https://") }
             ?: throw IllegalArgumentException("Invalid IPTV stream URL")
@@ -158,9 +159,27 @@ class RamiTvOnePlaybackService : MediaSessionService() {
 
         val preferences = playbackPreferences()
         saveCurrentLocalState()
+        val playbackPlayer = localPlayer ?: throw IllegalStateException("Local RAMİ player is unavailable")
+
+        // Returning to the same channel only restores its picture and sound. Do not reload
+        // the playlist: the independent player has already advanced while IPTV was on screen.
+        val activeChannelId = preferences.getInt(KEY_ACTIVE_CHANNEL_ID, -1)
+        val currentUris = (0 until playbackPlayer.mediaItemCount).mapNotNull { index ->
+            playbackPlayer.getMediaItemAt(index).localConfiguration?.uri?.toString()
+        }
+        if (activeChannelId == channelId && currentUris == videoUris &&
+            playbackPlayer.mediaItemCount == videoUris.size
+        ) {
+            iptvPlayer?.pause()
+            iptvPlayer?.volume = 0f
+            playbackPlayer.volume = 1f
+            preferences.edit().putString(KEY_ACTIVE_TYPE, TYPE_LOCAL).apply()
+            playbackPlayer.play()
+            return
+        }
+
         val startIndex = preferences.getInt(channelIndexKey(channelId), 0).coerceIn(0, videoUris.lastIndex)
         val startPosition = preferences.getLong(channelPositionKey(channelId), 0L).coerceAtLeast(0L)
-        val playbackPlayer = localPlayer ?: throw IllegalStateException("Local RAMİ player is unavailable")
 
         // IPTV is not the selected channel now. Keep its session independent but pause it.
         iptvPlayer?.pause()
