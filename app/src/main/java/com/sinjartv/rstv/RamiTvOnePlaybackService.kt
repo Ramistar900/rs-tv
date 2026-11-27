@@ -5,6 +5,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -31,6 +34,15 @@ class RamiTvOnePlaybackService : MediaSessionService() {
     private var localPlayer: ExoPlayer? = null
     private var iptvSession: MediaSession? = null
     private var localSession: MediaSession? = null
+    private var scheduledPlaybackChannelId: Int? = null
+    private var scheduledResumeIndex: Int = 0
+    private val scheduleHandler = Handler(Looper.getMainLooper())
+    private val scheduleTicker = object : Runnable {
+        override fun run() {
+            runScheduleCheck()
+            scheduleHandler.postDelayed(this, SCHEDULE_CHECK_INTERVAL_MS)
+        }
+    }
     private val positionHandler = Handler(Looper.getMainLooper())
     private val positionSaver = object : Runnable {
         override fun run() {
@@ -49,6 +61,13 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         }
         iptvPlayer = iptv
         localPlayer = local
+        local.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED && scheduledPlaybackChannelId != null) {
+                    resumeNormalLocalPlaylist()
+                }
+            }
+        })
 
         iptvSession = createSession(
             player = iptv,
@@ -65,6 +84,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         addSession(iptvSession!!)
         addSession(localSession!!)
         positionHandler.postDelayed(positionSaver, POSITION_SAVE_INTERVAL_MS)
+        scheduleHandler.postDelayed(scheduleTicker, SCHEDULE_CHECK_INTERVAL_MS)
     }
 
     private fun createSession(
@@ -84,6 +104,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
                         .buildUpon()
                         .add(allowedCommand)
                         .add(RamiPlaybackCommands.RESTORE_FOREGROUND_AUDIO)
+                        .add(RamiPlaybackCommands.MUTE_BACKGROUND_AUDIO)
                         .build()
                     return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(commands)
@@ -157,18 +178,30 @@ class RamiTvOnePlaybackService : MediaSessionService() {
 
     private fun playLocal(args: Bundle) {
         val channelId = args.getInt(KEY_CHANNEL_ID, -1)
-        require(channelId in 1..10) { "Invalid local RAMİ TV channel" }
+        require(channelId > 0) { "Invalid local RAMİ TV channel" }
         val videoUris = args.getStringArrayList(KEY_VIDEO_URIS).orEmpty()
             .filter { it.startsWith("content://") || it.startsWith("file://") }
         require(videoUris.isNotEmpty()) { "The local channel has no valid videos" }
 
         val preferences = playbackPreferences()
-        saveCurrentLocalState()
         val playbackPlayer = localPlayer ?: throw IllegalStateException("Local RAMİ player is unavailable")
-
-        // Returning to the same channel only restores its picture and sound. Do not reload
-        // the playlist: the independent player has already advanced while IPTV was on screen.
         val activeChannelId = preferences.getInt(KEY_ACTIVE_CHANNEL_ID, -1)
+
+        // A scheduled programme belongs to the local timeline. Returning from IPTV restores
+        // its audio without replacing the scheduled item or resetting its elapsed position.
+        if (scheduledPlaybackChannelId == channelId && activeChannelId == channelId) {
+            iptvPlayer?.pause()
+            iptvPlayer?.volume = 0f
+            playbackPlayer.volume = 1f
+            preferences.edit().putString(KEY_ACTIVE_TYPE, TYPE_LOCAL).apply()
+            playbackPlayer.play()
+            return
+        }
+        if (scheduledPlaybackChannelId != null && scheduledPlaybackChannelId != channelId) {
+            scheduledPlaybackChannelId = null
+        }
+
+        saveCurrentLocalState()
         val currentUris = (0 until playbackPlayer.mediaItemCount).mapNotNull { index ->
             playbackPlayer.getMediaItemAt(index).localConfiguration?.uri?.toString()
         }
@@ -185,8 +218,6 @@ class RamiTvOnePlaybackService : MediaSessionService() {
 
         val startIndex = preferences.getInt(channelIndexKey(channelId), 0).coerceIn(0, videoUris.lastIndex)
         val startPosition = preferences.getLong(channelPositionKey(channelId), 0L).coerceAtLeast(0L)
-
-        // IPTV is not the selected channel now. Keep its session independent but pause it.
         iptvPlayer?.pause()
         iptvPlayer?.volume = 0f
         playbackPlayer.volume = 1f
@@ -224,7 +255,8 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         val preferences = playbackPreferences()
         val channelId = preferences.getInt(KEY_ACTIVE_CHANNEL_ID, -1)
         val playbackPlayer = localPlayer ?: return
-        if (channelId !in 1..10 || playbackPlayer.mediaItemCount == 0) return
+        // Never persist the scheduled programme's single item as the normal channel playlist.
+        if (channelId <= 0 || playbackPlayer.mediaItemCount == 0 || scheduledPlaybackChannelId != null) return
         preferences.edit()
             .putInt(channelIndexKey(channelId), playbackPlayer.currentMediaItemIndex.coerceAtLeast(0))
             .putLong(channelPositionKey(channelId), playbackPlayer.currentPosition.coerceAtLeast(0L))
@@ -263,6 +295,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         positionHandler.removeCallbacks(positionSaver)
+        scheduleHandler.removeCallbacks(scheduleTicker)
         saveCurrentLocalState()
         iptvSession?.release()
         localSession?.release()
@@ -273,6 +306,85 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         iptvPlayer = null
         localPlayer = null
         super.onDestroy()
+    }
+
+    private fun runScheduleCheck() {
+        val preferences = playbackPreferences()
+        val channelId = preferences.getInt(KEY_ACTIVE_CHANNEL_ID, -1)
+        val playbackPlayer = localPlayer ?: return
+        // RAMİ's schedule runs on its own muted timeline while IPTV is displayed.
+        if (channelId <= 0 || !playbackPlayer.isPlaying || playbackPlayer.mediaItemCount == 0) return
+        if (scheduledPlaybackChannelId != null) return
+
+        val now = Calendar.getInstance()
+        val due = RamiProgrammeScheduleStore.load(this, channelId)
+            .asSequence()
+            .filter { it.enabled }
+            .mapNotNull { entry -> mostRecentStart(now, entry)?.let { entry to it } }
+            .firstOrNull { (entry, start) ->
+                now.timeInMillis - start.timeInMillis in 0 until entry.durationMs
+            } ?: return
+        val entry = due.first
+        val start = due.second
+        val marker = "schedule_started_" + entry.id
+        val dateKey = SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(start.time)
+        val schedulePrefs = getSharedPreferences(SCHEDULE_STATE_PREFS, MODE_PRIVATE)
+        if (schedulePrefs.getString(marker, null) == dateKey) return
+
+        scheduledResumeIndex = (playbackPlayer.currentMediaItemIndex + 1).coerceAtLeast(0)
+        saveCurrentLocalState()
+        scheduledPlaybackChannelId = channelId
+        schedulePrefs.edit().putString(marker, dateKey).apply()
+        playbackPlayer.repeatMode = Player.REPEAT_MODE_OFF
+        playbackPlayer.setMediaItem(
+            MediaItem.fromUri(Uri.parse(entry.videoUri)),
+            (now.timeInMillis - start.timeInMillis).coerceAtLeast(0L)
+        )
+        playbackPlayer.prepare()
+        playbackPlayer.play()
+    }
+
+    private fun mostRecentStart(now: Calendar, entry: RamiProgrammeSchedule): Calendar? {
+        for (daysBack in 0..7) {
+            val candidate = (now.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, -daysBack)
+                set(Calendar.HOUR_OF_DAY, entry.startMinute / 60)
+                set(Calendar.MINUTE, entry.startMinute % 60)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (candidate.get(Calendar.DAY_OF_WEEK) in entry.weekdays &&
+                candidate.timeInMillis <= now.timeInMillis
+            ) return candidate
+        }
+        return null
+    }
+
+    private fun resumeNormalLocalPlaylist() {
+        val channelId = scheduledPlaybackChannelId ?: return
+        val channel = LocalRamiChannelStore.load(this, channelId)
+        val playbackPlayer = localPlayer ?: return
+        val preferences = playbackPreferences()
+        scheduledPlaybackChannelId = null
+        if (channel.videoUris.isEmpty()) {
+            preferences.edit().putString(KEY_ACTIVE_TYPE, TYPE_STOPPED).apply()
+            return
+        }
+
+        val nextIndex = if (scheduledResumeIndex >= channel.videoUris.size) 0 else scheduledResumeIndex
+        playbackPlayer.repeatMode = Player.REPEAT_MODE_ALL
+        playbackPlayer.setMediaItems(
+            channel.videoUris.map { MediaItem.fromUri(Uri.parse(it)) },
+            nextIndex,
+            0L
+        )
+        // Keep IPTV's selected audio untouched; RAMİ stays muted until selected again.
+        playbackPlayer.volume = if (
+            preferences.getString(KEY_ACTIVE_TYPE, null) == TYPE_LOCAL
+        ) 1f else 0f
+        preferences.edit().putInt(KEY_ACTIVE_CHANNEL_ID, channelId).apply()
+        playbackPlayer.prepare()
+        playbackPlayer.play()
     }
 
     private fun playbackPreferences() = getSharedPreferences(PLAYBACK_PREFS, MODE_PRIVATE)
@@ -298,5 +410,7 @@ class RamiTvOnePlaybackService : MediaSessionService() {
         private const val IPTV_SESSION_ID = "rs-tv-iptv"
         private const val LOCAL_SESSION_ID = "rs-tv-local-rami"
         private const val POSITION_SAVE_INTERVAL_MS = 5_000L
+        private const val SCHEDULE_CHECK_INTERVAL_MS = 1_000L
+        private const val SCHEDULE_STATE_PREFS = "rami_programme_schedule_state"
     }
 }
