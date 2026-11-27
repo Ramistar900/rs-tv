@@ -197,11 +197,14 @@ class RamiTvOnePlaybackService : MediaSessionService() {
             playbackPlayer.play()
             return
         }
+        val interruptingScheduledProgramme = scheduledPlaybackChannelId != null
         if (scheduledPlaybackChannelId != null && scheduledPlaybackChannelId != channelId) {
             scheduledPlaybackChannelId = null
         }
 
-        saveCurrentLocalState()
+        // The normal playlist position was saved before the scheduled item replaced it.
+        // Do not overwrite it with the scheduled video's index when switching channels.
+        if (!interruptingScheduledProgramme) saveCurrentLocalState()
         val currentUris = (0 until playbackPlayer.mediaItemCount).mapNotNull { index ->
             playbackPlayer.getMediaItemAt(index).localConfiguration?.uri?.toString()
         }
