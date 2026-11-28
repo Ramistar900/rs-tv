@@ -1,5 +1,5 @@
 const TV_JSON_URL =
-  "https://gist.githubusercontent.com/Ramistar900/061b27eb6e7edb76a637021ae66e600e/raw/cf51987eaab24482441d5cf3e7a1e5305c80c7ef/tv.json";
+  "https://gist.githubusercontent.com/Ramistar900/061b27eb6e7edb76a637021ae66e600e/raw/tv.json";
 const ARCHIVE_MP4_URL =
   "https://ia600904.us.archive.org/5/items/abdulrhma-mosad/%D8%AA%D9%84%D8%A7%D9%88%D8%A9%20%D8%A8%D8%B5%D9%88%D8%AA%20%23%D8%B9%D8%A8%D8%AF%D8%A7%D9%84%D8%B1%D8%AD%D9%85%D9%86_%D9%85%D8%B3%D8%B9%D8%AF%20%20%D8%AA%D9%84%D8%A7%D9%88%D8%A7%D8%AA%20%D9%87%D8%A7%D8%AF%D8%A6%D8%A9%20%D9%84%D9%86%D9%88%D9%85%20%D8%B9%D9%85%D9%8A%D9%82%20%D9%88%D8%B1%D8%A7%D8%AD%D8%A9%20%D9%86%D9%81%D8%B3%D9%8A%D8%A9%20_%20%23abdulrhma_mosad.mp4";
 const MAX_SIMULATION_BYTES = 32 * 1024;
