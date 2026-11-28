@@ -1,0 +1,29 @@
+name: RAMI Sync Worker Prototype Tests
+
+on:
+  push:
+    branches:
+      - experiment/rami-sync-worker-prototype-2026-11-28
+    paths:
+      - "workers/rami-sync/**"
+      - ".github/workflows/rami-sync-worker-test.yml"
+  pull_request:
+    paths:
+      - "workers/rami-sync/**"
+      - ".github/workflows/rami-sync-worker-test.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  worker-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run timeline tests
+        run: node --test workers/rami-sync/test/index.test.mjs
