@@ -130,7 +130,7 @@ async function probeArchiveRange() {
       acceptRanges: ranged.headers.get("accept-ranges"),
       contentRange,
       finalUrl: ranged.url,
-      supported: ranged.status === 206 && /^bytes 0-1023\\//i.test(contentRange || "")
+      supported: ranged.status === 206 && /^bytes 0-1023\//i.test(contentRange || "")
     };
     await ranged.body?.cancel();
   } catch (error) {
@@ -180,7 +180,7 @@ export default {
       }
     }
 
-    const match = url.pathname.match(/^\\/api\\/channel\\/(\\d+)\\/?$/);
+    const match = url.pathname.match(/^\/api\/channel\/(\d+)\/?$/);
     if (request.method === "GET" && match) {
       const channelNumber = validateChannelNumber(match[1]);
       if (!channelNumber) return json({ error: "invalid_channel_number" }, 400);
