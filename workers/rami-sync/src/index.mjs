@@ -22,7 +22,7 @@ function json(data, status = 200, extraHeaders = {}) {
 }
 
 function validateChannelNumber(value) {
-  if (!/^\\d+$/.test(value || "")) return null;
+  if (!/^\d+$/.test(value || "")) return null;
   const number = Number(value);
   return Number.isSafeInteger(number) && number >= 1 && number <= MAX_CHANNEL_NUMBER
     ? String(number)
