@@ -61,6 +61,7 @@ function validatePlaylist(playlist) {
 export function calculatePlaylistPosition(playlist, startAtUtc, nowMs = Date.now()) {
   const startMs = Date.parse(startAtUtc);
   if (!Number.isFinite(startMs)) throw new TypeError("startAtUtc must be a valid UTC timestamp");
+  if (!Number.isFinite(nowMs)) throw new TypeError("nowMs must be a finite timestamp");
   const entries = validatePlaylist(playlist);
   const totalSeconds = entries.reduce((sum, item) => sum + item.durationSeconds, 0);
   const elapsedSeconds = (nowMs - startMs) / 1000;
